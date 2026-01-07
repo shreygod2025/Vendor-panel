@@ -658,7 +658,7 @@ class VendorManagementAPITester:
             "Unauthorized Access",
             "GET",
             "vendors",
-            401
+            403  # FastAPI returns 403 for "Not authenticated"
         )
         return success
 
