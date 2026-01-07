@@ -33,26 +33,31 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     { 
       section: "Overview",
       items: [
-        { path: "/oll", icon: LayoutDashboard, label: "Dashboard" },
-        { path: "/oll/deliveries", icon: CalendarClock, label: "Deliveries" }
+        { path: "/oll", icon: LayoutDashboard, label: "Dashboard" }
       ]
     },
     {
       section: "Orders",
       items: [
         { path: "/oll/purchase-orders", icon: FileText, label: "Purchase Orders" },
+        { path: "/oll/deliveries", icon: CalendarClock, label: "Deliveries" },
         { path: "/oll/issues", icon: AlertTriangle, label: "Issues" },
-        { path: "/oll/returns", icon: RotateCcw, label: "Returns & Credit Notes" }
+        { path: "/oll/returns", icon: RotateCcw, label: "Returns" }
+      ]
+    },
+    {
+      section: "Management",
+      items: [
+        { path: "/oll/vendors", icon: Building2, label: "Vendors" },
+        { path: "/oll/products", icon: Package, label: "Products" },
+        { path: "/oll/users", icon: UserCog, label: "Users" }
       ]
     },
     {
       section: "Finance",
       items: [
         { path: "/oll/invoices", icon: Receipt, label: "Invoices" },
-        { path: "/oll/payments", icon: CreditCard, label: "Payments" },
-        { path: "/oll/vendors", icon: Building2, label: "Vendors" },
-        { path: "/oll/products", icon: Package, label: "Products" },
-        { path: "/oll/users", icon: UserCog, label: "Users" }
+        { path: "/oll/payments", icon: CreditCard, label: "Payments" }
       ]
     },
     {
@@ -67,16 +72,16 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     {
       section: "Overview",
       items: [
-        { path: "/vendor", icon: LayoutDashboard, label: "Dashboard" },
-        { path: "/vendor/deliveries", icon: CalendarClock, label: "Deliveries" }
+        { path: "/vendor", icon: LayoutDashboard, label: "Dashboard" }
       ]
     },
     {
       section: "Orders",
       items: [
         { path: "/vendor/purchase-orders", icon: FileText, label: "Purchase Orders" },
+        { path: "/vendor/deliveries", icon: CalendarClock, label: "Deliveries" },
         { path: "/vendor/issues", icon: AlertTriangle, label: "Issues" },
-        { path: "/vendor/returns", icon: RotateCcw, label: "Returns & Credit Notes" }
+        { path: "/vendor/returns", icon: RotateCcw, label: "Returns" }
       ]
     },
     {
