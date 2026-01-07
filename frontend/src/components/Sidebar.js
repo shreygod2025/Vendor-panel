@@ -2,20 +2,20 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 import {
   LayoutDashboard,
-  Users,
   Package,
   FileText,
   Truck,
   Receipt,
   CreditCard,
   RotateCcw,
-  FileCheck,
   History,
   LogOut,
   X,
   ChevronRight,
   Building2,
-  UserCog
+  UserCog,
+  AlertTriangle,
+  CalendarClock
 } from "lucide-react";
 
 const OLL_LOGO = "https://customer-assets.emergentagent.com/job_vendormate-20/artifacts/ze7saivu_OLL-horizontal-logo-1.png";
@@ -33,30 +33,26 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     { 
       section: "Overview",
       items: [
-        { path: "/oll", icon: LayoutDashboard, label: "Dashboard" }
-      ]
-    },
-    {
-      section: "Management",
-      items: [
-        { path: "/oll/vendors", icon: Building2, label: "Vendors" },
-        { path: "/oll/products", icon: Package, label: "Products" },
-        { path: "/oll/users", icon: UserCog, label: "Users" }
+        { path: "/oll", icon: LayoutDashboard, label: "Dashboard" },
+        { path: "/oll/deliveries", icon: CalendarClock, label: "Deliveries" }
       ]
     },
     {
       section: "Orders",
       items: [
         { path: "/oll/purchase-orders", icon: FileText, label: "Purchase Orders" },
-        { path: "/oll/returns", icon: RotateCcw, label: "Returns" },
-        { path: "/oll/credit-notes", icon: FileCheck, label: "Credit Notes" }
+        { path: "/oll/issues", icon: AlertTriangle, label: "Issues" },
+        { path: "/oll/returns", icon: RotateCcw, label: "Returns & Credit Notes" }
       ]
     },
     {
       section: "Finance",
       items: [
         { path: "/oll/invoices", icon: Receipt, label: "Invoices" },
-        { path: "/oll/payments", icon: CreditCard, label: "Payments" }
+        { path: "/oll/payments", icon: CreditCard, label: "Payments" },
+        { path: "/oll/vendors", icon: Building2, label: "Vendors" },
+        { path: "/oll/products", icon: Package, label: "Products" },
+        { path: "/oll/users", icon: UserCog, label: "Users" }
       ]
     },
     {
@@ -71,15 +67,16 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     {
       section: "Overview",
       items: [
-        { path: "/vendor", icon: LayoutDashboard, label: "Dashboard" }
+        { path: "/vendor", icon: LayoutDashboard, label: "Dashboard" },
+        { path: "/vendor/deliveries", icon: CalendarClock, label: "Deliveries" }
       ]
     },
     {
       section: "Orders",
       items: [
         { path: "/vendor/purchase-orders", icon: FileText, label: "Purchase Orders" },
-        { path: "/vendor/returns", icon: RotateCcw, label: "Returns" },
-        { path: "/vendor/credit-notes", icon: FileCheck, label: "Credit Notes" }
+        { path: "/vendor/issues", icon: AlertTriangle, label: "Issues" },
+        { path: "/vendor/returns", icon: RotateCcw, label: "Returns & Credit Notes" }
       ]
     },
     {
@@ -95,7 +92,6 @@ const Sidebar = ({ role, isOpen, onClose }) => {
 
   return (
     <>
-      {/* Mobile overlay */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-30 lg:hidden"
@@ -104,7 +100,6 @@ const Sidebar = ({ role, isOpen, onClose }) => {
       )}
       
       <aside className={`sidebar ${isOpen ? 'open' : ''}`} data-testid="sidebar">
-        {/* Header */}
         <div className="sidebar-header">
           <div className="flex items-center justify-between">
             <img src={OLL_LOGO} alt="OLL" className="sidebar-logo" />
@@ -123,7 +118,6 @@ const Sidebar = ({ role, isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="sidebar-nav">
           {navItems.map((section, idx) => (
             <div key={idx} className="sidebar-section">
@@ -148,7 +142,6 @@ const Sidebar = ({ role, isOpen, onClose }) => {
           ))}
         </nav>
 
-        {/* Footer */}
         <div className="sidebar-footer">
           <div className="flex items-center gap-3 px-2 py-2 mb-2">
             <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
