@@ -365,4 +365,4 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Implemented Phase 2 enhancements: Added routes for Deliveries and Issues pages (both OLL and Vendor). Verified UI shows: 1) Deliveries page with summary cards and table, 2) Issues page with CRUD operations, 3) Returns & Credit Notes merged page, 4) PO list with visual stage progress indicators. Please test the core flows including login, navigation to new pages, and API functionality."
+    message: "Implemented Phase 2 enhancements including: 1) PO form redesigned - products table first, vendor auto-selected, editable quantity/discount/comment per line, final comments section. 2) PO list redesigned with tabs (PO Confirmation/Dispatched/Delivered) and sub-sections (Raised, Confirmed, Changes). 3) Sidebar reorganized with Management section separated from Finance. 4) Returns renamed from 'Returns & Credit Notes'. 5) Added comprehensive sample data. Please test PO creation flow, navigation, and data display."
