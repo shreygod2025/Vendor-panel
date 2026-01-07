@@ -335,6 +335,16 @@ function AppRoutes() {
           <DashboardLayout><PaymentsList /></DashboardLayout>
         </ProtectedRoute>
       } />
+      <Route path="/vendor/deliveries" element={
+        <ProtectedRoute allowedRoles={["vendor"]}>
+          <DashboardLayout><DeliveriesPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/vendor/issues" element={
+        <ProtectedRoute allowedRoles={["vendor"]}>
+          <DashboardLayout><IssuesPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
       
       {/* Default redirect */}
       <Route path="/" element={
