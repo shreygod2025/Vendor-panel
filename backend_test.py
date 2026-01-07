@@ -14,6 +14,10 @@ class VendorManagementAPITester:
         self.vendor_id = None
         self.product_id = None
         self.po_id = None
+        self.issue_id = None
+        self.return_id = None
+        self.invoice_id = None
+        self.payment_id = None
 
     def run_test(self, name, method, endpoint, expected_status, data=None, token=None):
         """Run a single API test"""
