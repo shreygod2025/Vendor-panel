@@ -185,6 +185,7 @@ class VendorManagementAPITester:
             "delivery_address": "123 Delivery Street, Mumbai",
             "contact_person": "Test Contact",
             "contact_number": "+91 9876543210",
+            "delivery_date": "2024-02-15",
             "line_items": [
                 {
                     "product_id": self.product_id,
