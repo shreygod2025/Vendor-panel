@@ -271,17 +271,20 @@ backend:
         comment: "✅ TESTED: GET /api/dashboard/stats returns different stats for OLL and Vendor roles. Both endpoints working correctly with proper role-based data filtering."
 
 frontend:
-  - task: "Login Page"
+  - task: "Create PO Form UI Enhancements"
     implemented: true
     working: true
-    file: "/app/frontend/src/pages/Login.js"
+    file: "/app/frontend/src/pages/oll/PurchaseOrderForm.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
       - working: true
         agent: "main"
-        comment: "Login working for both OLL and Vendor"
+        comment: "PO form redesigned with products table first, vendor auto-selection, editable line items with comments, final comments section"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Create PO page redesigned perfectly. Products table appears FIRST before vendor selection as requested. Add Product button working correctly. Table columns (Product dropdown, Qty, Unit Price, Disc %, Tax, Line Total, Comment, Delete) all present and functional. Vendor shows 'Auto-selected from products' placeholder text. Final Comments textarea exists with proper 'Final Comments' label. All UI requirements satisfied."
 
   - task: "OLL Dashboard"
     implemented: true
