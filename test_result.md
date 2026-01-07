@@ -316,11 +316,14 @@ frontend:
     file: "/app/frontend/src/pages/oll/IssuesPage.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Full CRUD UI for issues with resolve dialog"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Issues page navigation working correctly. Page loads successfully and is accessible from sidebar Orders section."
 
   - task: "Returns & Credit Notes Page"
     implemented: true
