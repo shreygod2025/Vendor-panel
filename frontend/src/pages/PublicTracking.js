@@ -15,7 +15,9 @@ import {
   Check,
   Clock,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  MapPin,
+  Calendar
 } from "lucide-react";
 import axios from "axios";
 
@@ -44,13 +46,6 @@ const PublicTracking = () => {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount);
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-IN', {
@@ -74,6 +69,18 @@ const PublicTracking = () => {
       default:
         return <Clock className="w-4 h-4" />;
     }
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      draft: "bg-slate-100 text-slate-600",
+      sent: "bg-blue-100 text-blue-700",
+      confirmed: "bg-indigo-100 text-indigo-700",
+      dispatched: "bg-amber-100 text-amber-700",
+      delivered: "bg-emerald-100 text-emerald-700",
+      closed: "bg-slate-200 text-slate-600"
+    };
+    return colors[status] || "bg-slate-100 text-slate-600";
   };
 
   if (loading) {
@@ -117,34 +124,35 @@ const PublicTracking = () => {
                 <CardTitle className="text-xl">{data.po_number}</CardTitle>
                 <p className="text-sm text-slate-500 mt-1">Order from {data.vendor_name}</p>
               </div>
-              <div className={`badge px-4 py-2 text-sm font-medium rounded-full ${
-                data.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
-                data.status === 'dispatched' ? 'bg-amber-100 text-amber-700' :
-                data.status === 'closed' ? 'bg-slate-100 text-slate-600' :
-                'bg-blue-100 text-blue-700'
-              }`}>
+              <div className={`badge px-4 py-2 text-sm font-medium rounded-full ${getStatusColor(data.status)}`}>
                 {data.status.charAt(0).toUpperCase() + data.status.slice(1)}
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-slate-500">Delivery Address</p>
-                <p className="font-medium">{data.delivery_address}</p>
+              <div className="flex items-start gap-3">
+                <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-slate-500">Delivery Address</p>
+                  <p className="font-medium">{data.delivery_address}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-slate-500">Contact Person</p>
-                <p className="font-medium">{data.contact_person}</p>
+              <div className="flex items-start gap-3">
+                <Calendar className="w-5 h-5 text-slate-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-slate-500">Expected Delivery</p>
+                  <p className="font-medium">{data.delivery_date || 'To be confirmed'}</p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Timeline */}
+        {/* Status Timeline */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Order Timeline</CardTitle>
+            <CardTitle>Order Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="relative">
@@ -189,38 +197,33 @@ const PublicTracking = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-slate-500">Courier Partner</p>
-                  <p className="font-medium">{data.dispatch.courier_partner}</p>
+                  <p className="font-medium">{data.dispatch.courier_partner || '-'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Tracking ID</p>
-                  <p className="font-mono font-medium">{data.dispatch.tracking_id}</p>
+                  <p className="font-mono font-medium">{data.dispatch.tracking_id || '-'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Dispatch Date</p>
-                  <p className="font-medium">{data.dispatch.dispatch_date}</p>
+                  <p className="font-medium">{data.dispatch.dispatch_date || '-'}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Order Items */}
+        {/* Order Items - Without Prices */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Order Items</CardTitle>
-              <span className="text-lg font-bold text-[#1e3a8a]">
-                {formatCurrency(data.grand_total)}
-              </span>
-            </div>
+            <CardTitle>Order Items</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
+                  <TableHead>SKU</TableHead>
                   <TableHead className="text-center">Quantity</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -228,12 +231,11 @@ const PublicTracking = () => {
                   <TableRow key={index}>
                     <TableCell>
                       <p className="font-medium">{item.product_name}</p>
-                      <p className="text-xs text-slate-500">{item.sku}</p>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-sm">{item.sku}</span>
                     </TableCell>
                     <TableCell className="text-center">{item.quantity}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(item.unit_price * item.quantity)}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
