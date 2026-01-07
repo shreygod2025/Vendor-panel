@@ -271,6 +271,21 @@ backend:
         comment: "✅ TESTED: GET /api/dashboard/stats returns different stats for OLL and Vendor roles. Both endpoints working correctly with proper role-based data filtering."
 
 frontend:
+  - task: "Login Page"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/Login.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Login working for both OLL and Vendor"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Login functionality working perfectly for OLL admin (olladmin/olladmin) credentials. Authentication successful and redirects to dashboard correctly."
+
   - task: "Create PO Form UI Enhancements"
     implemented: true
     working: true
