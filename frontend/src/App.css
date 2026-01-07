@@ -1,34 +1,379 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
-}
+/* Main App Styles - OLL Vendor Management System */
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
-}
-
-.App-header {
-    background-color: #0f0f10;
+/* Layout */
+.app-layout {
+    display: flex;
     min-height: 100vh;
+}
+
+.main-content {
+    flex: 1;
+    background-color: #f8fafc;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 256px;
+    background-color: #ffffff;
+    border-right: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
+    position: fixed;
+    height: 100vh;
+    z-index: 40;
+}
+
+.sidebar-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.sidebar-logo {
+    height: 40px;
+    width: auto;
+}
+
+.sidebar-nav {
+    flex: 1;
+    padding: 1rem 0.75rem;
+    overflow-y: auto;
+}
+
+.sidebar-section {
+    margin-bottom: 1.5rem;
+}
+
+.sidebar-section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    padding: 0 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-footer {
+    padding: 1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+/* Content area with sidebar offset */
+.content-with-sidebar {
+    margin-left: 256px;
+}
+
+/* Header */
+.page-header {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1.25rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-family: 'Manrope', sans-serif;
+}
+
+.page-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+/* Stats cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+}
+
+.stat-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.stat-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    display: flex;
     align-items: center;
     justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+    margin-bottom: 0.75rem;
 }
 
-.App-link {
-    color: #61dafb;
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-family: 'Manrope', sans-serif;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
+.stat-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+/* Currency */
+.currency {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.currency::before {
+    content: '₹';
+}
+
+/* Timeline */
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #e2e8f0;
+}
+
+.timeline-item {
+    position: relative;
+    padding-bottom: 1.5rem;
+}
+
+.timeline-item:last-child {
+    padding-bottom: 0;
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -1.625rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background-color: #e2e8f0;
+    border: 2px solid #ffffff;
+}
+
+.timeline-dot.completed {
+    background-color: #10b981;
+}
+
+.timeline-dot.current {
+    background-color: #3b82f6;
+}
+
+.timeline-content {
+    padding-left: 0.5rem;
+}
+
+.timeline-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #0f172a;
+}
+
+.timeline-date {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+/* Action buttons */
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.action-btn-primary {
+    background-color: #1e3a8a;
+    color: #ffffff;
+}
+
+.action-btn-primary:hover {
+    background-color: #1e40af;
+}
+
+.action-btn-secondary {
+    background-color: #ffffff;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+.action-btn-secondary:hover {
+    background-color: #f8fafc;
+}
+
+.action-btn-success {
+    background-color: #10b981;
+    color: #ffffff;
+}
+
+.action-btn-success:hover {
+    background-color: #059669;
+}
+
+.action-btn-danger {
+    background-color: #ef4444;
+    color: #ffffff;
+}
+
+.action-btn-danger:hover {
+    background-color: #dc2626;
+}
+
+/* Badge */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+    background-color: #ffffff;
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    animation: slideInFromBottom 0.3s ease;
+}
+
+.modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #0f172a;
+    font-family: 'Manrope', sans-serif;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    max-height: calc(90vh - 140px);
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+/* Login page */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f8fafc;
+    padding: 1rem;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background-color: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    padding: 2.5rem;
+}
+
+.login-logo {
+    height: 48px;
+    margin-bottom: 2rem;
+}
+
+.login-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+    font-family: 'Manrope', sans-serif;
+}
+
+.login-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin-bottom: 2rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
     }
-    to {
-        transform: rotate(360deg);
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .content-with-sidebar {
+        margin-left: 0;
+    }
+}
+
+/* Print styles */
+@media print {
+    .sidebar,
+    .no-print {
+        display: none !important;
+    }
+    
+    .content-with-sidebar {
+        margin-left: 0 !important;
+    }
+    
+    .page-container {
+        padding: 0 !important;
     }
 }
