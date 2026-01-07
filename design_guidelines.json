@@ -1,0 +1,146 @@
+{
+  "identity": {
+    "name": "OLL Vendor Management System",
+    "persona": "E1 - The Anti-AI Designer",
+    "tone": "Professional, Efficient, Trustworthy, Clean, Minimal",
+    "theme_preference": "light",
+    "logo_url": "https://customer-assets.emergentagent.com/job_vendormate-20/artifacts/ze7saivu_OLL-horizontal-logo-1.png"
+  },
+  "typography": {
+    "primary_font": "Manrope",
+    "secondary_font": "IBM Plex Sans",
+    "mono_font": "JetBrains Mono",
+    "usage": {
+      "headings": "font-sans font-semibold tracking-tight text-slate-900",
+      "body": "font-secondary text-slate-600 leading-relaxed",
+      "data_tables": "font-secondary text-sm",
+      "code": "font-mono text-xs"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-bold",
+      "h2": "text-3xl font-semibold",
+      "h3": "text-2xl font-medium",
+      "body": "text-base",
+      "small": "text-sm",
+      "tiny": "text-xs uppercase tracking-wider"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "DEFAULT": "#1e3a8a",
+        "foreground": "#ffffff",
+        "description": "Deep Corporate Blue - Trust & Authority"
+      },
+      "secondary": {
+        "DEFAULT": "#f1f5f9",
+        "foreground": "#0f172a",
+        "description": "Slate 100 - Backgrounds & Muted Elements"
+      },
+      "accent": {
+        "DEFAULT": "#3b82f6",
+        "foreground": "#ffffff",
+        "description": "Bright Blue - Active States & Highlights"
+      },
+      "background": "#ffffff",
+      "foreground": "#0f172a",
+      "muted": "#64748b",
+      "border": "#e2e8f0",
+      "success": "#10b981",
+      "warning": "#f59e0b",
+      "error": "#ef4444"
+    },
+    "gradients": {
+      "subtle_fade": "bg-gradient-to-b from-slate-50 to-white",
+      "active_glow": "from-blue-500/10 to-transparent"
+    },
+    "forbidden_colors": [
+      "#1B93A4",
+      "#7351B7"
+    ]
+  },
+  "layout": {
+    "grid_system": "The Control Room Grid",
+    "container_padding": "p-6 md:p-8 lg:p-10",
+    "gap_strategy": "gap-6",
+    "radius": "rounded-md",
+    "sidebar_width": "w-64",
+    "max_width": "max-w-7xl mx-auto",
+    "z_index": {
+      "header": "z-40",
+      "modal": "z-50",
+      "toast": "z-60",
+      "dropdown": "z-30"
+    }
+  },
+  "components": {
+    "buttons": {
+      "style": "sharp or slightly rounded (rounded-md)",
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+      "secondary": "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50",
+      "ghost": "hover:bg-slate-100 text-slate-600"
+    },
+    "cards": {
+      "style": "bg-white border border-slate-200 shadow-sm rounded-lg p-6",
+      "hover": "hover:shadow-md transition-shadow duration-200"
+    },
+    "inputs": {
+      "style": "bg-white border-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary rounded-md h-10"
+    },
+    "tables": {
+      "style": "w-full text-sm text-left",
+      "header": "bg-slate-50 text-slate-500 font-medium uppercase tracking-wider border-b border-slate-200",
+      "row": "border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
+    },
+    "status_badges": {
+      "draft": "bg-slate-100 text-slate-600 border-slate-200",
+      "sent": "bg-blue-50 text-blue-700 border-blue-200",
+      "confirmed": "bg-indigo-50 text-indigo-700 border-indigo-200",
+      "dispatched": "bg-amber-50 text-amber-700 border-amber-200",
+      "delivered": "bg-emerald-50 text-emerald-700 border-emerald-200",
+      "closed": "bg-slate-100 text-slate-500 border-slate-200 line-through"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-md bg-white/80 border-b border-slate-200/50",
+    "shadows": {
+      "sm": "shadow-sm",
+      "md": "shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.03)]",
+      "lg": "shadow-[0_10px_15px_-3px_rgba(0,0,0,0.05),0_4px_6px_-2px_rgba(0,0,0,0.025)]"
+    },
+    "textures": "Use subtle noise texture on dashboard backgrounds if possible, or keep clean white for maximum contrast."
+  },
+  "motion": {
+    "hover": "transition-all duration-200 ease-in-out",
+    "page_transition": "animate-in fade-in slide-in-from-bottom-4 duration-500",
+    "micro_interactions": "active:scale-95 duration-100"
+  },
+  "image_urls": {
+    "logo": "https://customer-assets.emergentagent.com/job_vendormate-20/artifacts/ze7saivu_OLL-horizontal-logo-1.png",
+    "placeholders": {
+      "warehouse_worker": "https://images.unsplash.com/photo-1740914994657-f1cdffdc418e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHx3YXJlaG91c2UlMjBsb2dpc3RpY3MlMjB3b3JrZXJ8ZW58MHx8fHwxNzY3NzkyNTUxfDA&ixlib=rb-4.1.0&q=85",
+      "forklift": "https://images.unsplash.com/photo-1740914994154-c3273e113336?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHx3YXJlaG91c2UlMjBsb2dpc3RpY3MlMjB3b3JrZXJ8ZW58MHx8fHwxNzY3NzkyNTUxfDA&ixlib=rb-4.1.0&q=85",
+      "business_portrait_female": "https://images.unsplash.com/photo-1758518727592-706e80ebc354?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHBvcnRyYWl0fGVufDB8fHx8MTc2Nzc4NDUwNnww&ixlib=rb-4.1.0&q=85",
+      "business_portrait_male": "https://images.unsplash.com/photo-1629507208649-70919ca33793?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHBvcnRyYWl0fGVufDB8fHx8MTc2Nzc4NDUwNnww&ixlib=rb-4.1.0&q=85"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use 'Manrope' for all headings and 'IBM Plex Sans' for body text. Import them via Google Fonts in index.css.",
+    "Implement the 'Control Room Grid' for the dashboard: dense, data-heavy, minimal gaps.",
+    "Use the provided OLL logo in the top-left of the sidebar/header.",
+    "Strictly follow the color palette. Do NOT use the forbidden Teal color.",
+    "Ensure all interactive elements have 'data-testid' attributes.",
+    "Use Shadcn components for all complex interactions (Datepicker, Select, Dialog, etc.) but customize them to match the 'Sharp/Clean' aesthetic.",
+    "For the 'Public Tracking Page', use a simplified layout without the sidebar, focusing on the timeline and status.",
+    "Use 'sonner' for all toast notifications.",
+    "Ensure high contrast for text. Text on white backgrounds must be Slate-600 or darker.",
+    "Do NOT use gradients for backgrounds. Keep it flat and clean."
+  ],
+  "universal_guidelines": [
+    "Avoid 'AI slop' - no generic centered layouts.",
+    "Use 2-3x more spacing than typical designs.",
+    "Every interaction needs micro-animations.",
+    "Never use AI assistant Emoji characters.",
+    "Dark colors look good when used independently without gradients."
+  ]
+}
