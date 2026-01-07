@@ -77,6 +77,49 @@ const PurchaseOrdersList = () => {
     return colors[status] || "status-draft";
   };
 
+  // Stage progress indicator
+  const renderStageProgress = (currentStatus) => {
+    const stages = [
+      { key: "confirmed", label: "Confirmed" },
+      { key: "dispatched", label: "Dispatched" },
+      { key: "delivered", label: "Delivered" }
+    ];
+    
+    const statusOrder = ["draft", "sent", "confirmed", "dispatched", "delivered", "closed"];
+    const currentIndex = statusOrder.indexOf(currentStatus);
+    
+    // Only show for confirmed, dispatched, delivered statuses
+    if (currentIndex < 2) return null;
+    
+    return (
+      <div className="flex items-center gap-1 mt-1">
+        {stages.map((stage, idx) => {
+          const stageIndex = statusOrder.indexOf(stage.key);
+          const isCompleted = currentIndex >= stageIndex;
+          const isCurrent = currentStatus === stage.key;
+          
+          return (
+            <div key={stage.key} className="flex items-center">
+              <div 
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                  isCompleted 
+                    ? 'bg-emerald-500 text-white' 
+                    : 'bg-slate-200 text-slate-400'
+                } ${isCurrent ? 'ring-2 ring-emerald-300' : ''}`}
+                title={stage.label}
+              >
+                {isCompleted ? <Check className="w-3 h-3" /> : <Circle className="w-2 h-2" />}
+              </div>
+              {idx < stages.length - 1 && (
+                <div className={`w-3 h-0.5 ${currentIndex > stageIndex ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const filteredOrders = orders.filter((order) => {
     const matchesSearch = order.po_number.toLowerCase().includes(search.toLowerCase());
     const matchesVendor = vendorFilter === "all" || order.vendor_id === vendorFilter;
