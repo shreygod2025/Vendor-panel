@@ -331,11 +331,14 @@ frontend:
     file: "/app/frontend/src/pages/oll/ReturnsList.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Merged view showing both returns and credit notes"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Returns page working perfectly. Page title correctly shows 'Returns' (not 'Returns & Credit Notes' as requested). Sample data shows 3 returns with ₹10,500 total credit value. Navigation and display working correctly."
 
   - task: "Purchase Orders List with Stage Indicators"
     implemented: true
