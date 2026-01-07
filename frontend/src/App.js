@@ -283,6 +283,16 @@ function AppRoutes() {
           <DashboardLayout><UsersList /></DashboardLayout>
         </ProtectedRoute>
       } />
+      <Route path="/oll/deliveries" element={
+        <ProtectedRoute allowedRoles={["oll"]}>
+          <DashboardLayout><DeliveriesPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/oll/issues" element={
+        <ProtectedRoute allowedRoles={["oll"]}>
+          <DashboardLayout><IssuesPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
       
       {/* Vendor Routes */}
       <Route path="/vendor" element={
