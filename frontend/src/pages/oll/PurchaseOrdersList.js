@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { Plus, Search, Eye, FileText, ExternalLink } from "lucide-react";
+import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle } from "lucide-react";
 import { toast } from "sonner";
 
 const PurchaseOrdersList = () => {
