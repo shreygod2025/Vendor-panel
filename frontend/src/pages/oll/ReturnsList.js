@@ -80,8 +80,8 @@ const ReturnsList = () => {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="page-title">Returns & Credit Notes</h1>
-            <p className="page-subtitle">Manage product returns and view credit notes</p>
+            <h1 className="page-title">Returns</h1>
+            <p className="page-subtitle">Manage product returns and credit notes</p>
           </div>
           {isOLL && (
             <Link to="/oll/returns/new">
