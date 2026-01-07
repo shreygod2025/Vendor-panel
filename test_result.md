@@ -346,11 +346,14 @@ frontend:
     file: "/app/frontend/src/pages/oll/PurchaseOrdersList.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Added visual progress tracker for Confirmed→Dispatched→Delivered stages"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Purchase Orders list redesigned perfectly. 3 main tabs (PO Confirmation, Dispatched, Delivered) working correctly. PO Confirmation tab has expandable sub-sections (Raised, Confirmed, Changes/Rejected) as requested. Visual stage indicators and navigation working properly."
 
   - task: "Public Tracking Page"
     implemented: true
