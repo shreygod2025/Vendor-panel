@@ -7,7 +7,14 @@ import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { Switch } from "../../components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Users, Building } from "lucide-react";
 import { toast } from "sonner";
 
 const VendorForm = () => {
@@ -24,7 +31,16 @@ const VendorForm = () => {
     address: "",
     gst_number: "",
     contact_person: "",
-    is_active: true
+    is_active: true,
+    bank_details: {
+      bank_name: "",
+      branch: "",
+      ifsc_code: "",
+      account_number: "",
+      account_holder_name: "",
+      cancel_cheque_url: ""
+    },
+    team_members: []
   });
 
   useEffect(() => {
@@ -37,7 +53,18 @@ const VendorForm = () => {
     setLoading(true);
     try {
       const response = await apiClient.get(`/vendors/${id}`);
-      setFormData(response.data);
+      setFormData({
+        ...response.data,
+        bank_details: response.data.bank_details || {
+          bank_name: "",
+          branch: "",
+          ifsc_code: "",
+          account_number: "",
+          account_holder_name: "",
+          cancel_cheque_url: ""
+        },
+        team_members: response.data.team_members || []
+      });
     } catch (error) {
       toast.error("Failed to fetch vendor");
       navigate("/oll/vendors");
@@ -49,6 +76,42 @@ const VendorForm = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleBankChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      bank_details: { ...prev.bank_details, [field]: value }
+    }));
+  };
+
+  const addTeamMember = () => {
+    setFormData((prev) => ({
+      ...prev,
+      team_members: [...prev.team_members, {
+        id: `temp-${Date.now()}`,
+        name: "",
+        phone: "",
+        email: "",
+        role: "coordinator"
+      }]
+    }));
+  };
+
+  const removeTeamMember = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      team_members: prev.team_members.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateTeamMember = (index, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      team_members: prev.team_members.map((member, i) =>
+        i === index ? { ...member, [field]: value } : member
+      )
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -99,12 +162,16 @@ const VendorForm = () => {
       </div>
 
       <div className="page-container">
-        <form onSubmit={handleSubmit}>
-          <Card className="max-w-2xl">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Info */}
+          <Card>
             <CardHeader>
-              <CardTitle>Vendor Details</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="w-5 h-5" />
+                Basic Information
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name" className="form-label">Company Name *</Label>
@@ -118,7 +185,7 @@ const VendorForm = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="contact_person" className="form-label">Contact Person</Label>
+                  <Label htmlFor="contact_person" className="form-label">Primary Contact Person</Label>
                   <Input
                     id="contact_person"
                     name="contact_person"
@@ -191,36 +258,192 @@ const VendorForm = () => {
                   data-testid="vendor-active-switch"
                 />
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/oll/vendors")}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-[#1e3a8a] hover:bg-[#1e40af]"
-                  disabled={saving}
-                  data-testid="save-vendor-btn"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      {isEdit ? "Update Vendor" : "Create Vendor"}
-                    </>
-                  )}
-                </Button>
+          {/* Bank Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Bank Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="form-label">Bank Name</Label>
+                  <Input
+                    value={formData.bank_details.bank_name}
+                    onChange={(e) => handleBankChange("bank_name", e.target.value)}
+                    placeholder="e.g., HDFC Bank"
+                  />
+                </div>
+                <div>
+                  <Label className="form-label">Branch</Label>
+                  <Input
+                    value={formData.bank_details.branch}
+                    onChange={(e) => handleBankChange("branch", e.target.value)}
+                    placeholder="e.g., Andheri West"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="form-label">IFSC Code</Label>
+                  <Input
+                    value={formData.bank_details.ifsc_code}
+                    onChange={(e) => handleBankChange("ifsc_code", e.target.value.toUpperCase())}
+                    placeholder="e.g., HDFC0001234"
+                  />
+                </div>
+                <div>
+                  <Label className="form-label">Account Number</Label>
+                  <Input
+                    value={formData.bank_details.account_number}
+                    onChange={(e) => handleBankChange("account_number", e.target.value)}
+                    placeholder="e.g., 50100123456789"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="form-label">Account Holder Name</Label>
+                  <Input
+                    value={formData.bank_details.account_holder_name}
+                    onChange={(e) => handleBankChange("account_holder_name", e.target.value)}
+                    placeholder="Company/Individual name"
+                  />
+                </div>
+                <div>
+                  <Label className="form-label">Cancel Cheque URL</Label>
+                  <Input
+                    value={formData.bank_details.cancel_cheque_url || ""}
+                    onChange={(e) => handleBankChange("cancel_cheque_url", e.target.value)}
+                    placeholder="https://drive.google.com/..."
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Team Members */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Team Members
+                </CardTitle>
+                <Button type="button" variant="outline" size="sm" onClick={addTeamMember}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Member
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {formData.team_members.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p>No team members added</p>
+                  <p className="text-sm">Add team members like accountant, director, coordinator</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {formData.team_members.map((member, index) => (
+                    <div key={member.id || index} className="p-4 bg-slate-50 rounded-lg">
+                      <div className="flex items-start justify-between mb-3">
+                        <span className="text-sm font-medium text-slate-500">Team Member #{index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeTeamMember(index)}
+                          className="text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                          <Label className="text-xs">Name</Label>
+                          <Input
+                            value={member.name}
+                            onChange={(e) => updateTeamMember(index, "name", e.target.value)}
+                            placeholder="Full name"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Phone</Label>
+                          <Input
+                            value={member.phone}
+                            onChange={(e) => updateTeamMember(index, "phone", e.target.value)}
+                            placeholder="+91 9876543210"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Email</Label>
+                          <Input
+                            type="email"
+                            value={member.email}
+                            onChange={(e) => updateTeamMember(index, "email", e.target.value)}
+                            placeholder="email@example.com"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Role</Label>
+                          <Select
+                            value={member.role}
+                            onValueChange={(v) => updateTeamMember(index, "role", v)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="director">Director</SelectItem>
+                              <SelectItem value="accountant">Accountant</SelectItem>
+                              <SelectItem value="coordinator">Coordinator</SelectItem>
+                              <SelectItem value="sales">Sales</SelectItem>
+                              <SelectItem value="support">Support</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/oll/vendors")}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-[#1e3a8a] hover:bg-[#1e40af]"
+              disabled={saving}
+              data-testid="save-vendor-btn"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  {isEdit ? "Update Vendor" : "Create Vendor"}
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </div>
     </div>
