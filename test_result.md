@@ -301,11 +301,14 @@ frontend:
     file: "/app/frontend/src/pages/oll/DeliveriesPage.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Shows upcoming deliveries with summary cards and table"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Deliveries page navigation working correctly. Page loads successfully and is accessible from sidebar Orders section."
 
   - task: "Issues Page"
     implemented: true
