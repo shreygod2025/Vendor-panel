@@ -23,6 +23,8 @@ import PaymentsList from "./pages/PaymentsList";
 import AuditLogs from "./pages/oll/AuditLogs";
 import PublicTracking from "./pages/PublicTracking";
 import UsersList from "./pages/oll/UsersList";
+import DeliveriesPage from "./pages/oll/DeliveriesPage";
+import IssuesPage from "./pages/oll/IssuesPage";
 
 // Vendor Pages
 import VendorPurchaseOrders from "./pages/vendor/PurchaseOrders";
