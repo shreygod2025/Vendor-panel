@@ -334,6 +334,308 @@ class VendorManagementAPITester:
         )
         return success
 
+    def test_upcoming_deliveries(self):
+        """Test upcoming deliveries API"""
+        success, response = self.run_test(
+            "Get Upcoming Deliveries",
+            "GET",
+            "deliveries/upcoming",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            print(f"   Found {len(response)} upcoming deliveries")
+        return success
+
+    def test_create_issue(self):
+        """Test creating an issue"""
+        if not self.po_id:
+            print("❌ Cannot create issue - no PO ID available")
+            return False
+            
+        issue_data = {
+            "po_id": self.po_id,
+            "issue_type": "quality_issue",
+            "description": "Test quality issue with delivered items",
+            "affected_items": [
+                {
+                    "product_id": self.product_id,
+                    "quantity": 1,
+                    "issue": "Damaged packaging"
+                }
+            ],
+            "priority": "medium"
+        }
+        success, response = self.run_test(
+            "Create Issue",
+            "POST",
+            "issues",
+            200,
+            data=issue_data,
+            token=self.oll_token
+        )
+        if success and 'id' in response:
+            self.issue_id = response['id']
+            print(f"   Created Issue: {response['issue_number']} (ID: {self.issue_id})")
+        return success
+
+    def test_get_issues(self):
+        """Test getting issues list"""
+        success, response = self.run_test(
+            "Get Issues",
+            "GET",
+            "issues",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            print(f"   Found {len(response)} issues")
+        return success
+
+    def test_create_return(self):
+        """Test creating a return with credit note"""
+        if not self.po_id or not self.vendor_id or not self.product_id:
+            print("❌ Cannot create return - missing required IDs")
+            return False
+            
+        return_data = {
+            "po_id": self.po_id,
+            "vendor_id": self.vendor_id,
+            "items": [
+                {
+                    "product_id": self.product_id,
+                    "product_name": "Test Product",
+                    "quantity": 1,
+                    "unit_price": 1000.0,
+                    "reason": "Defective item"
+                }
+            ],
+            "notes": "Test return for defective product"
+        }
+        success, response = self.run_test(
+            "Create Return",
+            "POST",
+            "returns",
+            200,
+            data=return_data,
+            token=self.oll_token
+        )
+        if success and 'id' in response:
+            self.return_id = response['id']
+            print(f"   Created Return: {response['return_number']} (ID: {self.return_id})")
+            print(f"   Credit Note: {response.get('credit_note_number', 'N/A')}")
+        return success
+
+    def test_get_returns(self):
+        """Test getting returns list"""
+        success, response = self.run_test(
+            "Get Returns",
+            "GET",
+            "returns",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            print(f"   Found {len(response)} returns")
+        return success
+
+    def test_create_invoice(self):
+        """Test creating an invoice"""
+        if not self.po_id:
+            print("❌ Cannot create invoice - no PO ID available")
+            return False
+            
+        invoice_data = {
+            "po_id": self.po_id,
+            "invoice_number": "INV-TEST-001",
+            "invoice_date": datetime.now().strftime("%Y-%m-%d"),
+            "amount": 2360.0,  # 2000 + 18% tax
+            "due_date": "2024-02-15",
+            "notes": "Test invoice"
+        }
+        success, response = self.run_test(
+            "Create Invoice",
+            "POST",
+            "invoices",
+            200,
+            data=invoice_data,
+            token=self.vendor_token
+        )
+        if success and 'id' in response:
+            self.invoice_id = response['id']
+            print(f"   Created Invoice: {response['invoice_number']} (ID: {self.invoice_id})")
+        return success
+
+    def test_get_invoices(self):
+        """Test getting invoices list"""
+        success, response = self.run_test(
+            "Get Invoices",
+            "GET",
+            "invoices",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            print(f"   Found {len(response)} invoices")
+        return success
+
+    def test_create_payment(self):
+        """Test creating a payment"""
+        if not hasattr(self, 'invoice_id') or not self.invoice_id:
+            print("❌ Cannot create payment - no invoice ID available")
+            return False
+            
+        payment_data = {
+            "invoice_id": self.invoice_id,
+            "amount": 2360.0,
+            "payment_date": datetime.now().strftime("%Y-%m-%d"),
+            "payment_mode": "bank_transfer",
+            "reference_id": "TEST-PAY-001",
+            "notes": "Test payment"
+        }
+        success, response = self.run_test(
+            "Create Payment",
+            "POST",
+            "payments",
+            200,
+            data=payment_data,
+            token=self.oll_token
+        )
+        if success and 'id' in response:
+            self.payment_id = response['id']
+            print(f"   Created Payment: {response['reference_id']} (ID: {self.payment_id})")
+        return success
+
+    def test_get_payments(self):
+        """Test getting payments list"""
+        success, response = self.run_test(
+            "Get Payments",
+            "GET",
+            "payments",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            print(f"   Found {len(response)} payments")
+        return success
+
+    def test_get_pending_payments(self):
+        """Test getting pending payments"""
+        success, response = self.run_test(
+            "Get Pending Payments",
+            "GET",
+            "payments/pending",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            print(f"   Found {len(response)} pending payments")
+        return success
+
+    def test_po_with_final_comments(self):
+        """Test creating PO with final_comments field"""
+        if not self.vendor_id or not self.product_id:
+            print("❌ Cannot create PO with final comments - missing vendor or product ID")
+            return False
+            
+        po_data = {
+            "vendor_id": self.vendor_id,
+            "delivery_address": "456 Final Comments Street, Delhi",
+            "contact_person": "Final Test Contact",
+            "contact_number": "+91 9876543211",
+            "delivery_date": "2024-02-20",
+            "line_items": [
+                {
+                    "product_id": self.product_id,
+                    "product_name": "Test Product",
+                    "sku": "TEST-001",
+                    "quantity": 3,
+                    "unit_price": 1000.0,
+                    "tax_rate": 18.0,
+                    "discount_amount": 0.0,
+                    "discount_percent": 5.0,
+                    "comment": "Line item comment for testing"
+                }
+            ],
+            "order_discount_amount": 0.0,
+            "order_discount_percent": 0.0,
+            "notes": "Test purchase order with final comments",
+            "final_comments": "These are the final comments for the PO - testing Phase 2 enhancement"
+        }
+        success, response = self.run_test(
+            "Create PO with Final Comments",
+            "POST",
+            "purchase-orders",
+            200,
+            data=po_data,
+            token=self.oll_token
+        )
+        if success and 'id' in response:
+            print(f"   Created PO with final comments: {response['po_number']}")
+            print(f"   Final Comments: {response.get('final_comments', 'N/A')}")
+        return success
+
+    def test_products_with_vendor_info(self):
+        """Test that products API returns vendor information"""
+        success, response = self.run_test(
+            "Get Products with Vendor Info",
+            "GET",
+            "products",
+            200,
+            token=self.oll_token
+        )
+        if success and response and len(response) > 0:
+            product = response[0]
+            if 'vendor_name' in product and product['vendor_name']:
+                print(f"   ✅ Product has vendor info: {product['vendor_name']}")
+                return True
+            else:
+                print(f"   ❌ Product missing vendor_name field")
+                return False
+        return success
+
+    def test_po_status_workflow(self):
+        """Test complete PO status workflow"""
+        if not self.po_id:
+            print("❌ Cannot test PO workflow - no PO ID available")
+            return False
+            
+        # Test getting PO with different statuses
+        success, response = self.run_test(
+            "Get PO by Status - Draft",
+            "GET",
+            "purchase-orders?status=draft",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            draft_pos = [po for po in response if po['status'] == 'draft']
+            print(f"   Found {len(draft_pos)} draft POs")
+            
+        success, response = self.run_test(
+            "Get PO by Status - Confirmed",
+            "GET",
+            "purchase-orders?status=confirmed",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            confirmed_pos = [po for po in response if po['status'] == 'confirmed']
+            print(f"   Found {len(confirmed_pos)} confirmed POs")
+            
+        success, response = self.run_test(
+            "Get PO by Status - Dispatched",
+            "GET",
+            "purchase-orders?status=dispatched",
+            200,
+            token=self.oll_token
+        )
+        if success:
+            dispatched_pos = [po for po in response if po['status'] == 'dispatched']
+            print(f"   Found {len(dispatched_pos)} dispatched POs")
+            
+        return success
+
     def test_invalid_login(self):
         """Test invalid login credentials"""
         success, response = self.run_test(
