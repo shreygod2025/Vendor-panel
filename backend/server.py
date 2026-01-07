@@ -1963,8 +1963,131 @@ async def seed_data():
     }
     await db.payments.insert_one(payment)
     
+    # Create more sample POs with different statuses
+    # PO3 - Draft status
+    po3 = {
+        "id": str(uuid.uuid4()),
+        "po_number": "PO-20250107-GHI789",
+        "vendor_id": vendors_data[0]["id"],
+        "delivery_address": "OLL Head Office, Cyber City, Gurugram, Haryana 122002",
+        "contact_person": "Rahul Verma",
+        "contact_number": "+91 9345678901",
+        "delivery_date": (datetime.now(timezone.utc) + timedelta(days=10)).strftime("%Y-%m-%d"),
+        "line_items": [
+            {"product_id": products_data[2]["id"], "product_name": products_data[2]["name"], "sku": products_data[2]["sku"], "quantity": 15, "unit_price": 3200.00, "tax_rate": 18.0, "discount_amount": 0, "discount_percent": 0, "comment": None},
+            {"product_id": products_data[3]["id"], "product_name": products_data[3]["name"], "sku": products_data[3]["sku"], "quantity": 3, "unit_price": 12000.00, "tax_rate": 18.0, "discount_amount": 0, "discount_percent": 10, "comment": "Bulk order discount"}
+        ],
+        "order_discount_amount": 0,
+        "order_discount_percent": 0,
+        "notes": "Draft order for Q1 requirements",
+        "final_comments": None,
+        "status": "draft",
+        "tracking_token": str(uuid.uuid4()),
+        "created_by": oll_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "subtotal": 84000.00,
+        "total_discount": 3600.00,
+        "total_tax": 14472.00,
+        "grand_total": 94872.00
+    }
+    await db.purchase_orders.insert_one(po3)
+    
+    # PO4 - Sent status (awaiting confirmation)
+    po4 = {
+        "id": str(uuid.uuid4()),
+        "po_number": "PO-20250106-JKL012",
+        "vendor_id": vendors_data[1]["id"],
+        "delivery_address": "OLL Distribution Center, Whitefield, Bangalore, Karnataka 560066",
+        "contact_person": "Meera Nair",
+        "contact_number": "+91 9456789012",
+        "delivery_date": (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d"),
+        "line_items": [
+            {"product_id": products_data[4]["id"], "product_name": products_data[4]["name"], "sku": products_data[4]["sku"], "quantity": 50, "unit_price": 2500.00, "tax_rate": 18.0, "discount_amount": 0, "discount_percent": 5, "comment": "High volume order"},
+            {"product_id": products_data[6]["id"], "product_name": products_data[6]["name"], "sku": products_data[6]["sku"], "quantity": 10, "unit_price": 6000.00, "tax_rate": 18.0, "discount_amount": 0, "discount_percent": 0, "comment": None}
+        ],
+        "order_discount_amount": 2000,
+        "order_discount_percent": 0,
+        "notes": "Urgent requirement for new facility",
+        "final_comments": "Please ensure timely delivery",
+        "status": "sent",
+        "tracking_token": str(uuid.uuid4()),
+        "created_by": oll_admin["id"],
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "subtotal": 185000.00,
+        "total_discount": 8250.00,
+        "total_tax": 31815.00,
+        "grand_total": 208565.00
+    }
+    await db.purchase_orders.insert_one(po4)
+    
+    # PO5 - Delivered status
+    po5 = {
+        "id": str(uuid.uuid4()),
+        "po_number": "PO-20250102-MNO345",
+        "vendor_id": vendors_data[0]["id"],
+        "delivery_address": "OLL Manufacturing Unit, MIDC, Pune, Maharashtra 411057",
+        "contact_person": "Sanjay Kulkarni",
+        "contact_number": "+91 9567890123",
+        "delivery_date": (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d"),
+        "line_items": [
+            {"product_id": products_data[0]["id"], "product_name": products_data[0]["name"], "sku": products_data[0]["sku"], "quantity": 2, "unit_price": 15000.00, "tax_rate": 18.0, "discount_amount": 0, "discount_percent": 0, "comment": "Standard replacement"},
+            {"product_id": products_data[1]["id"], "product_name": products_data[1]["name"], "sku": products_data[1]["sku"], "quantity": 5, "unit_price": 8500.00, "tax_rate": 18.0, "discount_amount": 0, "discount_percent": 0, "comment": None}
+        ],
+        "order_discount_amount": 0,
+        "order_discount_percent": 0,
+        "notes": None,
+        "final_comments": "Delivery completed successfully",
+        "status": "delivered",
+        "tracking_token": str(uuid.uuid4()),
+        "created_by": oll_admin["id"],
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(),
+        "updated_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
+        "subtotal": 72500.00,
+        "total_discount": 0,
+        "total_tax": 13050.00,
+        "grand_total": 85550.00
+    }
+    await db.purchase_orders.insert_one(po5)
+    
+    # Add dispatch for PO5
+    dispatch5 = {
+        "id": str(uuid.uuid4()),
+        "po_id": po5["id"],
+        "courier_partner": "Blue Dart",
+        "tracking_id": "BD456789012",
+        "dispatch_date": (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d"),
+        "expected_delivery_date": (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d"),
+        "proof_url": None,
+        "notes": None,
+        "created_by": vendor_user1["id"],
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    }
+    await db.dispatches.insert_one(dispatch5)
+    
+    # Create a return
+    return_doc = {
+        "id": str(uuid.uuid4()),
+        "return_number": "RET-20250105-ABC001",
+        "po_id": po5["id"],
+        "vendor_id": vendors_data[0]["id"],
+        "items": [
+            {"product_id": products_data[1]["id"], "product_name": products_data[1]["name"], "quantity": 1, "unit_price": 8500.00, "reason": "Defective unit received"}
+        ],
+        "total_value": 8500.00,
+        "status": "credit_issued",
+        "credit_note_number": "CN-20250105-XYZ001",
+        "credit_note_date": datetime.now(timezone.utc).isoformat(),
+        "notes": "Replacement requested",
+        "created_by": oll_admin["id"],
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.returns.insert_one(return_doc)
+    
     return {
-        "message": "Data seeded successfully with sample data",
+        "message": "Data seeded successfully with comprehensive sample data",
         "credentials": {
             "oll_admin": "olladmin/olladmin",
             "vendor1": "vendor/vendor",
