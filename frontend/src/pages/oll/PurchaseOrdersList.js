@@ -232,9 +232,12 @@ const PurchaseOrdersList = () => {
                     <TableCell>{order.line_items?.length || 0} items</TableCell>
                     <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
                     <TableCell>
-                      <span className={`badge ${getStatusColor(order.status)}`}>
-                        {order.status}
-                      </span>
+                      <div>
+                        <span className={`badge ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>
+                        {renderStageProgress(order.status)}
+                      </div>
                     </TableCell>
                     <TableCell className="text-slate-500">{formatDate(order.created_at)}</TableCell>
                     <TableCell className="text-right">
