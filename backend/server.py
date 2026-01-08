@@ -301,6 +301,16 @@ class IssueResponse(BaseModel):
     created_by: str
     resolved_by: Optional[str]
 
+# Vendor Delivery Submission Model
+class VendorDeliverySubmit(BaseModel):
+    invoice_number: str
+    invoice_amount: float
+    invoice_date: str
+    logistics_cost: float = 0
+    invoice_file_url: Optional[str] = None
+    logistics_bill_url: Optional[str] = None
+    notes: Optional[str] = None
+
 # Invoice Models
 class InvoiceCreate(BaseModel):
     po_id: str
@@ -309,6 +319,8 @@ class InvoiceCreate(BaseModel):
     amount: float
     due_date: Optional[str] = None
     file_url: Optional[str] = None
+    logistics_cost: Optional[float] = 0
+    logistics_bill_url: Optional[str] = None
     notes: Optional[str] = None
 
 class InvoiceResponse(BaseModel):
