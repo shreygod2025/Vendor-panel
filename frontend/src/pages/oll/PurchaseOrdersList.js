@@ -430,8 +430,7 @@ const PurchaseOrdersList = () => {
                         <Button variant="ghost" size="sm">
                           <MoreHorizontal className="w-4 h-4" />
                         </Button>
-                      </Button>
-                    </DropdownMenuTrigger>
+                      </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild>
                         <Link to={`/oll/issues?po_id=${order.id}`} className="flex items-center gap-2">
