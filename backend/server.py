@@ -99,6 +99,8 @@ class VendorCreate(BaseModel):
     is_active: bool = True
     bank_details: Optional[BankDetails] = None
     team_members: List[TeamMember] = []
+    username: str
+    password: str
 
 class VendorUpdate(BaseModel):
     name: Optional[str] = None
@@ -110,6 +112,8 @@ class VendorUpdate(BaseModel):
     is_active: Optional[bool] = None
     bank_details: Optional[BankDetails] = None
     team_members: Optional[List[TeamMember]] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
 
 class VendorResponse(BaseModel):
     id: str
