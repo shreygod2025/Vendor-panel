@@ -1184,6 +1184,267 @@ class VendorManagementAPITester:
             else:
                 return False
 
+    def test_credit_payment_feature(self):
+        """Test the newly implemented credit payment feature"""
+        print("\n💳 Testing Credit Payment Feature...")
+        
+        # Priority 1: Test Vendor Credit APIs
+        print("\n🔍 Priority 1: Testing Vendor Credit APIs")
+        
+        # Test GET /api/credits/by-vendor
+        success, credits_response = self.run_test(
+            "Get All Vendors Credits",
+            "GET",
+            "credits/by-vendor",
+            200,
+            token=self.oll_token
+        )
+        
+        if not success:
+            print("❌ Failed to get vendor credits")
+            return False
+            
+        print(f"   ✅ Found {len(credits_response)} vendors with credits")
+        
+        # Find TechParts Industries or any vendor with available credit
+        target_vendor = None
+        for vendor_credit in credits_response:
+            if vendor_credit.get('available_credit', 0) > 0:
+                target_vendor = vendor_credit
+                break
+        
+        if not target_vendor:
+            print("   ⚠️ No vendors found with available credit, creating test return first...")
+            # Create a return to generate credit
+            if not self.po_id or not self.vendor_id or not self.product_id:
+                print("❌ Cannot create return - missing required IDs")
+                return False
+                
+            return_data = {
+                "po_id": self.po_id,
+                "vendor_id": self.vendor_id,
+                "items": [
+                    {
+                        "product_id": self.product_id,
+                        "product_name": "Test Product for Credit",
+                        "quantity": 2,
+                        "unit_price": 8250.0,  # This will create ₹16,500 credit
+                        "reason": "Defective"
+                    }
+                ]
+            }
+            success, return_response = self.run_test(
+                "Create Return for Credit Generation",
+                "POST",
+                "returns",
+                200,
+                data=return_data,
+                token=self.oll_token
+            )
+            
+            if not success:
+                return False
+                
+            print(f"   ✅ Created return with credit: {return_response.get('return_number', 'N/A')}")
+            
+            # Re-fetch credits
+            success, credits_response = self.run_test(
+                "Re-fetch Vendor Credits",
+                "GET",
+                "credits/by-vendor",
+                200,
+                token=self.oll_token
+            )
+            
+            if success and credits_response:
+                for vendor_credit in credits_response:
+                    if vendor_credit.get('vendor_id') == self.vendor_id:
+                        target_vendor = vendor_credit
+                        break
+        
+        if not target_vendor:
+            print("❌ Still no vendor with available credit found")
+            return False
+            
+        vendor_id = target_vendor['vendor_id']
+        available_credit = target_vendor['available_credit']
+        print(f"   ✅ Found vendor {target_vendor['vendor_name']} with ₹{available_credit:.2f} available credit")
+        
+        # Test GET /api/vendors/{vendor_id}/credit
+        success, vendor_credit_response = self.run_test(
+            "Get Specific Vendor Credit",
+            "GET",
+            f"vendors/{vendor_id}/credit",
+            200,
+            token=self.oll_token
+        )
+        
+        if not success:
+            return False
+            
+        print(f"   ✅ Vendor credit details: Total=₹{vendor_credit_response.get('total_credit', 0):.2f}, Used=₹{vendor_credit_response.get('used_credit', 0):.2f}, Available=₹{vendor_credit_response.get('available_credit', 0):.2f}")
+        
+        # Priority 2: Test Credit Payment Flow
+        print("\n🔍 Priority 2: Testing Credit Payment Flow")
+        
+        # Get a pending invoice
+        success, invoices_response = self.run_test(
+            "Get Pending Invoices",
+            "GET",
+            "invoices",
+            200,
+            token=self.oll_token
+        )
+        
+        if not success:
+            return False
+            
+        # Find a pending invoice or create one
+        pending_invoice = None
+        for invoice in invoices_response:
+            if invoice.get('payment_status') in ['pending', 'partially_paid']:
+                pending_amount = invoice.get('amount', 0) - invoice.get('paid_amount', 0)
+                if pending_amount > 0:
+                    pending_invoice = invoice
+                    break
+        
+        if not pending_invoice:
+            print("   ⚠️ No pending invoices found, creating one...")
+            # Create a test invoice
+            if not self.po_id:
+                print("❌ Cannot create invoice - no PO ID available")
+                return False
+                
+            invoice_data = {
+                "po_id": self.po_id,
+                "invoice_number": "CREDIT-TEST-INV-001",
+                "invoice_date": "2026-01-08",
+                "amount": 5000.0,
+                "due_date": "2026-02-08",
+                "notes": "Test invoice for credit payment"
+            }
+            success, invoice_response = self.run_test(
+                "Create Test Invoice for Credit Payment",
+                "POST",
+                "invoices",
+                200,
+                data=invoice_data,
+                token=self.vendor_token
+            )
+            
+            if not success:
+                return False
+                
+            pending_invoice = invoice_response
+            print(f"   ✅ Created test invoice: {invoice_response.get('invoice_number', 'N/A')}")
+        
+        invoice_id = pending_invoice['id']
+        pending_amount = pending_invoice.get('amount', 0) - pending_invoice.get('paid_amount', 0)
+        print(f"   ✅ Found pending invoice with ₹{pending_amount:.2f} pending amount")
+        
+        # Record a credit payment
+        credit_payment_amount = min(1000.0, available_credit, pending_amount)
+        payment_data = {
+            "invoice_id": invoice_id,
+            "amount": credit_payment_amount,
+            "payment_date": "2026-01-08",
+            "payment_mode": "credit",
+            "reference_id": "CREDIT-TEST-001",
+            "notes": "Test credit payment"
+        }
+        
+        success, payment_response = self.run_test(
+            "Record Credit Payment",
+            "POST",
+            "payments",
+            200,
+            data=payment_data,
+            token=self.oll_token
+        )
+        
+        if not success:
+            return False
+            
+        print(f"   ✅ Credit payment recorded: ₹{credit_payment_amount:.2f}")
+        
+        # Verify credit is deducted
+        success, updated_credit_response = self.run_test(
+            "Verify Credit Deduction",
+            "GET",
+            f"vendors/{vendor_id}/credit",
+            200,
+            token=self.oll_token
+        )
+        
+        if not success:
+            return False
+            
+        new_available_credit = updated_credit_response.get('available_credit', 0)
+        expected_credit = available_credit - credit_payment_amount
+        
+        if abs(new_available_credit - expected_credit) < 0.01:  # Allow for floating point precision
+            print(f"   ✅ Credit correctly deducted: ₹{available_credit:.2f} → ₹{new_available_credit:.2f}")
+        else:
+            print(f"   ❌ Credit deduction incorrect: Expected ₹{expected_credit:.2f}, Got ₹{new_available_credit:.2f}")
+            return False
+        
+        # Verify invoice paid_amount is updated
+        success, updated_invoice_response = self.run_test(
+            "Verify Invoice Payment Update",
+            "GET",
+            f"invoices/{invoice_id}",
+            200,
+            token=self.oll_token
+        )
+        
+        if not success:
+            return False
+            
+        new_paid_amount = updated_invoice_response.get('paid_amount', 0)
+        expected_paid_amount = pending_invoice.get('paid_amount', 0) + credit_payment_amount
+        
+        if abs(new_paid_amount - expected_paid_amount) < 0.01:
+            print(f"   ✅ Invoice paid amount correctly updated: ₹{new_paid_amount:.2f}")
+        else:
+            print(f"   ❌ Invoice paid amount incorrect: Expected ₹{expected_paid_amount:.2f}, Got ₹{new_paid_amount:.2f}")
+            return False
+        
+        # Priority 3: Test Credit Validation
+        print("\n🔍 Priority 3: Testing Credit Validation")
+        
+        # Try to record a credit payment exceeding available credit
+        excessive_amount = new_available_credit + 1000.0  # More than available
+        excessive_payment_data = {
+            "invoice_id": invoice_id,
+            "amount": excessive_amount,
+            "payment_date": "2026-01-08",
+            "payment_mode": "credit",
+            "reference_id": "CREDIT-EXCESSIVE-001",
+            "notes": "Test excessive credit payment"
+        }
+        
+        success, error_response = self.run_test(
+            "Test Excessive Credit Payment",
+            "POST",
+            "payments",
+            400,  # Should return 400 error
+            data=excessive_payment_data,
+            token=self.oll_token
+        )
+        
+        if success:
+            print(f"   ✅ Excessive credit payment correctly rejected with 400 error")
+            if 'detail' in error_response and 'Insufficient credit' in error_response['detail']:
+                print(f"   ✅ Correct error message: {error_response['detail']}")
+            else:
+                print(f"   ⚠️ Error message might be different: {error_response.get('detail', 'No detail')}")
+        else:
+            print(f"   ❌ Excessive credit payment validation failed")
+            return False
+        
+        print("\n✅ Credit Payment Feature Testing Complete - All tests passed!")
+        return True
+
     def test_review_request_apis(self):
         """Test specific APIs mentioned in review request"""
         print("\n🎯 Testing Review Request Specific APIs...")
