@@ -183,7 +183,7 @@ const VendorPurchaseOrders = () => {
       <div className="page-container">
         <div className="flex gap-4 mb-6">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -191,6 +191,7 @@ const VendorPurchaseOrders = () => {
               <SelectItem value="sent">Sent</SelectItem>
               <SelectItem value="confirmed">Confirmed</SelectItem>
               <SelectItem value="dispatched">Dispatched</SelectItem>
+              <SelectItem value="pending_approval">Pending Approval</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
