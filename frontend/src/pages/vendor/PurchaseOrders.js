@@ -477,7 +477,7 @@ const VendorPurchaseOrders = () => {
                   </div>
                 </div>
                 <div className="p-4 border-t">
-                  {renderTable(categorizedOrders.delivered, "No delivered orders")}
+                  {renderDeliveredTable(categorizedOrders.delivered)}
                 </div>
               </div>
             </TabsContent>
