@@ -1817,13 +1817,13 @@ async def get_vendor_credit(vendor_id: str, current_user: dict = Depends(get_cur
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
     
-    # Calculate total credit from approved returns
+    # Calculate total credit from approved returns (use total_value or credit_amount)
     returns = await db.returns.find({
         "vendor_id": vendor_id,
         "status": "credit_issued"
     }, {"_id": 0}).to_list(1000)
     
-    total_credit = sum(r.get("credit_amount", 0) for r in returns)
+    total_credit = sum(r.get("credit_amount") or r.get("total_value", 0) for r in returns)
     
     # Calculate used credit from payments with mode "credit"
     payments = await db.payments.find({
@@ -1841,7 +1841,7 @@ async def get_vendor_credit(vendor_id: str, current_user: dict = Depends(get_cur
         "total_credit": total_credit,
         "used_credit": used_credit,
         "available_credit": available_credit,
-        "returns": [{"id": r["id"], "credit_note_number": r.get("credit_note_number"), "credit_amount": r.get("credit_amount", 0)} for r in returns]
+        "returns": [{"id": r["id"], "credit_note_number": r.get("credit_note_number"), "credit_amount": r.get("credit_amount") or r.get("total_value", 0)} for r in returns]
     }
 
 @api_router.get("/credits/by-vendor")
@@ -1864,7 +1864,8 @@ async def get_all_vendors_credit(current_user: dict = Depends(get_current_user))
         vid = r.get("vendor_id")
         if vid not in vendor_credits:
             vendor_credits[vid] = {"total": 0, "used": 0}
-        vendor_credits[vid]["total"] += r.get("credit_amount", 0)
+        # Use credit_amount if set, otherwise use total_value
+        vendor_credits[vid]["total"] += r.get("credit_amount") or r.get("total_value", 0)
     
     for p in payments:
         vid = p.get("vendor_id")
