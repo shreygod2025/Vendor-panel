@@ -290,6 +290,63 @@ const VendorPurchaseOrders = () => {
     );
   };
 
+  const renderDeliveredTable = (ordersList) => {
+    if (ordersList.length === 0) {
+      return (
+        <div className="text-center py-8 text-slate-500">
+          <p className="text-sm">No delivered orders</p>
+        </div>
+      );
+    }
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-slate-50">
+            <TableHead>PO Number</TableHead>
+            <TableHead>Receiver</TableHead>
+            <TableHead>Items</TableHead>
+            <TableHead>Total</TableHead>
+            <TableHead>Logistics Cost</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {ordersList.map(order => (
+            <TableRow key={order.id}>
+              <TableCell className="font-mono font-medium">{order.po_number}</TableCell>
+              <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
+              <TableCell>{order.line_items?.length || 0} items</TableCell>
+              <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
+              <TableCell className="font-mono text-slate-600">
+                {order.logistics_cost ? formatCurrency(order.logistics_cost) : "-"}
+              </TableCell>
+              <TableCell>
+                <span className={`badge ${getStatusColor(order.status)}`}>
+                  {order.status}
+                </span>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Link to={`/vendor/purchase-orders/${order.id}`}>
+                    <Button variant="ghost" size="sm" title="View PO">
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/vendor/invoices">
+                    <Button variant="ghost" size="sm" title="View Invoice" className="text-emerald-600">
+                      <Receipt className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
   const renderSubSection = (title, orders, sectionKey, icon, iconColor) => {
     const isExpanded = expandedSections[sectionKey];
     return (
