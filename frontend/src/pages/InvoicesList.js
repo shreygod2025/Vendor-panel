@@ -3,6 +3,7 @@ import { apiClient, useAuth } from "../App";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import {
   Table,
   TableBody,
@@ -25,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Plus, Receipt, Loader2 } from "lucide-react";
+import { Plus, Receipt, Loader2, Clock, CheckCircle, AlertTriangle, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 
 const InvoicesList = () => {
@@ -35,6 +36,8 @@ const InvoicesList = () => {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [saving, setSaving] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -43,6 +46,13 @@ const InvoicesList = () => {
     invoice_date: "",
     amount: "",
     file_url: "",
+    notes: ""
+  });
+
+  const [paymentData, setPaymentData] = useState({
+    amount: "",
+    payment_mode: "neft",
+    reference_id: "",
     notes: ""
   });
 
@@ -93,6 +103,39 @@ const InvoicesList = () => {
     }
   };
 
+  const openPaymentDialog = (invoice) => {
+    setSelectedInvoice(invoice);
+    setPaymentData({
+      amount: invoice.amount - (invoice.paid_amount || 0),
+      payment_mode: "neft",
+      reference_id: "",
+      notes: ""
+    });
+    setShowPaymentDialog(true);
+  };
+
+  const handlePayment = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await apiClient.post("/payments", {
+        invoice_id: selectedInvoice.id,
+        po_id: selectedInvoice.po_id,
+        amount: parseFloat(paymentData.amount),
+        payment_mode: paymentData.payment_mode,
+        reference_id: paymentData.reference_id,
+        notes: paymentData.notes
+      });
+      toast.success("Payment recorded successfully");
+      setShowPaymentDialog(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to record payment");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -108,13 +151,54 @@ const InvoicesList = () => {
     });
   };
 
+  // Calculate invoice status and overdue
+  const getInvoiceStatus = (invoice) => {
+    const invoiceDate = new Date(invoice.invoice_date);
+    const dueDate = new Date(invoiceDate);
+    dueDate.setDate(dueDate.getDate() + 7); // 7 days to clear
+    const today = new Date();
+    
+    const paidAmount = invoice.paid_amount || 0;
+    const totalAmount = invoice.amount;
+    
+    if (paidAmount >= totalAmount) {
+      return { status: "cleared", label: "Cleared", color: "bg-emerald-100 text-emerald-700" };
+    } else if (today > dueDate) {
+      return { status: "overdue", label: "Overdue", color: "bg-red-100 text-red-700" };
+    } else if (paidAmount > 0) {
+      return { status: "partial", label: "Partially Paid", color: "bg-amber-100 text-amber-700" };
+    } else {
+      return { status: "pending", label: "Pending", color: "bg-blue-100 text-blue-700" };
+    }
+  };
+
+  const getDaysRemaining = (invoice) => {
+    const invoiceDate = new Date(invoice.invoice_date);
+    const dueDate = new Date(invoiceDate);
+    dueDate.setDate(dueDate.getDate() + 7);
+    const today = new Date();
+    const diffTime = dueDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // Summary stats
+  const stats = {
+    total: invoices.length,
+    pending: invoices.filter(i => getInvoiceStatus(i).status === "pending").length,
+    overdue: invoices.filter(i => getInvoiceStatus(i).status === "overdue").length,
+    cleared: invoices.filter(i => getInvoiceStatus(i).status === "cleared").length,
+    totalAmount: invoices.reduce((sum, i) => sum + i.amount, 0),
+    pendingAmount: invoices.reduce((sum, i) => sum + i.amount - (i.paid_amount || 0), 0)
+  };
+
   return (
     <div data-testid="invoices-list-page">
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">Invoices</h1>
-            <p className="page-subtitle">Manage invoices</p>
+            <p className="page-subtitle">Manage invoices and payments</p>
           </div>
           {!isOLL && (
             <Button 
@@ -130,6 +214,76 @@ const InvoicesList = () => {
       </div>
 
       <div className="page-container">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Receipt className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
+                  <p className="text-xs text-slate-500">Total Invoices</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.pending}</p>
+                  <p className="text-xs text-slate-500">Pending</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.overdue}</p>
+                  <p className="text-xs text-slate-500">Overdue</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.cleared}</p>
+                  <p className="text-xs text-slate-500">Cleared</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Pending Amount Banner */}
+        {stats.pendingAmount > 0 && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <DollarSign className="w-6 h-6 text-amber-600" />
+              <div>
+                <p className="font-medium text-amber-800">Total Pending Amount</p>
+                <p className="text-sm text-amber-600">Invoices need to be cleared within 7 days of invoice date</p>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-amber-700">{formatCurrency(stats.pendingAmount)}</p>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
@@ -148,22 +302,64 @@ const InvoicesList = () => {
               <TableHeader>
                 <TableRow className="bg-slate-50">
                   <TableHead>Invoice #</TableHead>
-                  <TableHead>PO ID</TableHead>
+                  <TableHead>PO Number</TableHead>
+                  <TableHead>Vendor</TableHead>
                   <TableHead>Invoice Date</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>Uploaded</TableHead>
+                  <TableHead>Paid</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Timeline</TableHead>
+                  {isOLL && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-mono font-medium">{invoice.invoice_number}</TableCell>
-                    <TableCell className="font-mono text-sm">{invoice.po_id.slice(0, 8)}...</TableCell>
-                    <TableCell>{invoice.invoice_date}</TableCell>
-                    <TableCell className="font-mono font-medium">{formatCurrency(invoice.amount)}</TableCell>
-                    <TableCell className="text-slate-500">{formatDate(invoice.created_at)}</TableCell>
-                  </TableRow>
-                ))}
+                {invoices.map((invoice) => {
+                  const statusInfo = getInvoiceStatus(invoice);
+                  const daysRemaining = getDaysRemaining(invoice);
+                  const paidAmount = invoice.paid_amount || 0;
+                  
+                  return (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-mono font-medium">{invoice.invoice_number}</TableCell>
+                      <TableCell className="font-mono text-sm">{invoice.po_number || invoice.po_id?.slice(0, 8) + "..."}</TableCell>
+                      <TableCell>{invoice.vendor_name || "-"}</TableCell>
+                      <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
+                      <TableCell className="font-mono font-medium">{formatCurrency(invoice.amount)}</TableCell>
+                      <TableCell className="font-mono">{formatCurrency(paidAmount)}</TableCell>
+                      <TableCell>
+                        <span className={`badge ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {statusInfo.status === "cleared" ? (
+                          <span className="text-sm text-emerald-600">✓ Completed</span>
+                        ) : statusInfo.status === "overdue" ? (
+                          <span className="text-sm text-red-600 font-medium">
+                            {Math.abs(daysRemaining)} days overdue
+                          </span>
+                        ) : (
+                          <span className="text-sm text-slate-500">
+                            {daysRemaining} days remaining
+                          </span>
+                        )}
+                      </TableCell>
+                      {isOLL && (
+                        <TableCell className="text-right">
+                          {statusInfo.status !== "cleared" && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => openPaymentDialog(invoice)}
+                            >
+                              Record Payment
+                            </Button>
+                          )}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -232,6 +428,76 @@ const InvoicesList = () => {
               <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af]" disabled={saving}>
                 {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Upload Invoice
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Payment Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handlePayment} className="space-y-4">
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Invoice:</span>
+                <span className="font-medium">{selectedInvoice?.invoice_number}</span>
+              </div>
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-slate-500">Outstanding:</span>
+                <span className="font-medium text-red-600">
+                  {formatCurrency(selectedInvoice?.amount - (selectedInvoice?.paid_amount || 0))}
+                </span>
+              </div>
+            </div>
+            <div>
+              <Label>Payment Amount (₹)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={paymentData.amount}
+                onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <Label>Payment Mode</Label>
+              <Select value={paymentData.payment_mode} onValueChange={(v) => setPaymentData(prev => ({ ...prev, payment_mode: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="neft">NEFT</SelectItem>
+                  <SelectItem value="rtgs">RTGS</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Reference ID</Label>
+              <Input
+                value={paymentData.reference_id}
+                onChange={(e) => setPaymentData(prev => ({ ...prev, reference_id: e.target.value }))}
+                placeholder="Transaction reference number"
+              />
+            </div>
+            <div>
+              <Label>Notes (Optional)</Label>
+              <Input
+                value={paymentData.notes}
+                onChange={(e) => setPaymentData(prev => ({ ...prev, notes: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowPaymentDialog(false)}>Cancel</Button>
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700" disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Record Payment
               </Button>
             </DialogFooter>
           </form>
