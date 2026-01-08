@@ -417,6 +417,21 @@ const InvoicesList = () => {
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
+                          {invoice.file_url ? (
+                            <a
+                              href={invoice.file_url}
+                              download={`Invoice-${invoice.invoice_number}.pdf`}
+                              title="Download Invoice"
+                            >
+                              <Button variant="ghost" size="sm" className="text-emerald-600">
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </a>
+                          ) : (
+                            <Button variant="ghost" size="sm" disabled title="No document attached">
+                              <Download className="w-4 h-4 opacity-30" />
+                            </Button>
+                          )}
                           {isOLL && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
