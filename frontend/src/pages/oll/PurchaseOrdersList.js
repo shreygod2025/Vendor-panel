@@ -171,6 +171,7 @@ const PurchaseOrdersList = () => {
           <TableRow className="bg-slate-50">
             <TableHead>PO Number</TableHead>
             <TableHead>Vendor</TableHead>
+            <TableHead>Receiver</TableHead>
             <TableHead>Items</TableHead>
             <TableHead>Grand Total</TableHead>
             <TableHead>Status</TableHead>
