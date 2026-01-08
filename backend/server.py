@@ -823,6 +823,11 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         if po_update.status not in ["confirmed", "rejected"]:
             raise HTTPException(status_code=403, detail="Vendors can only confirm or reject POs")
     
+    # OLL can only edit draft or confirmed POs
+    if current_user.get("role") == "oll":
+        if existing["status"] not in ["draft", "confirmed"]:
+            raise HTTPException(status_code=400, detail="Only draft or confirmed POs can be edited")
+    
     update_data = {k: v for k, v in po_update.model_dump().items() if v is not None}
     
     if "line_items" in update_data:
@@ -833,6 +838,13 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
             update_data.get("order_discount_percent", existing.get("order_discount_percent", 0))
         )
         update_data.update(totals)
+    
+    # If OLL edits a confirmed PO, reset status to "sent" for vendor reconfirmation
+    if current_user.get("role") == "oll" and existing["status"] == "confirmed":
+        update_data["status"] = "sent"
+        # Add note about edit
+        existing_notes = existing.get("notes", "") or ""
+        update_data["notes"] = existing_notes + " [Edited by OLL - Requires reconfirmation]"
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
@@ -846,6 +858,8 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         updated["final_comments"] = None
     if "delivery_date" not in updated:
         updated["delivery_date"] = ""
+    if "receiver_name" not in updated:
+        updated["receiver_name"] = None
     
     return POResponse(**updated)
 
