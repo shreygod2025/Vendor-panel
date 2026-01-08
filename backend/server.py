@@ -823,10 +823,10 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         if po_update.status not in ["confirmed", "rejected"]:
             raise HTTPException(status_code=403, detail="Vendors can only confirm or reject POs")
     
-    # OLL can only edit draft or confirmed POs
+    # OLL can only edit draft, sent, or confirmed POs
     if current_user.get("role") == "oll":
-        if existing["status"] not in ["draft", "confirmed"]:
-            raise HTTPException(status_code=400, detail="Only draft or confirmed POs can be edited")
+        if existing["status"] not in ["draft", "sent", "confirmed"]:
+            raise HTTPException(status_code=400, detail="Only draft, sent, or confirmed POs can be edited")
     
     update_data = {k: v for k, v in po_update.model_dump().items() if v is not None}
     
