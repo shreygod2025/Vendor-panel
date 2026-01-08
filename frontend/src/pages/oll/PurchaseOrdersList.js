@@ -127,7 +127,7 @@ const PurchaseOrdersList = () => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const renderOrderRow = (order) => (
+  const renderOrderRow = (order, showActions = false) => (
     <TableRow key={order.id} data-testid={`po-row-${order.id}`}>
       <TableCell>
         <span className="font-mono font-medium text-slate-900">{order.po_number}</span>
@@ -158,6 +158,29 @@ const PurchaseOrdersList = () => {
           >
             <ExternalLink className="w-4 h-4" />
           </Button>
+          {showActions && (order.status === "delivered" || order.status === "closed") && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to={`/oll/issues?po_id=${order.id}`} className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Raise Issue
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to={`/oll/returns?po_id=${order.id}`} className="flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4" />
+                    Create Return
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </TableCell>
     </TableRow>
