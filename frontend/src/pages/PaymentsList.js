@@ -231,7 +231,7 @@ const PaymentsList = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-slate-50">
-                  <TableHead>Invoice ID</TableHead>
+                  <TableHead>Invoice #</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Payment Date</TableHead>
                   <TableHead>Mode</TableHead>
