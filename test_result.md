@@ -432,7 +432,7 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Implemented comprehensive enhancements: 1) PO form - Delivery details first, Receiver Name field, products table below with one row by default. 2) Products page - Import feature with sample CSV download. 3) Invoices - Status (Cleared/Pending/Overdue) with 7-day timeline. 4) Vendor PO list - Hidden draft POs, Mark Delivered button with invoice/logistics popup. 5) Sidebar - Finance above Management. 6) Bulk Import page for historical POs and invoices. Please test all new features."
+    message: "Implemented comprehensive features: 1) OLL Dashboard with pending payments breakdown (vendor name, due date, status). 2) Analytics page with monthly filters, popular products, issue types, delivery metrics, spend by vendor. 3) Vendor Dashboard with Upcoming Deliveries, Pending Issues, and Earnings sections. 4) PO list delivered section has 'Raise Issue' and 'Create Return' actions. Please test all new features including form submissions for issues, returns, invoices, and POs."
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE: All 34 backend API tests passed (100% success rate). Key findings: 1) Auth flow working correctly for both OLL admin (olladmin/olladmin) and vendor (vendor/vendor) credentials. 2) Products API returns vendor info correctly. 3) Purchase Orders API supports line_items with comments and final_comments field as requested. 4) All Phase 2 APIs (Deliveries, Issues, Returns, Invoices, Payments) working correctly. 5) Public tracking API working without exposing prices. 6) Dashboard stats working for both roles. All backend requirements from review request are satisfied. Ready for frontend testing if needed."
   - agent: "testing"
