@@ -94,22 +94,6 @@ const Login = () => {
             )}
           </Button>
         </form>
-
-        <div className="mt-6 pt-6 border-t border-slate-200">
-          <p className="text-xs text-slate-500 text-center">
-            Demo Credentials
-          </p>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-slate-50 rounded-lg p-3">
-              <p className="font-medium text-slate-700">OLL Admin</p>
-              <p className="text-slate-500 mt-1">olladmin / olladmin</p>
-            </div>
-            <div className="bg-slate-50 rounded-lg p-3">
-              <p className="font-medium text-slate-700">Vendor</p>
-              <p className="text-slate-500 mt-1">vendor / vendor</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
