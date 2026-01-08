@@ -602,18 +602,20 @@ const VendorPurchaseOrders = () => {
             </div>
 
             <div>
-              <Label className="form-label">Upload Invoice</Label>
+              <Label className="form-label">Upload Invoice *</Label>
               <div className="mt-1 flex items-center gap-3">
                 <Input
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
                   onChange={(e) => setDeliveryForm(prev => ({ ...prev, invoice_file: e.target.files[0] }))}
                   className="text-sm"
+                  required
                 />
                 {deliveryForm.invoice_file && (
                   <span className="text-xs text-emerald-600">✓ {deliveryForm.invoice_file.name}</span>
                 )}
               </div>
+              <p className="text-xs text-slate-500 mt-1">Required: Upload invoice PDF or image</p>
             </div>
 
             <div>
