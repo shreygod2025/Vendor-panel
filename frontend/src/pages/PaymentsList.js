@@ -251,75 +251,196 @@ const PaymentsList = () => {
       </div>
 
       {/* Record Payment Dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
+      <Dialog open={showDialog} onOpenChange={(open) => {
+        setShowDialog(open);
+        if (!open) {
+          setSelectedInvoice(null);
+          setFormData({
+            invoice_id: "",
+            amount: "",
+            payment_date: "",
+            payment_mode: "",
+            reference_id: "",
+            notes: "",
+            use_credit: false,
+            credit_amount: ""
+          });
+        }
+      }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label>Invoice</Label>
-              <Select value={formData.invoice_id} onValueChange={(v) => setFormData(prev => ({ ...prev, invoice_id: v }))}>
+              <Select value={formData.invoice_id} onValueChange={handleInvoiceSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select Invoice" />
                 </SelectTrigger>
                 <SelectContent>
-                  {invoices.map((inv) => (
+                  {invoices.filter(inv => (inv.amount - (inv.paid_amount || 0)) > 0).map((inv) => (
                     <SelectItem key={inv.id} value={inv.id}>
-                      {inv.invoice_number} - {formatCurrency(inv.amount)}
+                      {inv.invoice_number} - {formatCurrency(inv.amount)} (Pending: {formatCurrency(inv.amount - (inv.paid_amount || 0))})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Amount (₹)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
-                  required
-                />
+
+            {/* Show vendor credit if available */}
+            {selectedInvoice && getVendorCredit()?.available_credit > 0 && (
+              <Card className="bg-purple-50 border-purple-200">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Wallet className="w-5 h-5 text-purple-600 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-purple-800">Vendor Credit Available</span>
+                        <span className="font-mono font-bold text-purple-700">
+                          {formatCurrency(getVendorCredit()?.available_credit || 0)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-purple-600 mt-1">
+                        {getVendorCredit()?.vendor_name} has unused credit from returns
+                      </p>
+                      
+                      <div className="mt-3 flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="use_credit"
+                          checked={formData.use_credit}
+                          onChange={(e) => {
+                            const useCredit = e.target.checked;
+                            const availableCredit = getVendorCredit()?.available_credit || 0;
+                            const pendingAmount = getPendingAmount();
+                            const creditToUse = Math.min(availableCredit, pendingAmount);
+                            
+                            setFormData(prev => ({
+                              ...prev,
+                              use_credit: useCredit,
+                              credit_amount: useCredit ? creditToUse.toString() : "",
+                              amount: useCredit ? Math.max(0, pendingAmount - creditToUse).toString() : ""
+                            }));
+                          }}
+                          className="h-4 w-4 rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <label htmlFor="use_credit" className="text-sm text-purple-700">
+                          Use credit for this payment
+                        </label>
+                      </div>
+                      
+                      {formData.use_credit && (
+                        <div className="mt-2">
+                          <Label className="text-purple-700">Credit Amount to Use</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            max={Math.min(getVendorCredit()?.available_credit || 0, getPendingAmount())}
+                            value={formData.credit_amount}
+                            onChange={(e) => {
+                              const creditAmt = parseFloat(e.target.value) || 0;
+                              const pendingAmount = getPendingAmount();
+                              setFormData(prev => ({
+                                ...prev,
+                                credit_amount: e.target.value,
+                                amount: Math.max(0, pendingAmount - creditAmt).toString()
+                              }));
+                            }}
+                            className="mt-1 bg-white"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Payment Summary */}
+            {selectedInvoice && (
+              <div className="p-3 bg-slate-50 rounded-lg text-sm">
+                <div className="flex justify-between mb-1">
+                  <span className="text-slate-600">Invoice Amount:</span>
+                  <span className="font-mono">{formatCurrency(selectedInvoice.amount)}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-slate-600">Already Paid:</span>
+                  <span className="font-mono">{formatCurrency(selectedInvoice.paid_amount || 0)}</span>
+                </div>
+                <div className="flex justify-between font-medium border-t pt-1 mt-1">
+                  <span>Pending Amount:</span>
+                  <span className="font-mono text-amber-600">{formatCurrency(getPendingAmount())}</span>
+                </div>
+                {formData.use_credit && parseFloat(formData.credit_amount) > 0 && (
+                  <>
+                    <div className="flex justify-between text-purple-600 mt-1">
+                      <span>Credit Applied:</span>
+                      <span className="font-mono">-{formatCurrency(parseFloat(formData.credit_amount))}</span>
+                    </div>
+                    <div className="flex justify-between font-medium text-emerald-600">
+                      <span>Remaining to Pay:</span>
+                      <span className="font-mono">{formatCurrency(Math.max(0, getPendingAmount() - parseFloat(formData.credit_amount)))}</span>
+                    </div>
+                  </>
+                )}
               </div>
-              <div>
-                <Label>Payment Date</Label>
-                <Input
-                  type="date"
-                  value={formData.payment_date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, payment_date: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Payment Mode</Label>
-                <Select value={formData.payment_mode} onValueChange={(v) => setFormData(prev => ({ ...prev, payment_mode: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                    <SelectItem value="upi">UPI</SelectItem>
-                    <SelectItem value="cheque">Cheque</SelectItem>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="neft">NEFT</SelectItem>
-                    <SelectItem value="rtgs">RTGS</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Reference ID</Label>
-                <Input
-                  value={formData.reference_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, reference_id: e.target.value }))}
-                  required
-                  placeholder="Transaction ID"
-                />
-              </div>
-            </div>
+            )}
+
+            {/* Only show payment fields if there's remaining amount after credit */}
+            {(!formData.use_credit || (formData.use_credit && parseFloat(formData.amount) > 0)) && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Payment Amount (₹)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.amount}
+                      onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                      required={!formData.use_credit || parseFloat(formData.credit_amount) < getPendingAmount()}
+                    />
+                  </div>
+                  <div>
+                    <Label>Payment Date</Label>
+                    <Input
+                      type="date"
+                      value={formData.payment_date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, payment_date: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Payment Mode</Label>
+                    <Select value={formData.payment_mode} onValueChange={(v) => setFormData(prev => ({ ...prev, payment_mode: v }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="upi">UPI</SelectItem>
+                        <SelectItem value="cheque">Cheque</SelectItem>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="neft">NEFT</SelectItem>
+                        <SelectItem value="rtgs">RTGS</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Reference ID</Label>
+                    <Input
+                      value={formData.reference_id}
+                      onChange={(e) => setFormData(prev => ({ ...prev, reference_id: e.target.value }))}
+                      required={!formData.use_credit || parseFloat(formData.credit_amount) < getPendingAmount()}
+                      placeholder="Transaction ID"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            
             <div>
               <Label>Notes (Optional)</Label>
               <Textarea
@@ -329,7 +450,11 @@ const PaymentsList = () => {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af]" disabled={saving}>
+              <Button 
+                type="submit" 
+                className="bg-[#1e3a8a] hover:bg-[#1e40af]" 
+                disabled={saving || (!formData.use_credit && !formData.amount)}
+              >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Record Payment
               </Button>
