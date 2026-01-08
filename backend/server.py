@@ -634,6 +634,11 @@ async def update_vendor(vendor_id: str, vendor: VendorUpdate, current_user: dict
         raise HTTPException(status_code=403, detail="Only OLL can update vendors")
     
     update_data = {k: v for k, v in vendor.model_dump().items() if v is not None}
+    
+    # Handle password update separately
+    password = update_data.pop("password", None)
+    username = update_data.pop("username", None)
+    
     if "bank_details" in update_data and update_data["bank_details"]:
         update_data["bank_details"] = update_data["bank_details"] if isinstance(update_data["bank_details"], dict) else update_data["bank_details"].model_dump()
     if "team_members" in update_data and update_data["team_members"]:
@@ -644,6 +649,21 @@ async def update_vendor(vendor_id: str, vendor: VendorUpdate, current_user: dict
     result = await db.vendors.update_one({"id": vendor_id}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Vendor not found")
+    
+    # Update user account if password or username provided
+    if password or username:
+        user_update = {}
+        if password:
+            user_update["password"] = hash_password(password)
+        if username:
+            # Check if new username already exists
+            existing = await db.users.find_one({"username": username, "vendor_id": {"$ne": vendor_id}})
+            if existing:
+                raise HTTPException(status_code=400, detail="Username already exists")
+            user_update["username"] = username
+        
+        if user_update:
+            await db.users.update_one({"vendor_id": vendor_id}, {"$set": user_update})
     
     await create_audit_log("UPDATE_VENDOR", "vendor", vendor_id, current_user, update_data)
     
