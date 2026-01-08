@@ -340,6 +340,88 @@ const PurchaseOrdersList = () => {
     );
   };
 
+  const renderDeliveredTable = (ordersList) => {
+    if (ordersList.length === 0) {
+      return (
+        <div className="text-center py-8 text-slate-500">
+          <p className="text-sm">No delivered orders</p>
+        </div>
+      );
+    }
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-slate-50">
+            <TableHead>PO Number</TableHead>
+            <TableHead>Vendor</TableHead>
+            <TableHead>Receiver</TableHead>
+            <TableHead>Items</TableHead>
+            <TableHead>Grand Total</TableHead>
+            <TableHead>Logistics Cost</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {ordersList.map(order => (
+            <TableRow key={order.id} data-testid={`po-row-${order.id}`}>
+              <TableCell>
+                <span className="font-mono font-medium text-slate-900">{order.po_number}</span>
+              </TableCell>
+              <TableCell>{order.vendor_name}</TableCell>
+              <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
+              <TableCell>{order.line_items?.length || 0} items</TableCell>
+              <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
+              <TableCell className="font-mono text-slate-600">
+                {order.logistics_cost ? formatCurrency(order.logistics_cost) : "-"}
+              </TableCell>
+              <TableCell>
+                <span className={`badge ${getStatusColor(order.status)}`}>
+                  {order.status}
+                </span>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <Link to={`/oll/purchase-orders/${order.id}`}>
+                    <Button variant="ghost" size="sm" title="View PO">
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                  <Link to={`/oll/invoices?po_id=${order.id}`}>
+                    <Button variant="ghost" size="sm" title="View Invoice" className="text-emerald-600">
+                      <Receipt className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link to={`/oll/issues?po_id=${order.id}`} className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4" />
+                          Raise Issue
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to={`/oll/returns?po_id=${order.id}`} className="flex items-center gap-2">
+                          <RotateCcw className="w-4 h-4" />
+                          Create Return
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
   const renderSubSection = (title, orders, sectionKey, icon, iconColor, showApprovalActions = false) => {
     const isExpanded = expandedSections[sectionKey];
     return (
