@@ -730,17 +730,32 @@ const VendorPurchaseOrders = () => {
                   {selectedInvoice.payment_status === "fully_paid" ? "Cleared" :
                    selectedInvoice.payment_status === "partially_paid" ? "Partially Paid" : "Pending"}
                 </span>
-                {selectedInvoice.file_url && (
-                  <a 
-                    href={selectedInvoice.file_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    View Attached File →
-                  </a>
-                )}
               </div>
+
+              {/* Invoice Document */}
+              {selectedInvoice.file_url && (
+                <div className="p-4 border-2 border-dashed border-emerald-200 bg-emerald-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-emerald-800">Invoice Document</p>
+                        <p className="text-xs text-emerald-600">Uploaded document</p>
+                      </div>
+                    </div>
+                    <a 
+                      href={selectedInvoice.file_url} 
+                      download={`Invoice-${selectedInvoice.invoice_number}.pdf`}
+                      className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download
+                    </a>
+                  </div>
+                </div>
+              )}
 
               {selectedInvoice.notes && (
                 <div className="p-3 bg-amber-50 rounded-lg">
