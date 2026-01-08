@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { apiClient } from "../../App";
 import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -17,13 +20,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { Eye, FileText, Truck, Check, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../../components/ui/dialog";
+import { Eye, FileText, Truck, Check, X, Package, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const VendorPurchaseOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // Delivery dialog state
+  const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
+  const [selectedPO, setSelectedPO] = useState(null);
+  const [deliveryForm, setDeliveryForm] = useState({
+    invoice_number: "",
+    invoice_amount: "",
+    invoice_date: "",
+    invoice_file: null,
+    logistics_cost: "",
+    logistics_bill_file: null,
+    notes: ""
+  });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -32,7 +57,9 @@ const VendorPurchaseOrders = () => {
   const fetchOrders = async () => {
     try {
       const response = await apiClient.get("/purchase-orders");
-      setOrders(response.data);
+      // Filter out draft POs - vendor should not see drafts
+      const filteredOrders = response.data.filter(order => order.status !== "draft");
+      setOrders(filteredOrders);
     } catch (error) {
       toast.error("Failed to fetch purchase orders");
     } finally {
@@ -60,6 +87,60 @@ const VendorPurchaseOrders = () => {
       fetchOrders();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to reject PO");
+    }
+  };
+
+  const openDeliveryDialog = (order) => {
+    setSelectedPO(order);
+    setDeliveryForm({
+      invoice_number: "",
+      invoice_amount: order.grand_total || "",
+      invoice_date: new Date().toISOString().split('T')[0],
+      invoice_file: null,
+      logistics_cost: "",
+      logistics_bill_file: null,
+      notes: ""
+    });
+    setDeliveryDialogOpen(true);
+  };
+
+  const handleDeliverySubmit = async () => {
+    if (!deliveryForm.invoice_number || !deliveryForm.invoice_amount || !deliveryForm.invoice_date) {
+      toast.error("Please fill in all required invoice fields");
+      return;
+    }
+
+    if (!deliveryForm.logistics_cost) {
+      toast.error("Please enter logistics cost");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // First mark as delivered
+      await apiClient.post(`/purchase-orders/${selectedPO.id}/deliver`);
+      
+      // Then create the invoice
+      const invoiceData = {
+        po_id: selectedPO.id,
+        invoice_number: deliveryForm.invoice_number,
+        invoice_date: deliveryForm.invoice_date,
+        amount: parseFloat(deliveryForm.invoice_amount),
+        logistics_cost: parseFloat(deliveryForm.logistics_cost) || 0,
+        invoice_file_url: deliveryForm.invoice_file ? URL.createObjectURL(deliveryForm.invoice_file) : null,
+        logistics_bill_url: deliveryForm.logistics_bill_file ? URL.createObjectURL(deliveryForm.logistics_bill_file) : null,
+        notes: deliveryForm.notes
+      };
+      
+      await apiClient.post("/invoices", invoiceData);
+      
+      toast.success("Delivery marked and invoice created successfully");
+      setDeliveryDialogOpen(false);
+      fetchOrders();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to process delivery");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -134,6 +215,7 @@ const VendorPurchaseOrders = () => {
               <TableHeader>
                 <TableRow className="bg-slate-50">
                   <TableHead>PO Number</TableHead>
+                  <TableHead>Receiver</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
@@ -145,6 +227,7 @@ const VendorPurchaseOrders = () => {
                 {filteredOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-mono font-medium">{order.po_number}</TableCell>
+                    <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
                     <TableCell>{order.line_items?.length || 0} items</TableCell>
                     <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
                     <TableCell>
@@ -191,6 +274,17 @@ const VendorPurchaseOrders = () => {
                             </Button>
                           </Link>
                         )}
+
+                        {order.status === "dispatched" && (
+                          <Button 
+                            size="sm" 
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => openDeliveryDialog(order)}
+                          >
+                            <Package className="w-4 h-4 mr-1" />
+                            Mark Delivered
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -200,6 +294,132 @@ const VendorPurchaseOrders = () => {
           )}
         </div>
       </div>
+
+      {/* Delivery & Invoice Dialog */}
+      <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              Mark as Delivered
+            </DialogTitle>
+            <DialogDescription>
+              Upload invoice and logistics details to mark PO {selectedPO?.po_number} as delivered
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                <strong>Important:</strong> Invoice and logistics details are required to mark delivery complete.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="form-label">Invoice Number *</Label>
+                <Input
+                  value={deliveryForm.invoice_number}
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, invoice_number: e.target.value }))}
+                  placeholder="INV-001"
+                />
+              </div>
+              <div>
+                <Label className="form-label">Invoice Date *</Label>
+                <Input
+                  type="date"
+                  value={deliveryForm.invoice_date}
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, invoice_date: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="form-label">Invoice Amount (₹) *</Label>
+                <Input
+                  type="number"
+                  value={deliveryForm.invoice_amount}
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, invoice_amount: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <Label className="form-label">Logistics Cost (₹) *</Label>
+                <Input
+                  type="number"
+                  value={deliveryForm.logistics_cost}
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, logistics_cost: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="form-label">Upload Invoice</Label>
+              <div className="mt-1 flex items-center gap-3">
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, invoice_file: e.target.files[0] }))}
+                  className="text-sm"
+                />
+                {deliveryForm.invoice_file && (
+                  <span className="text-xs text-emerald-600">✓ {deliveryForm.invoice_file.name}</span>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label className="form-label">Upload Logistics Bill</Label>
+              <div className="mt-1 flex items-center gap-3">
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, logistics_bill_file: e.target.files[0] }))}
+                  className="text-sm"
+                />
+                {deliveryForm.logistics_bill_file && (
+                  <span className="text-xs text-emerald-600">✓ {deliveryForm.logistics_bill_file.name}</span>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label className="form-label">Notes</Label>
+              <Textarea
+                value={deliveryForm.notes}
+                onChange={(e) => setDeliveryForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Any additional notes..."
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeliveryDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeliverySubmit}
+              disabled={submitting}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Confirm Delivery
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
