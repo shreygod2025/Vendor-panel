@@ -1295,6 +1295,11 @@ def main():
         ("Vendor Confirm PO", tester.test_vendor_confirm_po),
         ("Vendor Add Dispatch", tester.test_vendor_dispatch),
         ("Get Upcoming Deliveries", tester.test_upcoming_deliveries),
+        # NEW DELIVERY APPROVAL WORKFLOW TESTS
+        ("Delivery Approval Workflow", tester.test_delivery_approval_workflow),
+        ("Delivery Rejection Workflow", tester.test_delivery_rejection_workflow),
+        ("Analytics API", tester.test_analytics_api),
+        ("Review Request APIs", tester.test_review_request_apis),
         ("Create Issue", tester.test_create_issue),
         ("Get Issues", tester.test_get_issues),
         ("Create Return", tester.test_create_return),
