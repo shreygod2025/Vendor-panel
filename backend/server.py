@@ -1045,6 +1045,112 @@ async def close_po(po_id: str, current_user: dict = Depends(get_current_user)):
     await create_audit_log("CLOSE_PO", "purchase_order", po_id, current_user)
     return {"message": "PO closed successfully"}
 
+@api_router.post("/purchase-orders/{po_id}/vendor-deliver")
+async def vendor_submit_delivery(po_id: str, delivery: VendorDeliverySubmit, current_user: dict = Depends(get_current_user)):
+    """Vendor submits delivery - marks PO as pending_approval, creates invoice"""
+    po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Only vendor can mark their own PO as delivered
+    if current_user.get("role") == "vendor" and current_user.get("vendor_id") != po["vendor_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if po["status"] != "dispatched":
+        raise HTTPException(status_code=400, detail="Only dispatched POs can be marked as delivered")
+    
+    # Update PO status to pending_approval
+    await db.purchase_orders.update_one(
+        {"id": po_id},
+        {"$set": {
+            "status": "pending_approval",
+            "delivery_submitted_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Create the invoice automatically
+    invoice_doc = {
+        "id": str(uuid.uuid4()),
+        "po_id": po_id,
+        "vendor_id": po["vendor_id"],
+        "invoice_number": delivery.invoice_number,
+        "invoice_date": delivery.invoice_date,
+        "amount": delivery.invoice_amount,
+        "logistics_cost": delivery.logistics_cost,
+        "file_url": delivery.invoice_file_url,
+        "logistics_bill_url": delivery.logistics_bill_url,
+        "due_date": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()[:10],
+        "paid_amount": 0,
+        "payment_status": "pending",
+        "notes": delivery.notes,
+        "created_by": current_user["user_id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.invoices.insert_one(invoice_doc)
+    
+    await create_audit_log("VENDOR_SUBMIT_DELIVERY", "purchase_order", po_id, current_user, {
+        "invoice_number": delivery.invoice_number,
+        "invoice_amount": delivery.invoice_amount
+    })
+    
+    return {"message": "Delivery submitted for approval", "invoice_id": invoice_doc["id"]}
+
+@api_router.post("/purchase-orders/{po_id}/approve-delivery")
+async def approve_delivery(po_id: str, current_user: dict = Depends(get_current_user)):
+    """OLL admin approves the vendor's delivery - marks PO as delivered"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can approve deliveries")
+    
+    po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    if po["status"] != "pending_approval":
+        raise HTTPException(status_code=400, detail="Only pending approval POs can be approved")
+    
+    await db.purchase_orders.update_one(
+        {"id": po_id},
+        {"$set": {
+            "status": "delivered",
+            "delivery_approved_at": datetime.now(timezone.utc).isoformat(),
+            "delivery_approved_by": current_user["user_id"],
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await create_audit_log("APPROVE_DELIVERY", "purchase_order", po_id, current_user)
+    return {"message": "Delivery approved successfully"}
+
+@api_router.post("/purchase-orders/{po_id}/reject-delivery")
+async def reject_delivery(po_id: str, reason: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """OLL admin rejects the delivery - marks PO back to dispatched"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can reject deliveries")
+    
+    po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    if po["status"] != "pending_approval":
+        raise HTTPException(status_code=400, detail="Only pending approval POs can be rejected")
+    
+    await db.purchase_orders.update_one(
+        {"id": po_id},
+        {"$set": {
+            "status": "dispatched",
+            "delivery_rejection_reason": reason,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Delete the auto-created invoice
+    await db.invoices.delete_many({"po_id": po_id, "payment_status": "pending"})
+    
+    await create_audit_log("REJECT_DELIVERY", "purchase_order", po_id, current_user, {"reason": reason})
+    return {"message": "Delivery rejected"}
+
 @api_router.post("/purchase-orders/import", response_model=POResponse)
 async def import_purchase_order(po: POImport, current_user: dict = Depends(get_current_user)):
     """Import historical purchase order (for bulk import feature)"""
