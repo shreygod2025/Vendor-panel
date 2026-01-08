@@ -13,13 +13,12 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import { Plus, Search, RotateCcw, FileCheck, Trash2, Eye } from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import { Plus, Search, RotateCcw, FileCheck, Trash2, Eye, FileText, Download } from "lucide-react";
 import { toast } from "sonner";
 
 const ReturnsList = () => {
@@ -28,6 +27,8 @@ const ReturnsList = () => {
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedReturn, setSelectedReturn] = useState(null);
+  const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchReturns();
@@ -55,6 +56,11 @@ const ReturnsList = () => {
     }
   };
 
+  const viewCreditNote = (ret) => {
+    setSelectedReturn(ret);
+    setCreditNoteDialogOpen(true);
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -63,6 +69,7 @@ const ReturnsList = () => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-IN', {
       year: 'numeric',
       month: 'short',
@@ -70,8 +77,18 @@ const ReturnsList = () => {
     });
   };
 
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: "bg-yellow-100 text-yellow-700",
+      approved: "bg-blue-100 text-blue-700",
+      credit_issued: "bg-emerald-100 text-emerald-700",
+      rejected: "bg-red-100 text-red-700"
+    };
+    return colors[status] || "bg-slate-100 text-slate-600";
+  };
+
   const filteredReturns = returns.filter((ret) => {
-    return ret.return_number.toLowerCase().includes(search.toLowerCase()) ||
+    return ret.return_number?.toLowerCase().includes(search.toLowerCase()) ||
            (ret.credit_note_number && ret.credit_note_number.toLowerCase().includes(search.toLowerCase()));
   });
 
@@ -96,7 +113,7 @@ const ReturnsList = () => {
 
       <div className="page-container">
         {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -115,6 +132,21 @@ const ReturnsList = () => {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
                   <FileCheck className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {returns.filter(r => r.credit_note_number).length}
+                  </p>
+                  <p className="text-sm text-slate-500">Credit Notes Issued</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
@@ -164,8 +196,9 @@ const ReturnsList = () => {
                     <TableHead>Vendor</TableHead>
                     <TableHead>Items</TableHead>
                     <TableHead>Credit Value</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
-                    {isOLL && <TableHead className="text-right">Actions</TableHead>}
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -176,28 +209,48 @@ const ReturnsList = () => {
                         {ret.credit_note_number ? (
                           <span className="font-mono text-emerald-600">{ret.credit_note_number}</span>
                         ) : (
-                          <span className="text-slate-400">-</span>
+                          <span className="text-slate-400">Pending</span>
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-sm">{ret.po_number || '-'}</TableCell>
-                      <TableCell>{ret.vendor_name}</TableCell>
+                      <TableCell>{ret.vendor_name || '-'}</TableCell>
                       <TableCell>{ret.items?.length || 0} items</TableCell>
                       <TableCell className="font-mono font-medium text-emerald-600">
                         {formatCurrency(ret.total_value || 0)}
                       </TableCell>
+                      <TableCell>
+                        <span className={`badge ${getStatusColor(ret.status)}`}>
+                          {ret.status?.replace('_', ' ') || 'pending'}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-slate-500">{formatDate(ret.created_at)}</TableCell>
-                      {isOLL && (
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(ret.id)}
-                            className="text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      )}
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {ret.credit_note_number && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => viewCreditNote(ret)}
+                              className="text-emerald-600 hover:bg-emerald-50"
+                              title="View Credit Note"
+                              data-testid={`view-credit-note-${ret.id}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {isOLL && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(ret.id)}
+                              className="text-red-600 hover:bg-red-50"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -206,6 +259,118 @@ const ReturnsList = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Credit Note Dialog */}
+      <Dialog open={creditNoteDialogOpen} onOpenChange={setCreditNoteDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck className="w-5 h-5 text-emerald-600" />
+              Credit Note Details
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedReturn && (
+            <div className="space-y-4">
+              {/* Credit Note Header */}
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-emerald-600">Credit Note Number</span>
+                  <span className="font-mono font-bold text-emerald-800">{selectedReturn.credit_note_number}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-emerald-600">Issue Date</span>
+                  <span className="text-emerald-800">{formatDate(selectedReturn.credit_note_date)}</span>
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Return Number</span>
+                  <span className="font-mono">{selectedReturn.return_number}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">PO Number</span>
+                  <span className="font-mono">{selectedReturn.po_number || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Vendor</span>
+                  <span>{selectedReturn.vendor_name || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Status</span>
+                  <span className={`badge ${getStatusColor(selectedReturn.status)}`}>
+                    {selectedReturn.status?.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">Returned Items</p>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="text-xs">Product</TableHead>
+                        <TableHead className="text-xs text-center">Qty</TableHead>
+                        <TableHead className="text-xs text-right">Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(selectedReturn.items || []).map((item, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="text-sm">{item.product_name}</TableCell>
+                          <TableCell className="text-sm text-center">{item.quantity}</TableCell>
+                          <TableCell className="text-sm text-right font-mono">
+                            {formatCurrency(item.unit_price * item.quantity)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Total */}
+              <div className="p-4 bg-slate-50 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-slate-700">Total Credit Value</span>
+                  <span className="text-xl font-bold text-emerald-600 font-mono">
+                    {formatCurrency(selectedReturn.total_value || 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {selectedReturn.notes && (
+                <div>
+                  <p className="text-sm font-medium text-slate-700 mb-1">Notes</p>
+                  <p className="text-sm text-slate-600 p-3 bg-slate-50 rounded-lg">
+                    {selectedReturn.notes}
+                  </p>
+                </div>
+              )}
+
+              {/* Credit Note File */}
+              {selectedReturn.credit_note_file_url && (
+                <div className="pt-2 border-t">
+                  <a 
+                    href={selectedReturn.credit_note_file_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Credit Note Document
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
