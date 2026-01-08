@@ -1570,7 +1570,7 @@ async def create_payment(payment: PaymentCreate, current_user: dict = Depends(ge
             "vendor_id": vendor_id,
             "status": "credit_issued"
         }, {"_id": 0}).to_list(1000)
-        total_credit = sum(r.get("credit_amount", 0) for r in returns)
+        total_credit = sum(r.get("credit_amount") or r.get("total_value", 0) for r in returns)
         
         # Get used credit
         credit_payments = await db.payments.find({
