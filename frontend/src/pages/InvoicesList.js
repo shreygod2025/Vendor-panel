@@ -35,7 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
-import { Plus, Receipt, Loader2, Clock, CheckCircle, AlertTriangle, DollarSign, Eye, MoreHorizontal, FileWarning } from "lucide-react";
+import { Plus, Receipt, Loader2, Clock, CheckCircle, AlertTriangle, DollarSign, Eye, MoreHorizontal, FileWarning, Download } from "lucide-react";
 import { toast } from "sonner";
 
 const InvoicesList = () => {
