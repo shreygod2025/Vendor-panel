@@ -264,6 +264,53 @@ const VendorForm = () => {
             </CardContent>
           </Card>
 
+          {/* Login Credentials */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <KeyRound className="w-5 h-5" />
+                Login Credentials
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> These credentials will be used by the vendor to login to their portal.
+                  {isEdit && " Leave password blank to keep existing password."}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="username" className="form-label">Username *</Label>
+                  <Input
+                    id="username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleChange}
+                    required={!isEdit}
+                    placeholder="vendor_username"
+                    data-testid="vendor-username-input"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="password" className="form-label">
+                    Password {!isEdit && "*"}
+                  </Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required={!isEdit}
+                    placeholder={isEdit ? "Leave blank to keep existing" : "Enter password"}
+                    data-testid="vendor-password-input"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Bank Details */}
           <Card>
             <CardHeader>
