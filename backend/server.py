@@ -1561,6 +1561,32 @@ async def create_payment(payment: PaymentCreate, current_user: dict = Depends(ge
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
+    vendor_id = invoice.get("vendor_id")
+    
+    # If payment mode is credit, validate vendor has enough credit
+    if payment.payment_mode == "credit":
+        # Get vendor credit
+        returns = await db.returns.find({
+            "vendor_id": vendor_id,
+            "status": "credit_issued"
+        }, {"_id": 0}).to_list(1000)
+        total_credit = sum(r.get("credit_amount", 0) for r in returns)
+        
+        # Get used credit
+        credit_payments = await db.payments.find({
+            "payment_mode": "credit",
+            "vendor_id": vendor_id
+        }, {"_id": 0}).to_list(1000)
+        used_credit = sum(p.get("amount", 0) for p in credit_payments)
+        
+        available_credit = total_credit - used_credit
+        
+        if payment.amount > available_credit:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Insufficient credit. Available: ₹{available_credit:.2f}, Requested: ₹{payment.amount:.2f}"
+            )
+    
     existing_payments = await db.payments.find({"invoice_id": payment.invoice_id}, {"_id": 0}).to_list(1000)
     total_paid = sum(p["amount"] for p in existing_payments) + payment.amount
     
@@ -1573,6 +1599,7 @@ async def create_payment(payment: PaymentCreate, current_user: dict = Depends(ge
         "id": str(uuid.uuid4()),
         "invoice_id": payment.invoice_id,
         "po_id": invoice["po_id"],
+        "vendor_id": vendor_id,
         "amount": payment.amount,
         "payment_date": payment.payment_date,
         "payment_mode": payment.payment_mode,
