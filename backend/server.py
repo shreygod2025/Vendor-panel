@@ -1014,6 +1014,46 @@ async def close_po(po_id: str, current_user: dict = Depends(get_current_user)):
     await create_audit_log("CLOSE_PO", "purchase_order", po_id, current_user)
     return {"message": "PO closed successfully"}
 
+@api_router.post("/purchase-orders/import", response_model=POResponse)
+async def import_purchase_order(po: POImport, current_user: dict = Depends(get_current_user)):
+    """Import historical purchase order (for bulk import feature)"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can import purchase orders")
+    
+    vendor = await db.vendors.find_one({"id": po.vendor_id}, {"_id": 0})
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    
+    totals = calculate_po_totals(po.line_items, 0, 0)
+    
+    po_doc = {
+        "id": str(uuid.uuid4()),
+        "po_number": generate_po_number(),
+        "vendor_id": po.vendor_id,
+        "delivery_address": po.delivery_address,
+        "receiver_name": po.receiver_name,
+        "contact_person": po.contact_person,
+        "contact_number": po.contact_number,
+        "delivery_date": po.delivery_date,
+        "line_items": [item.model_dump() for item in po.line_items],
+        "order_discount_amount": 0,
+        "order_discount_percent": 0,
+        "notes": po.notes or "Imported historical PO",
+        "final_comments": None,
+        "status": po.status,
+        "tracking_token": str(uuid.uuid4()),
+        "created_by": current_user["user_id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        **totals
+    }
+    
+    await db.purchase_orders.insert_one(po_doc)
+    await create_audit_log("IMPORT_PO", "purchase_order", po_doc["id"], current_user, {"po_number": po_doc["po_number"]})
+    
+    po_doc["vendor_name"] = vendor.get("name")
+    return POResponse(**po_doc)
+
 # ========================
 # DELIVERIES ENDPOINTS
 # ========================
