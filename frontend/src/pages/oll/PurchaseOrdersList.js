@@ -449,7 +449,8 @@ const PurchaseOrdersList = () => {
                 </div>
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     );
