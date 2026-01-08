@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { ArrowLeft, Save, Loader2, Plus, Trash2, Users, Building } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Users, Building, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 const VendorForm = () => {
@@ -32,6 +32,9 @@ const VendorForm = () => {
     gst_number: "",
     contact_person: "",
     is_active: true,
+    // Login credentials
+    username: "",
+    password: "",
     bank_details: {
       bank_name: "",
       branch: "",
