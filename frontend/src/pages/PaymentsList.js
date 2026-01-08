@@ -52,6 +52,11 @@ const PaymentsList = () => {
     credit_amount: ""
   });
 
+  // View Payment/Invoice dialog state
+  const [viewDialog, setViewDialog] = useState(false);
+  const [viewingPayment, setViewingPayment] = useState(null);
+  const [viewingInvoice, setViewingInvoice] = useState(null);
+
   useEffect(() => {
     fetchData();
   }, []);
