@@ -746,6 +746,9 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     
     totals = calculate_po_totals(po.line_items, po.order_discount_amount, po.order_discount_percent)
     
+    # Set status based on send_immediately flag - default is "sent"
+    initial_status = "sent" if po.send_immediately else "draft"
+    
     po_doc = {
         "id": str(uuid.uuid4()),
         "po_number": generate_po_number(),
@@ -760,7 +763,7 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
         "order_discount_percent": po.order_discount_percent,
         "notes": po.notes,
         "final_comments": po.final_comments,
-        "status": "draft",
+        "status": initial_status,
         "tracking_token": str(uuid.uuid4()),
         "created_by": current_user["user_id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -769,7 +772,7 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     }
     
     await db.purchase_orders.insert_one(po_doc)
-    await create_audit_log("CREATE_PO", "purchase_order", po_doc["id"], current_user, {"po_number": po_doc["po_number"]})
+    await create_audit_log("CREATE_PO", "purchase_order", po_doc["id"], current_user, {"po_number": po_doc["po_number"], "status": initial_status})
     
     po_doc["vendor_name"] = vendor.get("name")
     return POResponse(**po_doc)
