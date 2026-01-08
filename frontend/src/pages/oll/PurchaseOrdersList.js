@@ -179,7 +179,7 @@ const PurchaseOrdersList = () => {
     }
   };
 
-  const renderOrderRow = (order, showActions = false) => {
+  const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
     const canEdit = order.status === "draft" || order.status === "sent" || order.status === "confirmed";
     
     return (
@@ -193,7 +193,7 @@ const PurchaseOrdersList = () => {
         <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
         <TableCell>
           <span className={`badge ${getStatusColor(order.status)}`}>
-            {order.status}
+            {order.status === "pending_approval" ? "Pending Approval" : order.status}
           </span>
         </TableCell>
         <TableCell className="text-slate-500">{formatDate(order.created_at)}</TableCell>
@@ -220,6 +220,34 @@ const PurchaseOrdersList = () => {
             >
               <ExternalLink className="w-4 h-4" />
             </Button>
+            {showApprovalActions && order.status === "pending_approval" && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPO(order);
+                    setRejectDialogOpen(true);
+                  }}
+                  className="text-red-600 hover:bg-red-50"
+                  title="Reject Delivery"
+                >
+                  <XCircle className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPO(order);
+                    setApprovalDialogOpen(true);
+                  }}
+                  className="text-emerald-600 hover:bg-emerald-50"
+                  title="Approve Delivery"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                </Button>
+              </>
+            )}
             {showActions && (order.status === "delivered" || order.status === "closed") && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
