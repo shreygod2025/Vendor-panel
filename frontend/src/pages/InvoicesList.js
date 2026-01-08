@@ -65,6 +65,20 @@ const InvoicesList = () => {
     notes: ""
   });
 
+  // View invoice dialog state
+  const [viewInvoiceDialog, setViewInvoiceDialog] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState(null);
+
+  // Raise issue dialog state
+  const [issueDialog, setIssueDialog] = useState(false);
+  const [issueInvoice, setIssueInvoice] = useState(null);
+  const [issueForm, setIssueForm] = useState({
+    issue_type: "invoice_error",
+    description: "",
+    priority: "medium"
+  });
+  const [raisingIssue, setRaisingIssue] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
