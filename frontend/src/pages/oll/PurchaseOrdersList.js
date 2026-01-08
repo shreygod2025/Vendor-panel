@@ -306,7 +306,7 @@ const PurchaseOrdersList = () => {
     );
   };
 
-  const renderSubSection = (title, orders, sectionKey, icon, iconColor) => {
+  const renderSubSection = (title, orders, sectionKey, icon, iconColor, showApprovalActions = false) => {
     const isExpanded = expandedSections[sectionKey];
     return (
       <div className="border rounded-lg overflow-hidden mb-4">
@@ -325,7 +325,7 @@ const PurchaseOrdersList = () => {
         </button>
         {isExpanded && (
           <div className="p-4 border-t">
-            {renderTable(orders, `No ${title.toLowerCase()} orders`)}
+            {renderTable(orders, `No ${title.toLowerCase()} orders`, false, showApprovalActions)}
           </div>
         )}
       </div>
