@@ -182,6 +182,22 @@ const PurchaseOrdersList = () => {
     }
   };
 
+  const handleDeletePO = async () => {
+    if (!selectedPO) return;
+    setDeleting(true);
+    try {
+      await apiClient.delete(`/purchase-orders/${selectedPO.id}`);
+      toast.success("PO deleted successfully");
+      setDeleteDialogOpen(false);
+      setSelectedPO(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to delete PO");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
     const canEdit = order.status === "draft" || order.status === "sent" || order.status === "confirmed";
     
