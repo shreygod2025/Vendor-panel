@@ -35,8 +35,7 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     { 
       section: "Overview",
       items: [
-        { path: "/oll", icon: LayoutDashboard, label: "Dashboard" },
-        { path: "/oll/analytics", icon: BarChart3, label: "Analytics" }
+        { path: "/oll", icon: LayoutDashboard, label: "Dashboard" }
       ]
     },
     {
@@ -66,6 +65,7 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     {
       section: "System",
       items: [
+        { path: "/oll/analytics", icon: BarChart3, label: "Analytics" },
         { path: "/oll/bulk-import", icon: Upload, label: "Bulk Import" },
         { path: "/oll/audit-logs", icon: History, label: "Audit Logs" }
       ]
