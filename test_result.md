@@ -270,6 +270,21 @@ backend:
         agent: "testing"
         comment: "✅ TESTED: GET /api/dashboard/stats returns different stats for OLL and Vendor roles. Both endpoints working correctly with proper role-based data filtering."
 
+  - task: "Delivery Approval Workflow API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "New delivery approval workflow with vendor-deliver, approve-delivery, reject-delivery endpoints"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Complete delivery approval workflow working perfectly. POST /api/purchase-orders/{po_id}/vendor-deliver allows vendor to submit delivery with invoice details, changes PO status to pending_approval, auto-creates invoice. POST /api/purchase-orders/{po_id}/approve-delivery allows OLL to approve delivery, changes status to delivered. POST /api/purchase-orders/{po_id}/reject-delivery allows OLL to reject delivery with reason, reverts status to dispatched and deletes auto-created invoice. All status transitions working correctly: dispatched → pending_approval → delivered (approval) OR dispatched → pending_approval → dispatched (rejection). Tested with real dispatched POs using test credentials olladmin/olladmin and vendor/vendor."
+
 frontend:
   - task: "Login Page"
     implemented: true
