@@ -565,20 +565,43 @@ async def create_vendor(vendor: VendorCreate, current_user: dict = Depends(get_c
     if current_user.get("role") != "oll":
         raise HTTPException(status_code=403, detail="Only OLL can create vendors")
     
+    # Check if username already exists
+    existing_user = await db.users.find_one({"username": vendor.username})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
     vendor_dict = vendor.model_dump()
+    # Remove password from vendor doc
+    password = vendor_dict.pop("password", None)
+    username = vendor_dict.pop("username", None)
+    
     if vendor_dict.get("bank_details"):
         vendor_dict["bank_details"] = vendor_dict["bank_details"]
     if vendor_dict.get("team_members"):
         vendor_dict["team_members"] = [tm if isinstance(tm, dict) else tm.model_dump() for tm in vendor_dict["team_members"]]
     
+    vendor_id = str(uuid.uuid4())
     vendor_doc = {
-        "id": str(uuid.uuid4()),
+        "id": vendor_id,
         **vendor_dict,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.vendors.insert_one(vendor_doc)
+    
+    # Create user account for vendor
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "username": username,
+        "password": hash_password(password),
+        "role": "vendor",
+        "vendor_id": vendor_id,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(user_doc)
+    
     await create_audit_log("CREATE_VENDOR", "vendor", vendor_doc["id"], current_user, {"name": vendor.name})
     
     return VendorResponse(**vendor_doc)
