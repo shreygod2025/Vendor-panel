@@ -1571,6 +1571,8 @@ def main():
         ("Create Payment", tester.test_create_payment),
         ("Get Payments", tester.test_get_payments),
         ("Get Pending Payments", tester.test_get_pending_payments),
+        # NEW CREDIT PAYMENT FEATURE TEST
+        ("Credit Payment Feature", tester.test_credit_payment_feature),
         ("Public Tracking", tester.test_public_tracking),
         ("OLL Dashboard Stats", tester.test_dashboard_stats_oll),
         ("Vendor Dashboard Stats", tester.test_dashboard_stats_vendor),
