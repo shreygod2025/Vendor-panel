@@ -184,6 +184,7 @@ class POCreate(BaseModel):
     order_discount_percent: float = 0.0
     notes: Optional[str] = None
     final_comments: Optional[str] = None
+    send_immediately: bool = True  # Default to sending immediately
 
 class POUpdate(BaseModel):
     delivery_address: Optional[str] = None
