@@ -29,7 +29,7 @@ import {
 } from "../../components/ui/dialog";
 import { 
   Eye, FileText, Truck, Check, X, Package, Loader2, Clock, 
-  ChevronDown, ChevronRight, Circle
+  ChevronDown, ChevronRight, Circle, Receipt
 } from "lucide-react";
 import { toast } from "sonner";
 
