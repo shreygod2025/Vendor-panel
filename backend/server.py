@@ -785,6 +785,8 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
             p["final_comments"] = None
         if "delivery_date" not in p:
             p["delivery_date"] = ""
+        if "receiver_name" not in p:
+            p["receiver_name"] = None
         result.append(POResponse(**p))
     
     return result
