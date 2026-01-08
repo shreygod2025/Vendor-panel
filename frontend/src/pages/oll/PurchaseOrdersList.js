@@ -46,6 +46,7 @@ import { toast } from "sonner";
 const PurchaseOrdersList = () => {
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("all");
@@ -67,22 +68,42 @@ const PurchaseOrdersList = () => {
   const [approving, setApproving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // View Invoice dialog state
+  const [viewInvoiceDialog, setViewInvoiceDialog] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const [ordersRes, vendorsRes] = await Promise.all([
+      const [ordersRes, vendorsRes, invoicesRes] = await Promise.all([
         apiClient.get("/purchase-orders"),
-        apiClient.get("/vendors")
+        apiClient.get("/vendors"),
+        apiClient.get("/invoices")
       ]);
       setOrders(ordersRes.data);
       setVendors(vendorsRes.data);
+      setInvoices(invoicesRes.data);
     } catch (error) {
       toast.error("Failed to fetch purchase orders");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getInvoiceForPO = (poId) => {
+    return invoices.find(inv => inv.po_id === poId);
+  };
+
+  const openViewInvoice = (poId) => {
+    const invoice = getInvoiceForPO(poId);
+    if (invoice) {
+      setSelectedInvoice(invoice);
+      setViewInvoiceDialog(true);
+    } else {
+      toast.error("No invoice found for this PO");
     }
   };
 
