@@ -277,7 +277,7 @@ const PurchaseOrdersList = () => {
     );
   };
 
-  const renderTable = (ordersList, emptyMessage, showActions = false) => {
+  const renderTable = (ordersList, emptyMessage, showActions = false, showApprovalActions = false) => {
     if (ordersList.length === 0) {
       return (
         <div className="text-center py-8 text-slate-500">
@@ -300,7 +300,7 @@ const PurchaseOrdersList = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {ordersList.map(order => renderOrderRow(order, showActions))}
+          {ordersList.map(order => renderOrderRow(order, showActions, showApprovalActions))}
         </TableBody>
       </Table>
     );
