@@ -117,28 +117,24 @@ const VendorPurchaseOrders = () => {
 
     setSubmitting(true);
     try {
-      // First mark as delivered
-      await apiClient.post(`/purchase-orders/${selectedPO.id}/deliver`);
-      
-      // Then create the invoice
-      const invoiceData = {
-        po_id: selectedPO.id,
+      // Submit delivery via new vendor-deliver endpoint
+      const deliveryData = {
         invoice_number: deliveryForm.invoice_number,
+        invoice_amount: parseFloat(deliveryForm.invoice_amount),
         invoice_date: deliveryForm.invoice_date,
-        amount: parseFloat(deliveryForm.invoice_amount),
         logistics_cost: parseFloat(deliveryForm.logistics_cost) || 0,
         invoice_file_url: deliveryForm.invoice_file ? URL.createObjectURL(deliveryForm.invoice_file) : null,
         logistics_bill_url: deliveryForm.logistics_bill_file ? URL.createObjectURL(deliveryForm.logistics_bill_file) : null,
         notes: deliveryForm.notes
       };
       
-      await apiClient.post("/invoices", invoiceData);
+      await apiClient.post(`/purchase-orders/${selectedPO.id}/vendor-deliver`, deliveryData);
       
-      toast.success("Delivery marked and invoice created successfully");
+      toast.success("Delivery submitted for OLL approval");
       setDeliveryDialogOpen(false);
       fetchOrders();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to process delivery");
+      toast.error(error.response?.data?.detail || "Failed to submit delivery");
     } finally {
       setSubmitting(false);
     }
