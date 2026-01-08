@@ -161,6 +161,13 @@ const PaymentsList = () => {
     return selectedInvoice.amount - (selectedInvoice.paid_amount || 0);
   };
 
+  const openViewPayment = (payment) => {
+    const invoice = invoices.find(inv => inv.id === payment.invoice_id);
+    setViewingPayment(payment);
+    setViewingInvoice(invoice);
+    setViewDialog(true);
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
