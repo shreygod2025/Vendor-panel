@@ -147,15 +147,35 @@ const VendorPurchaseOrders = () => {
       return;
     }
 
+    if (!deliveryForm.invoice_file) {
+      toast.error("Please upload the invoice document");
+      return;
+    }
+
     setSubmitting(true);
     try {
+      // Convert file to base64 for storage
+      const fileToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (error) => reject(error);
+        });
+      };
+
+      const invoiceFileBase64 = await fileToBase64(deliveryForm.invoice_file);
+      const logisticsFileBase64 = deliveryForm.logistics_bill_file 
+        ? await fileToBase64(deliveryForm.logistics_bill_file) 
+        : null;
+
       const deliveryData = {
         invoice_number: deliveryForm.invoice_number,
         invoice_amount: parseFloat(deliveryForm.invoice_amount),
         invoice_date: deliveryForm.invoice_date,
         logistics_cost: parseFloat(deliveryForm.logistics_cost) || 0,
-        invoice_file_url: deliveryForm.invoice_file ? URL.createObjectURL(deliveryForm.invoice_file) : null,
-        logistics_bill_url: deliveryForm.logistics_bill_file ? URL.createObjectURL(deliveryForm.logistics_bill_file) : null,
+        invoice_file_url: invoiceFileBase64,
+        logistics_bill_url: logisticsFileBase64,
         notes: deliveryForm.notes
       };
       
