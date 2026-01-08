@@ -237,6 +237,7 @@ const PaymentsList = () => {
                   <TableHead>Mode</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -246,13 +247,23 @@ const PaymentsList = () => {
                     <TableCell className="font-mono font-medium text-emerald-600">
                       {formatCurrency(payment.amount)}
                     </TableCell>
-                    <TableCell>{payment.payment_date}</TableCell>
+                    <TableCell>{formatDate(payment.payment_date)}</TableCell>
                     <TableCell className="capitalize">{payment.payment_mode}</TableCell>
                     <TableCell className="font-mono text-sm">{payment.reference_id}</TableCell>
                     <TableCell>
                       <span className={`badge ${getStatusColor(payment.payment_status)}`}>
                         {payment.payment_status.replace('_', ' ')}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openViewPayment(payment)}
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
