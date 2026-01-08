@@ -16,7 +16,8 @@ import {
   UserCog,
   AlertTriangle,
   CalendarClock,
-  Upload
+  Upload,
+  BarChart3
 } from "lucide-react";
 
 const OLL_LOGO = "https://customer-assets.emergentagent.com/job_vendormate-20/artifacts/ze7saivu_OLL-horizontal-logo-1.png";
