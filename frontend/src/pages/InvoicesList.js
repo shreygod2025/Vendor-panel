@@ -372,7 +372,7 @@ const InvoicesList = () => {
                   <TableHead>Paid</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Timeline</TableHead>
-                  {isOLL && <TableHead className="text-right">Actions</TableHead>}
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -407,19 +407,45 @@ const InvoicesList = () => {
                           </span>
                         )}
                       </TableCell>
-                      {isOLL && (
-                        <TableCell className="text-right">
-                          {statusInfo.status !== "cleared" && (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => openPaymentDialog(invoice)}
-                            >
-                              Record Payment
-                            </Button>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openViewInvoice(invoice)}
+                            title="View Invoice"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {isOLL && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {statusInfo.status !== "cleared" && (
+                                  <DropdownMenuItem onClick={() => openPaymentDialog(invoice)}>
+                                    <DollarSign className="w-4 h-4 mr-2" />
+                                    Record Payment
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => openIssueDialog(invoice)}>
+                                  <FileWarning className="w-4 h-4 mr-2" />
+                                  Raise Issue
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link to={`/oll/purchase-orders/${invoice.po_id}`} className="flex items-center">
+                                    <Receipt className="w-4 h-4 mr-2" />
+                                    View PO
+                                  </Link>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
-                        </TableCell>
-                      )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
