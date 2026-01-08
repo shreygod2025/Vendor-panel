@@ -885,8 +885,9 @@ async def delete_purchase_order(po_id: str, current_user: dict = Depends(get_cur
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
     
-    if po["status"] not in ["draft", "rejected"]:
-        raise HTTPException(status_code=400, detail="Only draft or rejected POs can be deleted")
+    # Allow delete for draft, sent, confirmed, and rejected POs
+    if po["status"] not in ["draft", "sent", "confirmed", "rejected"]:
+        raise HTTPException(status_code=400, detail="Only draft, sent, confirmed, or rejected POs can be deleted")
     
     await db.purchase_orders.delete_one({"id": po_id})
     await create_audit_log("DELETE_PO", "purchase_order", po_id, current_user)
