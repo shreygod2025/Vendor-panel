@@ -127,6 +127,7 @@ const PurchaseOrdersList = () => {
         <span className="font-mono font-medium text-slate-900">{order.po_number}</span>
       </TableCell>
       <TableCell>{order.vendor_name}</TableCell>
+      <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
       <TableCell>{order.line_items?.length || 0} items</TableCell>
       <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
       <TableCell>
