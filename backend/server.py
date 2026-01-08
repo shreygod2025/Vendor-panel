@@ -806,6 +806,8 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
         po["final_comments"] = None
     if "delivery_date" not in po:
         po["delivery_date"] = ""
+    if "receiver_name" not in po:
+        po["receiver_name"] = None
     
     return POResponse(**po)
 
