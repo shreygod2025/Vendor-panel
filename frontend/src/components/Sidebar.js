@@ -64,6 +64,7 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     {
       section: "System",
       items: [
+        { path: "/oll/bulk-import", icon: Upload, label: "Bulk Import" },
         { path: "/oll/audit-logs", icon: History, label: "Audit Logs" }
       ]
     }
