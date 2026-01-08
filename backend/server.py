@@ -1197,7 +1197,7 @@ async def import_purchase_order(po: POImport, current_user: dict = Depends(get_c
 
 @api_router.get("/deliveries/upcoming")
 async def get_upcoming_deliveries(current_user: dict = Depends(get_current_user)):
-    query = {"status": {"$in": ["confirmed", "dispatched"]}}
+    query = {"status": {"$in": ["confirmed", "dispatched", "pending_approval"]}}
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
