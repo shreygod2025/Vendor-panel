@@ -59,20 +59,43 @@ const VendorPurchaseOrders = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Invoice state
+  const [invoices, setInvoices] = useState([]);
+  const [viewInvoiceDialog, setViewInvoiceDialog] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+
   useEffect(() => {
     fetchOrders();
   }, []);
 
   const fetchOrders = async () => {
     try {
-      const response = await apiClient.get("/purchase-orders");
+      const [ordersRes, invoicesRes] = await Promise.all([
+        apiClient.get("/purchase-orders"),
+        apiClient.get("/invoices")
+      ]);
       // Filter out draft POs - vendor should not see drafts
-      const filteredOrders = response.data.filter(order => order.status !== "draft");
+      const filteredOrders = ordersRes.data.filter(order => order.status !== "draft");
       setOrders(filteredOrders);
+      setInvoices(invoicesRes.data);
     } catch (error) {
       toast.error("Failed to fetch purchase orders");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getInvoiceForPO = (poId) => {
+    return invoices.find(inv => inv.po_id === poId);
+  };
+
+  const openViewInvoice = (poId) => {
+    const invoice = getInvoiceForPO(poId);
+    if (invoice) {
+      setSelectedInvoice(invoice);
+      setViewInvoiceDialog(true);
+    } else {
+      toast.error("No invoice found for this PO");
     }
   };
 
