@@ -350,7 +350,7 @@ const PurchaseOrdersList = () => {
             <TabsContent value="dispatched">
               <Card>
                 <CardContent className="p-4">
-                  {renderTable(categorizedOrders.dispatched, "No dispatched orders")}
+                  {renderTable(categorizedOrders.dispatched, "No dispatched orders", false)}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -358,7 +358,7 @@ const PurchaseOrdersList = () => {
             <TabsContent value="delivered">
               <Card>
                 <CardContent className="p-4">
-                  {renderTable(categorizedOrders.delivered, "No delivered orders")}
+                  {renderTable(categorizedOrders.delivered, "No delivered orders", true)}
                 </CardContent>
               </Card>
             </TabsContent>
