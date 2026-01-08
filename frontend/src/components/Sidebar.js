@@ -35,7 +35,8 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     { 
       section: "Overview",
       items: [
-        { path: "/oll", icon: LayoutDashboard, label: "Dashboard" }
+        { path: "/oll", icon: LayoutDashboard, label: "Dashboard" },
+        { path: "/oll/analytics", icon: BarChart3, label: "Analytics" }
       ]
     },
     {
