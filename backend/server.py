@@ -175,6 +175,7 @@ class POLineItem(BaseModel):
 class POCreate(BaseModel):
     vendor_id: str
     delivery_address: str
+    receiver_name: Optional[str] = None
     contact_person: str
     contact_number: str
     delivery_date: str
@@ -186,6 +187,7 @@ class POCreate(BaseModel):
 
 class POUpdate(BaseModel):
     delivery_address: Optional[str] = None
+    receiver_name: Optional[str] = None
     contact_person: Optional[str] = None
     contact_number: Optional[str] = None
     delivery_date: Optional[str] = None
@@ -195,6 +197,18 @@ class POUpdate(BaseModel):
     notes: Optional[str] = None
     final_comments: Optional[str] = None
     status: Optional[str] = None
+
+# PO Import Model
+class POImport(BaseModel):
+    vendor_id: str
+    delivery_address: str
+    receiver_name: Optional[str] = None
+    contact_person: str
+    contact_number: str
+    delivery_date: str
+    line_items: List[POLineItem]
+    status: str = "delivered"
+    notes: Optional[str] = None
 
 class POResponse(BaseModel):
     id: str
