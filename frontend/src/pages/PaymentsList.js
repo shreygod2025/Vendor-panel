@@ -241,32 +241,52 @@ const PaymentsList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell className="font-mono text-sm">{payment.invoice_id.slice(0, 8)}...</TableCell>
-                    <TableCell className="font-mono font-medium text-emerald-600">
-                      {formatCurrency(payment.amount)}
-                    </TableCell>
-                    <TableCell>{formatDate(payment.payment_date)}</TableCell>
-                    <TableCell className="capitalize">{payment.payment_mode}</TableCell>
-                    <TableCell className="font-mono text-sm">{payment.reference_id}</TableCell>
-                    <TableCell>
-                      <span className={`badge ${getStatusColor(payment.payment_status)}`}>
-                        {payment.payment_status.replace('_', ' ')}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openViewPayment(payment)}
-                        title="View Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {payments.map((payment) => {
+                  const invoice = invoices.find(inv => inv.id === payment.invoice_id);
+                  return (
+                    <TableRow key={payment.id}>
+                      <TableCell className="font-mono text-sm">{invoice?.invoice_number || payment.invoice_id.slice(0, 8) + "..."}</TableCell>
+                      <TableCell className="font-mono font-medium text-emerald-600">
+                        {formatCurrency(payment.amount)}
+                      </TableCell>
+                      <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                      <TableCell className="capitalize">{payment.payment_mode}</TableCell>
+                      <TableCell className="font-mono text-sm">{payment.reference_id}</TableCell>
+                      <TableCell>
+                        <span className={`badge ${getStatusColor(payment.payment_status)}`}>
+                          {payment.payment_status.replace('_', ' ')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openViewPayment(payment)}
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {invoice?.file_url ? (
+                            <a
+                              href={invoice.file_url}
+                              download={`Invoice-${invoice.invoice_number}.pdf`}
+                              title="Download Invoice"
+                            >
+                              <Button variant="ghost" size="sm" className="text-emerald-600">
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </a>
+                          ) : (
+                            <Button variant="ghost" size="sm" disabled title="No document attached">
+                              <Download className="w-4 h-4 opacity-30" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
