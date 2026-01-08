@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiClient } from "../../App";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
 import {
   Select,
   SelectContent,
@@ -32,8 +31,9 @@ import {
   Building2,
   DollarSign,
   CheckCircle,
+  PieChart,
   Clock,
-  PieChart
+  XCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -55,12 +55,16 @@ const Analytics = () => {
   const [analytics, setAnalytics] = useState({
     totalSpend: 0,
     totalOrders: 0,
+    deliveredOrders: 0,
     onTimeDeliveries: 0,
+    lateDeliveries: 0,
     issueFreePOs: 0,
+    posWithIssues: 0,
     popularProducts: [],
     issueTypes: [],
     vendorSpend: [],
-    monthlySpend: []
+    monthlySpend: [],
+    vendorPerformance: []
   });
 
   useEffect(() => {
@@ -102,7 +106,6 @@ const Analytics = () => {
   const calculateAnalytics = () => {
     let filteredPOs = [...data.purchaseOrders];
     let filteredIssues = [...data.issues];
-    let filteredInvoices = [...data.invoices];
     
     // Apply month filter
     if (monthFilter !== "all") {
@@ -120,22 +123,48 @@ const Analytics = () => {
     // Apply vendor filter
     if (vendorFilter !== "all") {
       filteredPOs = filteredPOs.filter(po => po.vendor_id === vendorFilter);
-      filteredIssues = filteredIssues.filter(issue => issue.vendor_id === vendorFilter);
+      filteredIssues = filteredIssues.filter(issue => {
+        const po = data.purchaseOrders.find(p => p.id === issue.po_id);
+        return po && po.vendor_id === vendorFilter;
+      });
     }
 
-    // Total spend
-    const totalSpend = filteredPOs.reduce((sum, po) => sum + (po.grand_total || 0), 0);
-    const totalOrders = filteredPOs.length;
+    // Total spend (excluding drafts)
+    const nonDraftPOs = filteredPOs.filter(po => po.status !== "draft");
+    const totalSpend = nonDraftPOs.reduce((sum, po) => sum + (po.grand_total || 0), 0);
+    const totalOrders = nonDraftPOs.length;
 
     // Delivery metrics
     const deliveredPOs = filteredPOs.filter(po => po.status === "delivered" || po.status === "closed");
-    const posWithIssues = new Set(filteredIssues.map(i => i.po_id));
-    const issueFreePOs = deliveredPOs.filter(po => !posWithIssues.has(po.id)).length;
-    const onTimeDeliveries = deliveredPOs.length; // Simplified - assuming all delivered are on-time
+    const deliveredOrders = deliveredPOs.length;
+
+    // On-time deliveries (compare delivery_date with actual delivery - simplified: assume delivered on time if delivered)
+    // In a real system, you'd compare actual delivery date with expected delivery date
+    let onTimeDeliveries = 0;
+    let lateDeliveries = 0;
+    
+    deliveredPOs.forEach(po => {
+      // Check if there's a delivery delay issue for this PO
+      const hasDelayIssue = filteredIssues.some(issue => 
+        issue.po_id === po.id && 
+        (issue.issue_type === "delay" || issue.issue_type === "delivery_delay")
+      );
+      if (hasDelayIssue) {
+        lateDeliveries++;
+      } else {
+        onTimeDeliveries++;
+      }
+    });
+
+    // Issue-free POs
+    const posWithIssueIds = new Set(filteredIssues.map(i => i.po_id));
+    const issueFreePOs = deliveredPOs.filter(po => !posWithIssueIds.has(po.id)).length;
+    const posWithIssues = deliveredPOs.filter(po => posWithIssueIds.has(po.id)).length;
 
     // Popular products
     const productCount = {};
     filteredPOs.forEach(po => {
+      if (po.status === "draft") return; // Exclude draft POs
       (po.line_items || []).forEach(item => {
         const productName = item.product_name || "Unknown";
         productCount[productName] = (productCount[productName] || 0) + (item.quantity || 1);
@@ -158,19 +187,38 @@ const Analytics = () => {
 
     // Vendor spend
     const vendorSpendMap = {};
-    filteredPOs.forEach(po => {
+    const vendorOrderCount = {};
+    const vendorIssueCount = {};
+    
+    nonDraftPOs.forEach(po => {
       const vendorId = po.vendor_id;
       const vendor = data.vendors.find(v => v.id === vendorId);
       const vendorName = vendor?.name || "Unknown";
       vendorSpendMap[vendorName] = (vendorSpendMap[vendorName] || 0) + (po.grand_total || 0);
+      vendorOrderCount[vendorName] = (vendorOrderCount[vendorName] || 0) + 1;
     });
+    
+    filteredIssues.forEach(issue => {
+      const po = data.purchaseOrders.find(p => p.id === issue.po_id);
+      if (po) {
+        const vendor = data.vendors.find(v => v.id === po.vendor_id);
+        const vendorName = vendor?.name || "Unknown";
+        vendorIssueCount[vendorName] = (vendorIssueCount[vendorName] || 0) + 1;
+      }
+    });
+    
     const vendorSpend = Object.entries(vendorSpendMap)
-      .map(([name, amount]) => ({ name, amount }))
+      .map(([name, amount]) => ({ 
+        name, 
+        amount,
+        orders: vendorOrderCount[name] || 0,
+        issues: vendorIssueCount[name] || 0
+      }))
       .sort((a, b) => b.amount - a.amount);
 
     // Monthly spend
     const monthlySpendMap = {};
-    filteredPOs.forEach(po => {
+    nonDraftPOs.forEach(po => {
       const date = new Date(po.created_at);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       monthlySpendMap[monthKey] = (monthlySpendMap[monthKey] || 0) + (po.grand_total || 0);
@@ -182,8 +230,11 @@ const Analytics = () => {
     setAnalytics({
       totalSpend,
       totalOrders,
+      deliveredOrders,
       onTimeDeliveries,
+      lateDeliveries,
       issueFreePOs,
+      posWithIssues,
       popularProducts,
       issueTypes,
       vendorSpend,
@@ -212,16 +263,22 @@ const Analytics = () => {
     return months;
   };
 
-  const deliveredTotal = data.purchaseOrders.filter(po => 
-    po.status === "delivered" || po.status === "closed"
-  ).length;
+  // Get unique vendors (filter out duplicates)
+  const getUniqueVendors = () => {
+    const seen = new Set();
+    return data.vendors.filter(vendor => {
+      if (seen.has(vendor.name)) return false;
+      seen.add(vendor.name);
+      return true;
+    });
+  };
 
-  const onTimeRate = deliveredTotal > 0 
-    ? ((analytics.onTimeDeliveries / deliveredTotal) * 100).toFixed(1) 
+  const onTimeRate = analytics.deliveredOrders > 0 
+    ? ((analytics.onTimeDeliveries / analytics.deliveredOrders) * 100).toFixed(1) 
     : 0;
 
-  const issuesFreeRate = deliveredTotal > 0 
-    ? ((analytics.issueFreePOs / deliveredTotal) * 100).toFixed(1) 
+  const issuesFreeRate = analytics.deliveredOrders > 0 
+    ? ((analytics.issueFreePOs / analytics.deliveredOrders) * 100).toFixed(1) 
     : 0;
 
   if (loading) {
@@ -260,12 +317,12 @@ const Analytics = () => {
               </SelectContent>
             </Select>
             <Select value={vendorFilter} onValueChange={setVendorFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="All Vendors" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Vendors</SelectItem>
-                {data.vendors.map(vendor => (
+                {getUniqueVendors().map(vendor => (
                   <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -298,7 +355,7 @@ const Analytics = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-900">{analytics.totalOrders}</p>
-                  <p className="text-xs text-slate-500">Total Orders</p>
+                  <p className="text-xs text-slate-500">Total Orders (excl. drafts)</p>
                 </div>
               </div>
             </CardContent>
@@ -311,7 +368,7 @@ const Analytics = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-900">{onTimeRate}%</p>
-                  <p className="text-xs text-slate-500">On-Time Deliveries</p>
+                  <p className="text-xs text-slate-500">On-Time Delivery Rate</p>
                 </div>
               </div>
             </CardContent>
@@ -324,7 +381,7 @@ const Analytics = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-slate-900">{issuesFreeRate}%</p>
-                  <p className="text-xs text-slate-500">Issue-Free Deliveries</p>
+                  <p className="text-xs text-slate-500">Issue-Free Delivery Rate</p>
                 </div>
               </div>
             </CardContent>
@@ -353,13 +410,14 @@ const Analytics = () => {
                 <CardContent>
                   {analytics.monthlySpend.length > 0 ? (
                     <div className="space-y-3">
-                      {analytics.monthlySpend.map((item, idx) => {
+                      {analytics.monthlySpend.slice(-6).map((item, idx) => {
                         const maxAmount = Math.max(...analytics.monthlySpend.map(s => s.amount));
                         const percentage = maxAmount > 0 ? (item.amount / maxAmount) * 100 : 0;
+                        const monthLabel = new Date(item.month + "-01").toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
                         return (
                           <div key={idx}>
                             <div className="flex justify-between text-sm mb-1">
-                              <span className="text-slate-600">{item.month}</span>
+                              <span className="text-slate-600">{monthLabel}</span>
                               <span className="font-mono font-medium">{formatCurrency(item.amount)}</span>
                             </div>
                             <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
@@ -394,7 +452,9 @@ const Analytics = () => {
                           <CheckCircle className="w-5 h-5 text-emerald-600" />
                           <span className="text-emerald-800">On-Time Deliveries</span>
                         </div>
-                        <span className="text-2xl font-bold text-emerald-700">{analytics.onTimeDeliveries}/{deliveredTotal}</span>
+                        <span className="text-2xl font-bold text-emerald-700">
+                          {analytics.onTimeDeliveries}/{analytics.deliveredOrders}
+                        </span>
                       </div>
                       <div className="mt-2 h-2 bg-emerald-200 rounded-full overflow-hidden">
                         <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${onTimeRate}%` }} />
@@ -407,12 +467,38 @@ const Analytics = () => {
                           <Package className="w-5 h-5 text-blue-600" />
                           <span className="text-blue-800">Issue-Free Deliveries</span>
                         </div>
-                        <span className="text-2xl font-bold text-blue-700">{analytics.issueFreePOs}/{deliveredTotal}</span>
+                        <span className="text-2xl font-bold text-blue-700">
+                          {analytics.issueFreePOs}/{analytics.deliveredOrders}
+                        </span>
                       </div>
                       <div className="mt-2 h-2 bg-blue-200 rounded-full overflow-hidden">
                         <div className="h-full bg-blue-500 rounded-full" style={{ width: `${issuesFreeRate}%` }} />
                       </div>
                     </div>
+
+                    {analytics.lateDeliveries > 0 && (
+                      <div className="p-4 bg-red-50 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-red-600" />
+                            <span className="text-red-800">Late Deliveries</span>
+                          </div>
+                          <span className="text-2xl font-bold text-red-700">{analytics.lateDeliveries}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {analytics.posWithIssues > 0 && (
+                      <div className="p-4 bg-amber-50 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="w-5 h-5 text-amber-600" />
+                            <span className="text-amber-800">Deliveries with Issues</span>
+                          </div>
+                          <span className="text-2xl font-bold text-amber-700">{analytics.posWithIssues}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -491,7 +577,7 @@ const Analytics = () => {
                         return (
                           <div key={idx} className="flex items-center gap-3">
                             <div className={`w-4 h-4 rounded ${colors[idx % colors.length]}`} />
-                            <span className="flex-1 text-sm capitalize">{item.type.replace('_', ' ')}</span>
+                            <span className="flex-1 text-sm capitalize">{item.type.replace(/_/g, ' ')}</span>
                             <span className="text-sm font-mono">{item.count}</span>
                             <span className="text-sm text-slate-500">({percentage}%)</span>
                           </div>
@@ -526,8 +612,12 @@ const Analytics = () => {
                     <div className="p-4 bg-slate-50 rounded-lg">
                       <p className="text-sm text-slate-600 mb-2">Most Common Issue</p>
                       <p className="text-lg font-medium capitalize">
-                        {analytics.issueTypes[0]?.type.replace('_', ' ') || "None"}
+                        {analytics.issueTypes[0]?.type.replace(/_/g, ' ') || "None"}
                       </p>
+                    </div>
+                    <div className="p-4 bg-amber-50 rounded-lg">
+                      <p className="text-sm text-amber-600 mb-2">Total Issues</p>
+                      <p className="text-lg font-medium">{data.issues.length} issues reported</p>
                     </div>
                   </div>
                 </CardContent>
@@ -541,7 +631,7 @@ const Analytics = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building2 className="w-5 h-5" />
-                  Spend by Vendor
+                  Vendor Performance & Spend
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -551,9 +641,11 @@ const Analytics = () => {
                       <TableRow>
                         <TableHead>#</TableHead>
                         <TableHead>Vendor</TableHead>
+                        <TableHead className="text-right">Orders</TableHead>
+                        <TableHead className="text-right">Issues</TableHead>
                         <TableHead className="text-right">Total Spend</TableHead>
                         <TableHead className="text-right">% of Total</TableHead>
-                        <TableHead className="w-[200px]">Share</TableHead>
+                        <TableHead className="w-[150px]">Share</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -565,6 +657,14 @@ const Analytics = () => {
                           <TableRow key={idx}>
                             <TableCell className="font-medium">{idx + 1}</TableCell>
                             <TableCell>{vendor.name}</TableCell>
+                            <TableCell className="text-right">{vendor.orders}</TableCell>
+                            <TableCell className="text-right">
+                              {vendor.issues > 0 ? (
+                                <span className="text-red-600 font-medium">{vendor.issues}</span>
+                              ) : (
+                                <span className="text-emerald-600">0</span>
+                              )}
+                            </TableCell>
                             <TableCell className="text-right font-mono">{formatCurrency(vendor.amount)}</TableCell>
                             <TableCell className="text-right">{percentage}%</TableCell>
                             <TableCell>
