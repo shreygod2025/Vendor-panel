@@ -11,22 +11,57 @@ import {
   AlertCircle,
   RotateCcw,
   ArrowRight,
-  Package
+  Package,
+  DollarSign,
+  AlertTriangle,
+  CalendarClock
 } from "lucide-react";
 import { toast } from "sonner";
 
 const VendorDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [upcomingDeliveries, setUpcomingDeliveries] = useState([]);
+  const [pendingIssues, setPendingIssues] = useState([]);
+  const [earnings, setEarnings] = useState({ total: 0, paid: 0, pending: 0 });
 
   useEffect(() => {
-    fetchStats();
+    fetchData();
   }, []);
 
-  const fetchStats = async () => {
+  const fetchData = async () => {
     try {
-      const response = await apiClient.get("/dashboard/stats");
-      setStats(response.data);
+      const [statsRes, posRes, issuesRes, invoicesRes, paymentsRes] = await Promise.all([
+        apiClient.get("/dashboard/stats"),
+        apiClient.get("/purchase-orders"),
+        apiClient.get("/issues"),
+        apiClient.get("/invoices"),
+        apiClient.get("/payments")
+      ]);
+      
+      setStats(statsRes.data);
+      
+      // Filter POs that are sent or confirmed (not draft) for upcoming deliveries
+      const pos = posRes.data.filter(po => po.status !== "draft");
+      const upcoming = pos.filter(po => 
+        po.status === "sent" || po.status === "confirmed"
+      ).slice(0, 5);
+      setUpcomingDeliveries(upcoming);
+      
+      // Filter issues that are open
+      const openIssues = (issuesRes.data || []).filter(i => i.status === "open");
+      setPendingIssues(openIssues.slice(0, 5));
+      
+      // Calculate earnings
+      const invoices = invoicesRes.data || [];
+      const payments = paymentsRes.data || [];
+      const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.amount, 0);
+      const totalPaid = payments.reduce((sum, pay) => sum + pay.amount, 0);
+      setEarnings({
+        total: totalInvoiced,
+        paid: totalPaid,
+        pending: totalInvoiced - totalPaid
+      });
     } catch (error) {
       toast.error("Failed to fetch dashboard stats");
     } finally {
@@ -42,6 +77,14 @@ const VendorDashboard = () => {
     }).format(amount);
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   const getStatusColor = (status) => {
     const colors = {
       sent: "bg-blue-100 text-blue-700",
@@ -53,14 +96,24 @@ const VendorDashboard = () => {
     return colors[status] || "bg-slate-100 text-slate-600";
   };
 
+  const getPriorityColor = (priority) => {
+    const colors = {
+      critical: "bg-red-100 text-red-700",
+      high: "bg-orange-100 text-orange-700",
+      medium: "bg-yellow-100 text-yellow-700",
+      low: "bg-slate-100 text-slate-600"
+    };
+    return colors[priority] || "bg-slate-100 text-slate-600";
+  };
+
   if (loading) {
     return (
       <div className="page-container">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-slate-200 rounded w-48"></div>
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-slate-200 rounded-lg"></div>
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-48 bg-slate-200 rounded-lg"></div>
             ))}
           </div>
         </div>
@@ -103,116 +156,141 @@ const VendorDashboard = () => {
           </Card>
         )}
 
-        {/* Stats Grid */}
-        <div className="stats-grid">
-          <Card className="card-hover">
-            <CardContent className="p-5">
-              <div className="stat-icon bg-blue-100">
-                <FileText className="w-5 h-5 text-blue-600" />
+        {/* Main Grid - 3 Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Upcoming Deliveries */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-blue-600" />
+                  Upcoming Deliveries
+                </CardTitle>
+                <Link to="/vendor/purchase-orders" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                  View all <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
-              <div className="stat-value">{stats?.total_pos || 0}</div>
-              <div className="stat-label">Total POs</div>
+            </CardHeader>
+            <CardContent>
+              {upcomingDeliveries.length > 0 ? (
+                <div className="space-y-3">
+                  {upcomingDeliveries.map((po) => (
+                    <Link 
+                      key={po.id} 
+                      to={`/vendor/purchase-orders/${po.id}`}
+                      className="block p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-mono text-sm font-medium">{po.po_number}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(po.status)}`}>
+                          {po.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-500">
+                          {po.status === "sent" ? "Awaiting Confirmation" : "Ready to Dispatch"}
+                        </span>
+                        <span className="text-sm font-mono">{formatCurrency(po.grand_total)}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-slate-500">
+                  <Truck className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No pending deliveries</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="card-hover">
-            <CardContent className="p-5">
-              <div className="stat-icon bg-amber-100">
-                <Clock className="w-5 h-5 text-amber-600" />
+          {/* Pending Issues */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  Pending Issues
+                  {pendingIssues.length > 0 && (
+                    <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                      {pendingIssues.length}
+                    </span>
+                  )}
+                </CardTitle>
+                <Link to="/vendor/issues" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                  View all <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
-              <div className="stat-value">{stats?.pending_pos || 0}</div>
-              <div className="stat-label">Awaiting Confirmation</div>
+            </CardHeader>
+            <CardContent>
+              {pendingIssues.length > 0 ? (
+                <div className="space-y-3">
+                  {pendingIssues.map((issue) => (
+                    <div 
+                      key={issue.id}
+                      className="p-3 rounded-lg bg-slate-50"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-mono text-sm">{issue.issue_number}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${getPriorityColor(issue.priority)}`}>
+                          {issue.priority}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600 truncate">{issue.description}</p>
+                      <p className="text-xs text-slate-400 mt-1 capitalize">{issue.issue_type?.replace('_', ' ')}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-slate-500">
+                  <AlertTriangle className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No pending issues</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="card-hover">
-            <CardContent className="p-5">
-              <div className="stat-icon bg-indigo-100">
-                <Truck className="w-5 h-5 text-indigo-600" />
+          {/* Earnings */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-emerald-600" />
+                  Earnings
+                </CardTitle>
+                <Link to="/vendor/payments" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                  Details <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
-              <div className="stat-value">{stats?.po_by_status?.dispatched || 0}</div>
-              <div className="stat-label">In Transit</div>
-            </CardContent>
-          </Card>
-
-          <Card className="card-hover">
-            <CardContent className="p-5">
-              <div className="stat-icon bg-emerald-100">
-                <CheckCircle className="w-5 h-5 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-4 bg-emerald-50 rounded-lg">
+                  <p className="text-sm text-emerald-600">Total Invoiced</p>
+                  <p className="text-2xl font-bold text-emerald-700 font-mono">
+                    {formatCurrency(earnings.total)}
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-blue-600">Received</p>
+                    <p className="text-lg font-bold text-blue-700 font-mono">
+                      {formatCurrency(earnings.paid)}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-amber-50 rounded-lg">
+                    <p className="text-xs text-amber-600">Pending</p>
+                    <p className="text-lg font-bold text-amber-700 font-mono">
+                      {formatCurrency(earnings.pending)}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="stat-value">{stats?.po_by_status?.delivered || 0}</div>
-              <div className="stat-label">Delivered</div>
             </CardContent>
           </Card>
         </div>
-
-        {/* PO Status Overview */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold">Order Status Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {stats?.po_by_status && Object.entries(stats.po_by_status).map(([status, count]) => (
-                <div 
-                  key={status} 
-                  className="text-center p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
-                >
-                  <div className="text-2xl font-bold text-slate-900">{count}</div>
-                  <div className={`mt-1 text-xs font-medium px-2 py-0.5 rounded-full inline-block ${getStatusColor(status)}`}>
-                    {status}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent POs */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Clock className="w-5 h-5 text-slate-400" />
-                Recent Purchase Orders
-              </CardTitle>
-              <Link to="/vendor/purchase-orders" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                View all <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {stats?.recent_pos?.length > 0 ? (
-              <div className="space-y-3">
-                {stats.recent_pos.map((po) => (
-                  <Link 
-                    key={po.id} 
-                    to={`/vendor/purchase-orders/${po.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-slate-900">{po.po_number}</p>
-                      <p className="text-sm text-slate-500">{formatCurrency(po.grand_total)}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(po.status)}`}>
-                        {po.status}
-                      </span>
-                      {po.status === "sent" && (
-                        <span className="text-xs text-blue-600 font-medium">Action Required</span>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-500">
-                <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>No purchase orders yet</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Quick Actions */}
         <Card>
