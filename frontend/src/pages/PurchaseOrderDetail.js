@@ -258,8 +258,8 @@ const PurchaseOrderDetail = () => {
               </Button>
             )}
             
-            {/* Edit button - for draft and confirmed POs */}
-            {isOLL && (order.status === "draft" || order.status === "confirmed") && (
+            {/* Edit button - for draft, sent, and confirmed POs */}
+            {isOLL && (order.status === "draft" || order.status === "sent" || order.status === "confirmed") && (
               <Link to={`/oll/purchase-orders/${order.id}/edit`}>
                 <Button variant="outline" data-testid="edit-po-btn">
                   <Edit className="w-4 h-4 mr-2" />
