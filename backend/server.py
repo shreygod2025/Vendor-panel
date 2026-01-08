@@ -1783,6 +1783,83 @@ async def delete_return(return_id: str, current_user: dict = Depends(get_current
     await create_audit_log("DELETE_RETURN", "return", return_id, current_user)
     return {"message": "Return deleted successfully"}
 
+@api_router.get("/vendors/{vendor_id}/credit")
+async def get_vendor_credit(vendor_id: str, current_user: dict = Depends(get_current_user)):
+    """Get available credit for a vendor based on approved returns minus used credits"""
+    vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    
+    # Calculate total credit from approved returns
+    returns = await db.returns.find({
+        "vendor_id": vendor_id,
+        "status": "credit_issued"
+    }, {"_id": 0}).to_list(1000)
+    
+    total_credit = sum(r.get("credit_amount", 0) for r in returns)
+    
+    # Calculate used credit from payments with mode "credit"
+    payments = await db.payments.find({
+        "payment_mode": "credit",
+        "vendor_id": vendor_id
+    }, {"_id": 0}).to_list(1000)
+    
+    used_credit = sum(p.get("amount", 0) for p in payments)
+    
+    available_credit = max(0, total_credit - used_credit)
+    
+    return {
+        "vendor_id": vendor_id,
+        "vendor_name": vendor.get("name"),
+        "total_credit": total_credit,
+        "used_credit": used_credit,
+        "available_credit": available_credit,
+        "returns": [{"id": r["id"], "credit_note_number": r.get("credit_note_number"), "credit_amount": r.get("credit_amount", 0)} for r in returns]
+    }
+
+@api_router.get("/credits/by-vendor")
+async def get_all_vendors_credit(current_user: dict = Depends(get_current_user)):
+    """Get credit summary for all vendors"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can view all vendor credits")
+    
+    vendors = await db.vendors.find({}, {"_id": 0}).to_list(1000)
+    
+    # Get all credit_issued returns
+    returns = await db.returns.find({"status": "credit_issued"}, {"_id": 0}).to_list(1000)
+    
+    # Get all credit payments
+    payments = await db.payments.find({"payment_mode": "credit"}, {"_id": 0}).to_list(1000)
+    
+    # Calculate credit per vendor
+    vendor_credits = {}
+    for r in returns:
+        vid = r.get("vendor_id")
+        if vid not in vendor_credits:
+            vendor_credits[vid] = {"total": 0, "used": 0}
+        vendor_credits[vid]["total"] += r.get("credit_amount", 0)
+    
+    for p in payments:
+        vid = p.get("vendor_id")
+        if vid in vendor_credits:
+            vendor_credits[vid]["used"] += p.get("amount", 0)
+    
+    result = []
+    for v in vendors:
+        vid = v["id"]
+        credit_info = vendor_credits.get(vid, {"total": 0, "used": 0})
+        available = max(0, credit_info["total"] - credit_info["used"])
+        if credit_info["total"] > 0 or available > 0:
+            result.append({
+                "vendor_id": vid,
+                "vendor_name": v.get("name"),
+                "total_credit": credit_info["total"],
+                "used_credit": credit_info["used"],
+                "available_credit": available
+            })
+    
+    return result
+
 # ========================
 # AUDIT LOG ENDPOINTS
 # ========================
