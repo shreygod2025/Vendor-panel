@@ -25,7 +25,13 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle, Clock, Truck, Package, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle, Clock, Truck, Package, ChevronDown, ChevronRight, AlertTriangle, RotateCcw, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 const PurchaseOrdersList = () => {
