@@ -662,6 +662,211 @@ class VendorManagementAPITester:
         )
         return success
 
+    def test_po_import_endpoint(self):
+        """Test PO Import Endpoint - POST /api/purchase-orders/import"""
+        if not self.vendor_id or not self.product_id:
+            print("❌ Cannot test PO import - missing vendor or product ID")
+            return False
+            
+        po_import_data = {
+            "vendor_id": self.vendor_id,
+            "delivery_address": "Historical Import Address, Mumbai",
+            "receiver_name": "Historical Receiver",
+            "contact_person": "Import Contact",
+            "contact_number": "+91 9876543299",
+            "delivery_date": "2024-01-15",
+            "line_items": [
+                {
+                    "product_id": self.product_id,
+                    "product_name": "Historical Product",
+                    "sku": "HIST-001",
+                    "quantity": 5,
+                    "unit_price": 800.0,
+                    "tax_rate": 18.0,
+                    "discount_amount": 0.0,
+                    "discount_percent": 0.0,
+                    "comment": "Historical line item comment"
+                }
+            ],
+            "status": "delivered",
+            "notes": "Imported historical PO"
+        }
+        success, response = self.run_test(
+            "PO Import Endpoint",
+            "POST",
+            "purchase-orders/import",
+            200,
+            data=po_import_data,
+            token=self.oll_token
+        )
+        if success and 'id' in response:
+            print(f"   Imported PO: {response['po_number']} with status: {response['status']}")
+            print(f"   Receiver Name: {response.get('receiver_name', 'N/A')}")
+            print(f"   Line Items Count: {len(response.get('line_items', []))}")
+        return success
+
+    def test_invoice_status_tracking(self):
+        """Test Invoice Status - GET /api/invoices - verify status tracking"""
+        # First create an invoice with partial payment to test status
+        if not self.po_id:
+            print("❌ Cannot test invoice status - no PO ID available")
+            return False
+            
+        # Create invoice
+        invoice_data = {
+            "po_id": self.po_id,
+            "invoice_number": "INV-STATUS-TEST",
+            "invoice_date": datetime.now().strftime("%Y-%m-%d"),
+            "amount": 1000.0,
+            "due_date": "2024-03-15",
+            "notes": "Invoice for status testing"
+        }
+        success, invoice_response = self.run_test(
+            "Create Invoice for Status Test",
+            "POST",
+            "invoices",
+            200,
+            data=invoice_data,
+            token=self.vendor_token
+        )
+        
+        if not success or 'id' not in invoice_response:
+            return False
+            
+        test_invoice_id = invoice_response['id']
+        
+        # Create partial payment
+        payment_data = {
+            "invoice_id": test_invoice_id,
+            "amount": 500.0,  # Partial payment
+            "payment_date": datetime.now().strftime("%Y-%m-%d"),
+            "payment_mode": "bank_transfer",
+            "reference_id": "PARTIAL-PAY-001",
+            "notes": "Partial payment for status test"
+        }
+        success, payment_response = self.run_test(
+            "Create Partial Payment for Status Test",
+            "POST",
+            "payments",
+            200,
+            data=payment_data,
+            token=self.oll_token
+        )
+        
+        if not success:
+            return False
+        
+        # Now test invoice status tracking
+        success, response = self.run_test(
+            "Invoice Status Tracking",
+            "GET",
+            "invoices",
+            200,
+            token=self.oll_token
+        )
+        
+        if success and response:
+            # Find our test invoice
+            test_invoice = None
+            for invoice in response:
+                if invoice['id'] == test_invoice_id:
+                    test_invoice = invoice
+                    break
+            
+            if test_invoice:
+                print(f"   Invoice Amount: {test_invoice['amount']}")
+                print(f"   Paid Amount: {test_invoice.get('paid_amount', 0)}")
+                print(f"   Payment Status: {test_invoice.get('payment_status', 'N/A')}")
+                
+                # Verify status logic
+                amount = test_invoice['amount']
+                paid_amount = test_invoice.get('paid_amount', 0)
+                payment_status = test_invoice.get('payment_status', 'pending')
+                
+                if paid_amount >= amount:
+                    expected_status = "fully_paid"
+                elif paid_amount > 0:
+                    expected_status = "partially_paid"
+                else:
+                    expected_status = "pending"
+                
+                if payment_status == expected_status:
+                    print(f"   ✅ Status tracking working correctly: {payment_status}")
+                    return True
+                else:
+                    print(f"   ❌ Status mismatch - Expected: {expected_status}, Got: {payment_status}")
+                    return False
+            else:
+                print("   ❌ Test invoice not found in response")
+                return False
+        return success
+
+    def test_po_with_receiver_name(self):
+        """Test PO with receiver_name - POST /api/purchase-orders - verify receiver_name field is saved"""
+        if not self.vendor_id or not self.product_id:
+            print("❌ Cannot test PO with receiver_name - missing vendor or product ID")
+            return False
+            
+        po_data = {
+            "vendor_id": self.vendor_id,
+            "delivery_address": "Receiver Name Test Address, Bangalore",
+            "receiver_name": "John Doe Receiver",
+            "contact_person": "Test Contact Person",
+            "contact_number": "+91 9876543288",
+            "delivery_date": "2024-02-25",
+            "line_items": [
+                {
+                    "product_id": self.product_id,
+                    "product_name": "Test Product for Receiver",
+                    "sku": "TEST-REC-001",
+                    "quantity": 3,
+                    "unit_price": 1200.0,
+                    "tax_rate": 18.0,
+                    "discount_amount": 0.0,
+                    "discount_percent": 0.0,
+                    "comment": "Testing receiver name field"
+                }
+            ],
+            "order_discount_amount": 0.0,
+            "order_discount_percent": 0.0,
+            "notes": "Testing receiver_name field",
+            "final_comments": "Final comments for receiver name test"
+        }
+        success, response = self.run_test(
+            "Create PO with Receiver Name",
+            "POST",
+            "purchase-orders",
+            200,
+            data=po_data,
+            token=self.oll_token
+        )
+        
+        if success and 'id' in response:
+            receiver_name = response.get('receiver_name')
+            if receiver_name == "John Doe Receiver":
+                print(f"   ✅ Receiver Name saved correctly: {receiver_name}")
+                
+                # Also test retrieving the PO to ensure receiver_name persists
+                po_id = response['id']
+                success2, get_response = self.run_test(
+                    "Get PO to Verify Receiver Name",
+                    "GET",
+                    f"purchase-orders/{po_id}",
+                    200,
+                    token=self.oll_token
+                )
+                
+                if success2 and get_response.get('receiver_name') == "John Doe Receiver":
+                    print(f"   ✅ Receiver Name persisted correctly in database")
+                    return True
+                else:
+                    print(f"   ❌ Receiver Name not persisted correctly")
+                    return False
+            else:
+                print(f"   ❌ Receiver Name not saved correctly - Expected: 'John Doe Receiver', Got: {receiver_name}")
+                return False
+        return success
+
 def main():
     print("🚀 Starting Vendor Management System API Tests")
     print("=" * 60)
