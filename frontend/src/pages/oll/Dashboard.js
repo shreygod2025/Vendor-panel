@@ -14,12 +14,14 @@ import {
   FileText,
   Building2,
   Package,
-  RotateCcw
+  RotateCcw,
+  BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
 
 const OLLDashboard = () => {
   const [stats, setStats] = useState(null);
+  const [pendingInvoices, setPendingInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,8 +30,37 @@ const OLLDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await apiClient.get("/dashboard/stats");
-      setStats(response.data);
+      const [statsRes, invoicesRes] = await Promise.all([
+        apiClient.get("/dashboard/stats"),
+        apiClient.get("/invoices")
+      ]);
+      setStats(statsRes.data);
+      
+      // Calculate pending invoices with due date info
+      const invoices = invoicesRes.data || [];
+      const pending = invoices
+        .filter(inv => {
+          const paidAmount = inv.paid_amount || 0;
+          return paidAmount < inv.amount;
+        })
+        .map(inv => {
+          const invoiceDate = new Date(inv.invoice_date);
+          const dueDate = new Date(invoiceDate);
+          dueDate.setDate(dueDate.getDate() + 7);
+          const today = new Date();
+          const daysRemaining = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+          
+          return {
+            ...inv,
+            dueDate,
+            daysRemaining,
+            isOverdue: daysRemaining < 0,
+            pendingAmount: inv.amount - (inv.paid_amount || 0)
+          };
+        })
+        .sort((a, b) => a.daysRemaining - b.daysRemaining);
+      
+      setPendingInvoices(pending);
     } catch (error) {
       toast.error("Failed to fetch dashboard stats");
     } finally {
@@ -74,6 +105,16 @@ const OLLDashboard = () => {
     return colors[priority] || "bg-slate-100 text-slate-600";
   };
 
+  const getDueDateStatus = (daysRemaining) => {
+    if (daysRemaining < 0) {
+      return { label: `${Math.abs(daysRemaining)}d overdue`, color: "bg-red-100 text-red-700" };
+    } else if (daysRemaining <= 3) {
+      return { label: `${daysRemaining}d left`, color: "bg-amber-100 text-amber-700" };
+    } else {
+      return { label: `${daysRemaining}d left`, color: "bg-emerald-100 text-emerald-700" };
+    }
+  };
+
   if (loading) {
     return (
       <div className="page-container">
@@ -97,6 +138,12 @@ const OLLDashboard = () => {
             <h1 className="page-title">Dashboard</h1>
             <p className="page-subtitle">Overview of your vendor management system</p>
           </div>
+          <Link to="/oll/analytics">
+            <Button variant="outline">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              View Analytics
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -195,7 +242,7 @@ const OLLDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Pending Payments */}
+          {/* Pending Payments - Breakdown */}
           <Card className="lg:col-span-1">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -203,27 +250,43 @@ const OLLDashboard = () => {
                   <CreditCard className="w-5 h-5 text-emerald-600" />
                   Pending Payments
                 </CardTitle>
-                <Link to="/oll/payments" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                <Link to="/oll/invoices" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
                   View all <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="mb-4 p-4 bg-emerald-50 rounded-lg">
+              <div className="mb-4 p-3 bg-emerald-50 rounded-lg">
                 <p className="text-sm text-emerald-600">Total Pending</p>
                 <p className="text-2xl font-bold text-emerald-700 font-mono">
-                  {formatCurrency(stats?.total_pending_amount || 0)}
-                </p>
-                <p className="text-xs text-emerald-600 mt-1">
-                  {stats?.pending_payment_count || 0} invoice(s)
+                  {formatCurrency(pendingInvoices.reduce((sum, inv) => sum + inv.pendingAmount, 0))}
                 </p>
               </div>
-              <Link to="/oll/payments">
-                <Button variant="outline" className="w-full">
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Record Payment
-                </Button>
-              </Link>
+              
+              {/* Payment Breakdown */}
+              {pendingInvoices.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {pendingInvoices.slice(0, 5).map((invoice) => {
+                    const dueDateStatus = getDueDateStatus(invoice.daysRemaining);
+                    return (
+                      <div key={invoice.id} className="p-2 rounded-lg bg-slate-50 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-slate-700">{invoice.vendor_name || "Unknown"}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${dueDateStatus.color}`}>
+                            {dueDateStatus.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-slate-500 text-xs">Due: {formatDate(invoice.dueDate)}</span>
+                          <span className="font-mono font-medium">{formatCurrency(invoice.pendingAmount)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 text-center py-2">No pending payments</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -259,16 +322,16 @@ const OLLDashboard = () => {
                   <span className="text-sm">View Issues</span>
                 </Button>
               </Link>
-              <Link to="/oll/returns/new">
+              <Link to="/oll/returns">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
                   <RotateCcw className="w-6 h-6 text-red-600" />
                   <span className="text-sm">Create Return</span>
                 </Button>
               </Link>
-              <Link to="/oll/invoices">
+              <Link to="/oll/analytics">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <Plus className="w-6 h-6 text-indigo-600" />
-                  <span className="text-sm">View Invoices</span>
+                  <BarChart3 className="w-6 h-6 text-indigo-600" />
+                  <span className="text-sm">Analytics</span>
                 </Button>
               </Link>
             </div>
