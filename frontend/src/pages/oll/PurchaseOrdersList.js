@@ -25,13 +25,22 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle, Clock, Truck, Package, ChevronDown, ChevronRight, AlertTriangle, RotateCcw, MoreHorizontal, Edit } from "lucide-react";
+import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle, Clock, Truck, Package, ChevronDown, ChevronRight, AlertTriangle, RotateCcw, MoreHorizontal, Edit, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../../components/ui/dialog";
+import { Textarea } from "../../components/ui/textarea";
 import { toast } from "sonner";
 
 const PurchaseOrdersList = () => {
