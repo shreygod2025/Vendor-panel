@@ -466,6 +466,84 @@ const PurchaseOrdersList = () => {
           </Tabs>
         )}
       </div>
+
+      {/* Approve Delivery Dialog */}
+      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-emerald-600" />
+              Approve Delivery
+            </DialogTitle>
+            <DialogDescription>
+              Approve the delivery for PO {selectedPO?.po_number}? This will mark the order as delivered.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-sm text-emerald-800">
+                <strong>Vendor:</strong> {selectedPO?.vendor_name}<br />
+                <strong>Items:</strong> {selectedPO?.line_items?.length || 0} items<br />
+                <strong>Total:</strong> {formatCurrency(selectedPO?.grand_total || 0)}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApprovalDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleApproveDelivery}
+              disabled={approving}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {approving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+              Approve
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Delivery Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-red-600" />
+              Reject Delivery
+            </DialogTitle>
+            <DialogDescription>
+              Reject the delivery for PO {selectedPO?.po_number}? This will return the order to dispatched status.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">
+                <strong>Warning:</strong> The auto-created invoice will be deleted if you reject this delivery.
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">Reason for rejection</label>
+              <Textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Enter reason for rejection..."
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleRejectDelivery}
+              disabled={approving}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {approving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
