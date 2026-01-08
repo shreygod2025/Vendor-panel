@@ -127,57 +127,67 @@ const PurchaseOrdersList = () => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const renderOrderRow = (order, showActions = false) => (
-    <TableRow key={order.id} data-testid={`po-row-${order.id}`}>
-      <TableCell>
-        <span className="font-mono font-medium text-slate-900">{order.po_number}</span>
-      </TableCell>
-      <TableCell>{order.vendor_name}</TableCell>
-      <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
-      <TableCell>{order.line_items?.length || 0} items</TableCell>
-      <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
-      <TableCell>
-        <span className={`badge ${getStatusColor(order.status)}`}>
-          {order.status}
-        </span>
-      </TableCell>
-      <TableCell className="text-slate-500">{formatDate(order.created_at)}</TableCell>
-      <TableCell className="text-right">
-        <div className="flex items-center justify-end gap-2">
-          <Link to={`/oll/purchase-orders/${order.id}`}>
-            <Button variant="ghost" size="sm" data-testid={`view-po-${order.id}`}>
-              <Eye className="w-4 h-4" />
-            </Button>
-          </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => copyTrackingLink(order.tracking_token)}
-            title="Copy tracking link"
-            data-testid={`copy-tracking-${order.id}`}
-          >
-            <ExternalLink className="w-4 h-4" />
-          </Button>
-          {showActions && (order.status === "delivered" || order.status === "closed") && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <MoreHorizontal className="w-4 h-4" />
+  const renderOrderRow = (order, showActions = false) => {
+    const canEdit = order.status === "draft" || order.status === "confirmed";
+    
+    return (
+      <TableRow key={order.id} data-testid={`po-row-${order.id}`}>
+        <TableCell>
+          <span className="font-mono font-medium text-slate-900">{order.po_number}</span>
+        </TableCell>
+        <TableCell>{order.vendor_name}</TableCell>
+        <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
+        <TableCell>{order.line_items?.length || 0} items</TableCell>
+        <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
+        <TableCell>
+          <span className={`badge ${getStatusColor(order.status)}`}>
+            {order.status}
+          </span>
+        </TableCell>
+        <TableCell className="text-slate-500">{formatDate(order.created_at)}</TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end gap-1">
+            <Link to={`/oll/purchase-orders/${order.id}`}>
+              <Button variant="ghost" size="sm" data-testid={`view-po-${order.id}`} title="View">
+                <Eye className="w-4 h-4" />
+              </Button>
+            </Link>
+            {canEdit && (
+              <Link to={`/oll/purchase-orders/${order.id}/edit`}>
+                <Button variant="ghost" size="sm" data-testid={`edit-po-${order.id}`} title="Edit">
+                  <Edit className="w-4 h-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link to={`/oll/issues?po_id=${order.id}`} className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    Raise Issue
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to={`/oll/returns?po_id=${order.id}`} className="flex items-center gap-2">
-                    <RotateCcw className="w-4 h-4" />
-                    Create Return
-                  </Link>
-                </DropdownMenuItem>
+              </Link>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => copyTrackingLink(order.tracking_token)}
+              title="Copy tracking link"
+              data-testid={`copy-tracking-${order.id}`}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Button>
+            {showActions && (order.status === "delivered" || order.status === "closed") && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to={`/oll/issues?po_id=${order.id}`} className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Raise Issue
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to={`/oll/returns?po_id=${order.id}`} className="flex items-center gap-2">
+                      <RotateCcw className="w-4 h-4" />
+                      Create Return
+                    </Link>
+                  </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
