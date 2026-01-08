@@ -88,11 +88,32 @@ const PaymentsList = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    
     try {
-      await apiClient.post("/payments", {
-        ...formData,
-        amount: parseFloat(formData.amount)
-      });
+      // If using credit, first record the credit payment
+      if (formData.use_credit && parseFloat(formData.credit_amount) > 0) {
+        await apiClient.post("/payments", {
+          invoice_id: formData.invoice_id,
+          amount: parseFloat(formData.credit_amount),
+          payment_date: formData.payment_date,
+          payment_mode: "credit",
+          reference_id: `CREDIT-${Date.now()}`,
+          notes: "Payment via vendor credit"
+        });
+      }
+      
+      // If there's also a cash/bank payment
+      if (parseFloat(formData.amount) > 0 && formData.payment_mode !== "credit") {
+        await apiClient.post("/payments", {
+          invoice_id: formData.invoice_id,
+          amount: parseFloat(formData.amount),
+          payment_date: formData.payment_date,
+          payment_mode: formData.payment_mode,
+          reference_id: formData.reference_id,
+          notes: formData.notes
+        });
+      }
+      
       toast.success("Payment recorded successfully");
       setShowDialog(false);
       setFormData({
@@ -101,14 +122,38 @@ const PaymentsList = () => {
         payment_date: "",
         payment_mode: "",
         reference_id: "",
-        notes: ""
+        notes: "",
+        use_credit: false,
+        credit_amount: ""
       });
+      setSelectedInvoice(null);
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to record payment");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleInvoiceSelect = (invoiceId) => {
+    const invoice = invoices.find(inv => inv.id === invoiceId);
+    setSelectedInvoice(invoice);
+    setFormData(prev => ({ 
+      ...prev, 
+      invoice_id: invoiceId,
+      use_credit: false,
+      credit_amount: ""
+    }));
+  };
+
+  const getVendorCredit = () => {
+    if (!selectedInvoice) return null;
+    return vendorCredits[selectedInvoice.vendor_id];
+  };
+
+  const getPendingAmount = () => {
+    if (!selectedInvoice) return 0;
+    return selectedInvoice.amount - (selectedInvoice.paid_amount || 0);
   };
 
   const formatCurrency = (amount) => {
