@@ -135,14 +135,48 @@ const PurchaseOrdersList = () => {
     raised: filteredOrders.filter(o => o.status === "draft" || o.status === "sent"),
     confirmed: filteredOrders.filter(o => o.status === "confirmed"),
     changes: filteredOrders.filter(o => o.status === "rejected"),
-    // Dispatched section
+    // Dispatched section (includes pending_approval)
     dispatched: filteredOrders.filter(o => o.status === "dispatched"),
+    pending_approval: filteredOrders.filter(o => o.status === "pending_approval"),
     // Delivered section
     delivered: filteredOrders.filter(o => o.status === "delivered" || o.status === "closed")
   };
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const handleApproveDelivery = async () => {
+    if (!selectedPO) return;
+    setApproving(true);
+    try {
+      await apiClient.post(`/purchase-orders/${selectedPO.id}/approve-delivery`);
+      toast.success("Delivery approved successfully");
+      setApprovalDialogOpen(false);
+      setSelectedPO(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to approve delivery");
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const handleRejectDelivery = async () => {
+    if (!selectedPO) return;
+    setApproving(true);
+    try {
+      await apiClient.post(`/purchase-orders/${selectedPO.id}/reject-delivery?reason=${encodeURIComponent(rejectionReason)}`);
+      toast.success("Delivery rejected");
+      setRejectDialogOpen(false);
+      setSelectedPO(null);
+      setRejectionReason("");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to reject delivery");
+    } finally {
+      setApproving(false);
+    }
   };
 
   const renderOrderRow = (order, showActions = false) => {
