@@ -105,6 +105,7 @@ const PurchaseOrdersList = () => {
       sent: "status-sent",
       confirmed: "status-confirmed",
       dispatched: "status-dispatched",
+      pending_approval: "bg-purple-100 text-purple-700",
       delivered: "status-delivered",
       closed: "status-closed",
       rejected: "status-rejected"
