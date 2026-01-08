@@ -194,7 +194,8 @@ const PurchaseOrdersList = () => {
         </div>
       </TableCell>
     </TableRow>
-  );
+    );
+  };
 
   const renderTable = (ordersList, emptyMessage, showActions = false) => {
     if (ordersList.length === 0) {
