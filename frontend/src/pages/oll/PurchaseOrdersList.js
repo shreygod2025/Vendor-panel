@@ -186,7 +186,7 @@ const PurchaseOrdersList = () => {
     </TableRow>
   );
 
-  const renderTable = (ordersList, emptyMessage) => {
+  const renderTable = (ordersList, emptyMessage, showActions = false) => {
     if (ordersList.length === 0) {
       return (
         <div className="text-center py-8 text-slate-500">
@@ -209,7 +209,7 @@ const PurchaseOrdersList = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {ordersList.map(renderOrderRow)}
+          {ordersList.map(order => renderOrderRow(order, showActions))}
         </TableBody>
       </Table>
     );
