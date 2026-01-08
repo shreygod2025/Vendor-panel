@@ -592,6 +592,178 @@ const InvoicesList = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* View Invoice Dialog */}
+      <Dialog open={viewInvoiceDialog} onOpenChange={setViewInvoiceDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5" />
+              Invoice Details
+            </DialogTitle>
+          </DialogHeader>
+          {viewingInvoice && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Invoice Number</p>
+                  <p className="font-mono font-medium">{viewingInvoice.invoice_number}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Invoice Date</p>
+                  <p className="font-medium">{formatDate(viewingInvoice.invoice_date)}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">PO Number</p>
+                  <p className="font-mono">{viewingInvoice.po_number || viewingInvoice.po_id?.slice(0, 8) + "..."}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Vendor</p>
+                  <p className="font-medium">{viewingInvoice.vendor_name || "-"}</p>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg">
+                <div className="flex justify-between mb-2">
+                  <span className="text-slate-600">Invoice Amount</span>
+                  <span className="font-mono font-medium">{formatCurrency(viewingInvoice.amount)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-slate-600">Logistics Cost</span>
+                  <span className="font-mono">{formatCurrency(viewingInvoice.logistics_cost || 0)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-slate-600">Paid Amount</span>
+                  <span className="font-mono text-emerald-600">{formatCurrency(viewingInvoice.paid_amount || 0)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t font-medium">
+                  <span>Outstanding</span>
+                  <span className="font-mono text-amber-600">{formatCurrency(viewingInvoice.amount - (viewingInvoice.paid_amount || 0))}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className={`badge ${getInvoiceStatus(viewingInvoice).color}`}>
+                  {getInvoiceStatus(viewingInvoice).label}
+                </span>
+                {viewingInvoice.file_url && (
+                  <a 
+                    href={viewingInvoice.file_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-sm"
+                  >
+                    View Attached File →
+                  </a>
+                )}
+              </div>
+
+              {viewingInvoice.notes && (
+                <div className="p-3 bg-amber-50 rounded-lg">
+                  <p className="text-xs text-amber-600 mb-1">Notes</p>
+                  <p className="text-sm text-amber-800">{viewingInvoice.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewInvoiceDialog(false)}>Close</Button>
+            {isOLL && viewingInvoice && (
+              <Link to={`/oll/purchase-orders/${viewingInvoice.po_id}`}>
+                <Button>View Purchase Order</Button>
+              </Link>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Raise Issue Dialog */}
+      <Dialog open={issueDialog} onOpenChange={setIssueDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileWarning className="w-5 h-5 text-amber-600" />
+              Raise Invoice Issue
+            </DialogTitle>
+            <DialogDescription>
+              Report an error or issue with invoice {issueInvoice?.invoice_number}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRaiseIssue} className="space-y-4">
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Invoice:</span>
+                <span className="font-medium">{issueInvoice?.invoice_number}</span>
+              </div>
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-slate-500">Vendor:</span>
+                <span className="font-medium">{issueInvoice?.vendor_name || "-"}</span>
+              </div>
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-slate-500">Amount:</span>
+                <span className="font-mono">{formatCurrency(issueInvoice?.amount || 0)}</span>
+              </div>
+            </div>
+            
+            <div>
+              <Label>Issue Type</Label>
+              <Select value={issueForm.issue_type} onValueChange={(v) => setIssueForm(prev => ({ ...prev, issue_type: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="invoice_error">Invoice Error</SelectItem>
+                  <SelectItem value="amount_mismatch">Amount Mismatch</SelectItem>
+                  <SelectItem value="wrong_details">Wrong Details</SelectItem>
+                  <SelectItem value="duplicate_invoice">Duplicate Invoice</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Priority</Label>
+              <Select value={issueForm.priority} onValueChange={(v) => setIssueForm(prev => ({ ...prev, priority: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Description *</Label>
+              <Textarea
+                value={issueForm.description}
+                onChange={(e) => setIssueForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the issue with this invoice..."
+                rows={3}
+                required
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIssueDialog(false)}>Cancel</Button>
+              <Button 
+                type="submit" 
+                className="bg-amber-600 hover:bg-amber-700" 
+                disabled={raisingIssue}
+              >
+                {raisingIssue ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <FileWarning className="w-4 h-4 mr-2" />}
+                Raise Issue
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
