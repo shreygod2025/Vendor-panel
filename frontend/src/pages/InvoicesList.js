@@ -159,6 +159,46 @@ const InvoicesList = () => {
     }
   };
 
+  const openViewInvoice = (invoice) => {
+    setViewingInvoice(invoice);
+    setViewInvoiceDialog(true);
+  };
+
+  const openIssueDialog = (invoice) => {
+    setIssueInvoice(invoice);
+    setIssueForm({
+      issue_type: "invoice_error",
+      description: "",
+      priority: "medium"
+    });
+    setIssueDialog(true);
+  };
+
+  const handleRaiseIssue = async (e) => {
+    e.preventDefault();
+    if (!issueForm.description.trim()) {
+      toast.error("Please enter issue description");
+      return;
+    }
+    
+    setRaisingIssue(true);
+    try {
+      await apiClient.post("/issues", {
+        po_id: issueInvoice.po_id,
+        issue_type: issueForm.issue_type,
+        description: `Invoice Error - ${issueInvoice.invoice_number}: ${issueForm.description}`,
+        priority: issueForm.priority,
+        affected_items: []
+      });
+      toast.success("Issue raised successfully");
+      setIssueDialog(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to raise issue");
+    } finally {
+      setRaisingIssue(false);
+    }
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
