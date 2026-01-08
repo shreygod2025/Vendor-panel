@@ -46,18 +46,18 @@ const Sidebar = ({ role, isOpen, onClose }) => {
       ]
     },
     {
+      section: "Finance",
+      items: [
+        { path: "/oll/invoices", icon: Receipt, label: "Invoices" },
+        { path: "/oll/payments", icon: CreditCard, label: "Payments" }
+      ]
+    },
+    {
       section: "Management",
       items: [
         { path: "/oll/vendors", icon: Building2, label: "Vendors" },
         { path: "/oll/products", icon: Package, label: "Products" },
         { path: "/oll/users", icon: UserCog, label: "Users" }
-      ]
-    },
-    {
-      section: "Finance",
-      items: [
-        { path: "/oll/invoices", icon: Receipt, label: "Invoices" },
-        { path: "/oll/payments", icon: CreditCard, label: "Payments" }
       ]
     },
     {
