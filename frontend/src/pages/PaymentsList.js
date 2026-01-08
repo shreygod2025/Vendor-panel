@@ -485,6 +485,106 @@ const PaymentsList = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* View Payment Details Dialog */}
+      <Dialog open={viewDialog} onOpenChange={setViewDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-emerald-600" />
+              Payment & Invoice Details
+            </DialogTitle>
+          </DialogHeader>
+          {viewingPayment && (
+            <div className="space-y-4">
+              {/* Payment Details */}
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <h4 className="font-medium text-emerald-800 mb-3">Payment Information</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-emerald-600">Amount Paid</p>
+                    <p className="font-mono font-medium">{formatCurrency(viewingPayment.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-emerald-600">Payment Date</p>
+                    <p className="font-medium">{formatDate(viewingPayment.payment_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-emerald-600">Payment Mode</p>
+                    <p className="font-medium capitalize">{viewingPayment.payment_mode}</p>
+                  </div>
+                  <div>
+                    <p className="text-emerald-600">Reference ID</p>
+                    <p className="font-mono text-sm">{viewingPayment.reference_id || "-"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Invoice Details */}
+              {viewingInvoice && (
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-medium text-slate-800 mb-3">Invoice Information</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-slate-500">Invoice Number</p>
+                      <p className="font-mono font-medium">{viewingInvoice.invoice_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Invoice Date</p>
+                      <p className="font-medium">{formatDate(viewingInvoice.invoice_date)}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Total Amount</p>
+                      <p className="font-mono">{formatCurrency(viewingInvoice.amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Outstanding</p>
+                      <p className="font-mono text-amber-600">
+                        {formatCurrency(viewingInvoice.amount - (viewingInvoice.paid_amount || 0))}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Invoice Document Download */}
+              {viewingInvoice?.file_url && (
+                <div className="p-4 border-2 border-dashed border-emerald-200 bg-emerald-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <FileText className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-emerald-800">Invoice Document</p>
+                        <p className="text-xs text-emerald-600">Uploaded by vendor</p>
+                      </div>
+                    </div>
+                    <a 
+                      href={viewingInvoice.file_url} 
+                      download={`Invoice-${viewingInvoice.invoice_number}.pdf`}
+                      className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {viewingPayment.notes && (
+                <div className="p-3 bg-amber-50 rounded-lg">
+                  <p className="text-xs text-amber-600 mb-1">Notes</p>
+                  <p className="text-sm text-amber-800">{viewingPayment.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
