@@ -148,7 +148,54 @@ const OLLDashboard = () => {
       </div>
 
       <div className="page-container space-y-6">
-        {/* Main Grid */}
+        {/* Quick Actions - Now at the top */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              <Link to="/oll/purchase-orders/new">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                  <FileText className="w-6 h-6 text-blue-600" />
+                  <span className="text-sm">Create PO</span>
+                </Button>
+              </Link>
+              <Link to="/oll/vendors/new">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                  <Building2 className="w-6 h-6 text-purple-600" />
+                  <span className="text-sm">Add Vendor</span>
+                </Button>
+              </Link>
+              <Link to="/oll/products/new">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                  <Package className="w-6 h-6 text-emerald-600" />
+                  <span className="text-sm">Add Product</span>
+                </Button>
+              </Link>
+              <Link to="/oll/issues">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                  <AlertTriangle className="w-6 h-6 text-amber-600" />
+                  <span className="text-sm">View Issues</span>
+                </Button>
+              </Link>
+              <Link to="/oll/returns">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                  <RotateCcw className="w-6 h-6 text-red-600" />
+                  <span className="text-sm">Create Return</span>
+                </Button>
+              </Link>
+              <Link to="/oll/analytics">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                  <BarChart3 className="w-6 h-6 text-indigo-600" />
+                  <span className="text-sm">Analytics</span>
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Main Grid - Cards below */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Upcoming Deliveries */}
@@ -290,53 +337,6 @@ const OLLDashboard = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              <Link to="/oll/purchase-orders/new">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                  <span className="text-sm">Create PO</span>
-                </Button>
-              </Link>
-              <Link to="/oll/vendors/new">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <Building2 className="w-6 h-6 text-purple-600" />
-                  <span className="text-sm">Add Vendor</span>
-                </Button>
-              </Link>
-              <Link to="/oll/products/new">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <Package className="w-6 h-6 text-emerald-600" />
-                  <span className="text-sm">Add Product</span>
-                </Button>
-              </Link>
-              <Link to="/oll/issues">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <AlertTriangle className="w-6 h-6 text-amber-600" />
-                  <span className="text-sm">View Issues</span>
-                </Button>
-              </Link>
-              <Link to="/oll/returns">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <RotateCcw className="w-6 h-6 text-red-600" />
-                  <span className="text-sm">Create Return</span>
-                </Button>
-              </Link>
-              <Link to="/oll/analytics">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                  <BarChart3 className="w-6 h-6 text-indigo-600" />
-                  <span className="text-sm">Analytics</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
