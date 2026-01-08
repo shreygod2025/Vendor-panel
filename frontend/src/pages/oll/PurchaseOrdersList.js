@@ -438,12 +438,22 @@ const PurchaseOrdersList = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="dispatched">
-              <Card>
-                <CardContent className="p-4">
-                  {renderTable(categorizedOrders.dispatched, "No dispatched orders", false)}
-                </CardContent>
-              </Card>
+            <TabsContent value="dispatched" className="space-y-4">
+              {renderSubSection(
+                "In Transit",
+                categorizedOrders.dispatched,
+                "dispatched",
+                <Truck className="w-4 h-4 text-amber-600" />,
+                "bg-amber-100"
+              )}
+              {renderSubSection(
+                "Pending Approval",
+                categorizedOrders.pending_approval,
+                "pending_approval",
+                <Clock className="w-4 h-4 text-purple-600" />,
+                "bg-purple-100",
+                true // showApprovalActions
+              )}
             </TabsContent>
 
             <TabsContent value="delivered">
