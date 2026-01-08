@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table";
-import { ArrowLeft, Save, Loader2, Plus, Trash2, Package } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Package, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 const PurchaseOrderForm = () => {
@@ -37,6 +37,7 @@ const PurchaseOrderForm = () => {
   const [formData, setFormData] = useState({
     vendor_id: "",
     delivery_address: "",
+    receiver_name: "",
     contact_person: "",
     contact_number: "",
     delivery_date: "",
@@ -44,7 +45,20 @@ const PurchaseOrderForm = () => {
     order_discount_percent: 0,
     notes: "",
     final_comments: "",
-    line_items: []
+    line_items: [
+      // Start with one empty row
+      {
+        product_id: "",
+        product_name: "",
+        sku: "",
+        quantity: 1,
+        unit_price: 0,
+        tax_rate: 18,
+        discount_amount: 0,
+        discount_percent: 0,
+        comment: ""
+      }
+    ]
   });
 
   const [totals, setTotals] = useState({
@@ -77,6 +91,7 @@ const PurchaseOrderForm = () => {
         setFormData({
           vendor_id: poRes.data.vendor_id,
           delivery_address: poRes.data.delivery_address,
+          receiver_name: poRes.data.receiver_name || "",
           contact_person: poRes.data.contact_person,
           contact_number: poRes.data.contact_number,
           delivery_date: poRes.data.delivery_date || "",
@@ -101,6 +116,7 @@ const PurchaseOrderForm = () => {
     let totalTax = 0;
 
     formData.line_items.forEach(item => {
+      if (!item.product_id) return;
       const itemTotal = item.quantity * item.unit_price;
       let itemDiscount = 0;
       if (item.discount_percent > 0) {
@@ -200,9 +216,23 @@ const PurchaseOrderForm = () => {
   const handleRemoveItem = (index) => {
     setFormData(prev => {
       const newLineItems = prev.line_items.filter((_, i) => i !== index);
-      // If no line items left, clear vendor selection
+      // If no line items left, add one empty row and clear vendor selection
       if (newLineItems.length === 0) {
-        return { ...prev, vendor_id: "", line_items: newLineItems };
+        return { 
+          ...prev, 
+          vendor_id: "", 
+          line_items: [{
+            product_id: "",
+            product_name: "",
+            sku: "",
+            quantity: 1,
+            unit_price: 0,
+            tax_rate: 18,
+            discount_amount: 0,
+            discount_percent: 0,
+            comment: ""
+          }] 
+        };
       }
       return { ...prev, line_items: newLineItems };
     });
@@ -220,13 +250,11 @@ const PurchaseOrderForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (formData.line_items.length === 0) {
+    // Filter out empty line items
+    const validLineItems = formData.line_items.filter(item => item.product_id);
+    
+    if (validLineItems.length === 0) {
       toast.error("Please add at least one product");
-      return;
-    }
-
-    if (formData.line_items.some(item => !item.product_id)) {
-      toast.error("Please select a product for all line items");
       return;
     }
 
@@ -235,13 +263,18 @@ const PurchaseOrderForm = () => {
       return;
     }
 
+    const submitData = {
+      ...formData,
+      line_items: validLineItems
+    };
+
     setSaving(true);
     try {
       if (isEdit) {
-        await apiClient.put(`/purchase-orders/${id}`, formData);
+        await apiClient.put(`/purchase-orders/${id}`, submitData);
         toast.success("Purchase order updated successfully");
       } else {
-        await apiClient.post("/purchase-orders", formData);
+        await apiClient.post("/purchase-orders", submitData);
         toast.success("Purchase order created successfully");
       }
       navigate("/oll/purchase-orders");
@@ -275,6 +308,7 @@ const PurchaseOrderForm = () => {
   }
 
   const availableProducts = getAvailableProducts();
+  const validLineItemsCount = formData.line_items.filter(item => item.product_id).length;
 
   return (
     <div data-testid="po-form-page">
@@ -295,163 +329,36 @@ const PurchaseOrderForm = () => {
 
       <div className="page-container">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Products Table - Now First */}
+          {/* Delivery Details - Now First */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="w-5 h-5" />
-                    Products
-                  </CardTitle>
-                  {formData.vendor_id && (
-                    <p className="text-sm text-slate-500 mt-1">
-                      Vendor: <span className="font-medium text-slate-700">{getSelectedVendorName()}</span>
-                    </p>
-                  )}
-                </div>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleAddProduct}
-                  data-testid="add-product-btn"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Product
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {formData.line_items.length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
-                  <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                  <p className="text-slate-600 font-medium">No products added yet</p>
-                  <p className="text-sm text-slate-500 mb-4">Click "Add Product" to start building your order</p>
-                  <Button type="button" variant="outline" onClick={handleAddProduct}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Product
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-slate-50">
-                        <TableHead className="w-[250px]">Product</TableHead>
-                        <TableHead className="w-24 text-center">Qty</TableHead>
-                        <TableHead className="w-32 text-right">Unit Price</TableHead>
-                        <TableHead className="w-24 text-center">Disc %</TableHead>
-                        <TableHead className="w-24 text-center">Tax</TableHead>
-                        <TableHead className="w-32 text-right">Line Total</TableHead>
-                        <TableHead className="w-[200px]">Comment</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {formData.line_items.map((item, index) => {
-                        const itemTotal = item.quantity * item.unit_price;
-                        const discount = item.discount_percent > 0 
-                          ? itemTotal * (item.discount_percent / 100) 
-                          : item.discount_amount;
-                        const afterDiscount = itemTotal - discount;
-                        const tax = afterDiscount * (item.tax_rate / 100);
-                        const lineTotal = afterDiscount + tax;
-
-                        return (
-                          <TableRow key={index} data-testid={`line-item-${index}`}>
-                            <TableCell>
-                              <Select 
-                                value={item.product_id} 
-                                onValueChange={(v) => handleProductSelect(index, v)}
-                              >
-                                <SelectTrigger data-testid={`product-select-${index}`} className="w-full">
-                                  <SelectValue placeholder="Select product" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {availableProducts.map((product) => (
-                                    <SelectItem key={product.id} value={product.id}>
-                                      <div className="flex flex-col">
-                                        <span>{product.name}</span>
-                                        <span className="text-xs text-slate-500">{product.sku} • {product.vendor_name}</span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                                className="w-20 text-center"
-                                data-testid={`qty-input-${index}`}
-                              />
-                            </TableCell>
-                            <TableCell className="font-mono text-sm text-right">
-                              {formatCurrency(item.unit_price)}
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={item.discount_percent}
-                                onChange={(e) => handleItemChange(index, 'discount_percent', e.target.value)}
-                                className="w-16 text-center"
-                                data-testid={`discount-input-${index}`}
-                              />
-                            </TableCell>
-                            <TableCell className="text-sm text-center">{item.tax_rate}%</TableCell>
-                            <TableCell className="text-right font-mono font-medium text-slate-900">
-                              {formatCurrency(lineTotal)}
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                value={item.comment || ""}
-                                onChange={(e) => handleItemChange(index, 'comment', e.target.value)}
-                                placeholder="Add comment..."
-                                className="text-sm"
-                                data-testid={`comment-input-${index}`}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveItem(index)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                data-testid={`remove-item-${index}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Delivery Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Delivery Details</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Delivery Details
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label className="form-label">Vendor</Label>
                   <Select 
                     value={formData.vendor_id} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, vendor_id: value, line_items: [] }))}
-                    disabled={isEdit || formData.line_items.length > 0}
+                    onValueChange={(value) => setFormData(prev => ({ 
+                      ...prev, 
+                      vendor_id: value, 
+                      line_items: [{
+                        product_id: "",
+                        product_name: "",
+                        sku: "",
+                        quantity: 1,
+                        unit_price: 0,
+                        tax_rate: 18,
+                        discount_amount: 0,
+                        discount_percent: 0,
+                        comment: ""
+                      }] 
+                    }))}
+                    disabled={isEdit || formData.line_items.some(item => item.product_id)}
                   >
                     <SelectTrigger data-testid="vendor-select">
                       <SelectValue placeholder="Auto-selected from products" />
@@ -462,7 +369,17 @@ const PurchaseOrderForm = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-slate-500 mt-1">Vendor is auto-selected based on the first product you add</p>
+                  <p className="text-xs text-slate-500 mt-1">Auto-selected from products</p>
+                </div>
+                <div>
+                  <Label className="form-label">Receiver Name *</Label>
+                  <Input
+                    value={formData.receiver_name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, receiver_name: e.target.value }))}
+                    required
+                    placeholder="Person receiving the delivery"
+                    data-testid="receiver-name-input"
+                  />
                 </div>
                 <div>
                   <Label className="form-label">Delivery Date *</Label>
@@ -520,6 +437,138 @@ const PurchaseOrderForm = () => {
                   placeholder="Additional notes for this order (visible to vendor)"
                   data-testid="notes-input"
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Products Table - Below Delivery Details */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Products
+                  </CardTitle>
+                  {formData.vendor_id && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      Vendor: <span className="font-medium text-slate-700">{getSelectedVendorName()}</span>
+                    </p>
+                  )}
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleAddProduct}
+                  data-testid="add-product-btn"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Row
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="w-[250px]">Product</TableHead>
+                      <TableHead className="w-24 text-center">Qty</TableHead>
+                      <TableHead className="w-32 text-right">Unit Price</TableHead>
+                      <TableHead className="w-24 text-center">Disc %</TableHead>
+                      <TableHead className="w-24 text-center">Tax</TableHead>
+                      <TableHead className="w-32 text-right">Line Total</TableHead>
+                      <TableHead className="w-[200px]">Comment</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {formData.line_items.map((item, index) => {
+                      const itemTotal = item.quantity * item.unit_price;
+                      const discount = item.discount_percent > 0 
+                        ? itemTotal * (item.discount_percent / 100) 
+                        : item.discount_amount;
+                      const afterDiscount = itemTotal - discount;
+                      const tax = afterDiscount * (item.tax_rate / 100);
+                      const lineTotal = afterDiscount + tax;
+
+                      return (
+                        <TableRow key={index} data-testid={`line-item-${index}`}>
+                          <TableCell>
+                            <Select 
+                              value={item.product_id} 
+                              onValueChange={(v) => handleProductSelect(index, v)}
+                            >
+                              <SelectTrigger data-testid={`product-select-${index}`} className="w-full">
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableProducts.map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    <div className="flex flex-col">
+                                      <span>{product.name}</span>
+                                      <span className="text-xs text-slate-500">{product.sku} • {product.vendor_name}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                              className="w-20 text-center"
+                              data-testid={`qty-input-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell className="font-mono text-sm text-right">
+                            {formatCurrency(item.unit_price)}
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={item.discount_percent}
+                              onChange={(e) => handleItemChange(index, 'discount_percent', e.target.value)}
+                              className="w-16 text-center"
+                              data-testid={`discount-input-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-sm text-center">{item.tax_rate}%</TableCell>
+                          <TableCell className="text-right font-mono font-medium text-slate-900">
+                            {item.product_id ? formatCurrency(lineTotal) : "₹0.00"}
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={item.comment || ""}
+                              onChange={(e) => handleItemChange(index, 'comment', e.target.value)}
+                              placeholder="Add comment..."
+                              className="text-sm"
+                              data-testid={`comment-input-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveItem(index)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              data-testid={`remove-item-${index}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
@@ -584,7 +633,7 @@ const PurchaseOrderForm = () => {
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex justify-between text-slate-600">
-                    <span>Subtotal ({formData.line_items.length} items)</span>
+                    <span>Subtotal ({validLineItemsCount} items)</span>
                     <span className="font-mono">{formatCurrency(totals.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
@@ -618,7 +667,7 @@ const PurchaseOrderForm = () => {
             <Button
               type="submit"
               className="bg-[#1e3a8a] hover:bg-[#1e40af]"
-              disabled={saving || formData.line_items.length === 0}
+              disabled={saving || validLineItemsCount === 0}
               data-testid="save-po-btn"
             >
               {saving ? (
