@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { apiClient } from "../../App";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 import {
   Table,
   TableBody,
@@ -18,7 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../../components/ui/dialog";
+import { Plus, Search, Edit, Trash2, Package, Upload, Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const ProductsList = () => {
@@ -28,6 +37,13 @@ const ProductsList = () => {
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // Import dialog state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState([]);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -67,6 +83,141 @@ const ProductsList = () => {
     }).format(amount);
   };
 
+  // Download sample CSV
+  const downloadSampleFile = () => {
+    const sampleData = `name,sku,vendor_name,unit_price,tax_rate,description,is_active
+"Industrial Motor A1",SKU-MOTOR-001,"Tech Components Pvt Ltd",15000,18,"High performance industrial motor",true
+"Steel Bearings Set",SKU-BEAR-002,"Tech Components Pvt Ltd",3500,18,"Premium steel bearings pack of 10",true
+"Control Panel Unit",SKU-CTRL-003,"Supreme Electricals",25000,18,"Advanced control panel with LCD display",true
+"Copper Wire Bundle",SKU-WIRE-004,"Supreme Electricals",8000,18,"100m copper wire bundle",true`;
+
+    const blob = new Blob([sampleData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'products_sample.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    toast.success("Sample file downloaded");
+  };
+
+  // Parse CSV file
+  const parseCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+    const data = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+      const row = {};
+      headers.forEach((header, idx) => {
+        let value = values[idx] || '';
+        value = value.replace(/^"|"$/g, '').trim();
+        if (header === 'unit_price' || header === 'tax_rate') {
+          value = parseFloat(value) || 0;
+        }
+        if (header === 'is_active') {
+          value = value.toLowerCase() === 'true';
+        }
+        row[header] = value;
+      });
+      if (row.name && row.sku) {
+        data.push(row);
+      }
+    }
+    return data;
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx')) {
+      toast.error("Please upload a CSV or XLSX file");
+      return;
+    }
+
+    setImportFile(file);
+    
+    // Parse and preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = parseCSV(event.target.result);
+        setImportPreview(data.slice(0, 5)); // Preview first 5 rows
+      } catch (error) {
+        toast.error("Failed to parse file");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      toast.error("Please select a file");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const data = parseCSV(event.target.result);
+          
+          // Map vendor names to IDs
+          const productsToImport = data.map(row => {
+            const vendor = vendors.find(v => 
+              v.name.toLowerCase() === (row.vendor_name || '').toLowerCase()
+            );
+            return {
+              name: row.name,
+              sku: row.sku,
+              vendor_id: vendor?.id || '',
+              unit_price: row.unit_price || 0,
+              tax_rate: row.tax_rate || 18,
+              description: row.description || '',
+              is_active: row.is_active !== false
+            };
+          });
+
+          // Import products one by one
+          let successCount = 0;
+          let failCount = 0;
+          
+          for (const product of productsToImport) {
+            if (!product.vendor_id) {
+              failCount++;
+              continue;
+            }
+            try {
+              await apiClient.post("/products", product);
+              successCount++;
+            } catch (err) {
+              failCount++;
+            }
+          }
+
+          toast.success(`Imported ${successCount} products. ${failCount > 0 ? `${failCount} failed.` : ''}`);
+          setImportDialogOpen(false);
+          setImportFile(null);
+          setImportPreview([]);
+          fetchData();
+        } catch (error) {
+          toast.error("Failed to import products");
+        } finally {
+          setImporting(false);
+        }
+      };
+      reader.readAsText(importFile);
+    } catch (error) {
+      toast.error("Failed to read file");
+      setImporting(false);
+    }
+  };
+
   const filteredProducts = products.filter((product) => {
     const matchesSearch = 
       product.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -87,12 +238,22 @@ const ProductsList = () => {
             <h1 className="page-title">Products</h1>
             <p className="page-subtitle">Manage products from all vendors</p>
           </div>
-          <Link to="/oll/products/new">
-            <Button className="bg-[#1e3a8a] hover:bg-[#1e40af]" data-testid="add-product-btn">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Product
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setImportDialogOpen(true)}
+              data-testid="import-products-btn"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import Products
             </Button>
-          </Link>
+            <Link to="/oll/products/new">
+              <Button className="bg-[#1e3a8a] hover:bg-[#1e40af]" data-testid="add-product-btn">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Product
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -143,9 +304,15 @@ const ProductsList = () => {
               <Package className="empty-state-icon" />
               <p className="empty-state-title">No products found</p>
               <p className="empty-state-text">Get started by adding your first product</p>
-              <Link to="/oll/products/new" className="mt-4">
-                <Button>Add Product</Button>
-              </Link>
+              <div className="flex gap-3 mt-4 justify-center">
+                <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import Products
+                </Button>
+                <Link to="/oll/products/new">
+                  <Button>Add Product</Button>
+                </Link>
+              </div>
             </div>
           ) : (
             <Table>
@@ -207,6 +374,118 @@ const ProductsList = () => {
           )}
         </div>
       </div>
+
+      {/* Import Products Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              Import Products
+            </DialogTitle>
+            <DialogDescription>
+              Upload a CSV or XLSX file to import multiple products at once
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Download Sample */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-blue-800">Download Sample File</p>
+                  <p className="text-sm text-blue-600">Use this template to format your data correctly</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={downloadSampleFile}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Sample
+                </Button>
+              </div>
+            </div>
+
+            {/* File Upload */}
+            <div>
+              <Label>Select File</Label>
+              <div className="mt-2">
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Supported formats: CSV, XLSX</p>
+            </div>
+
+            {/* Preview */}
+            {importPreview.length > 0 && (
+              <div>
+                <Label>Preview (first 5 rows)</Label>
+                <div className="mt-2 border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="text-xs">Name</TableHead>
+                        <TableHead className="text-xs">SKU</TableHead>
+                        <TableHead className="text-xs">Vendor</TableHead>
+                        <TableHead className="text-xs">Price</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importPreview.map((row, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="text-xs py-2">{row.name}</TableCell>
+                          <TableCell className="text-xs py-2">{row.sku}</TableCell>
+                          <TableCell className="text-xs py-2">{row.vendor_name}</TableCell>
+                          <TableCell className="text-xs py-2">₹{row.unit_price}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {importPreview.length} rows found. Vendor names must match existing vendors.
+                </p>
+              </div>
+            )}
+
+            {/* Required columns info */}
+            <div className="text-xs text-slate-500">
+              <p className="font-medium text-slate-700 mb-1">Required columns:</p>
+              <p>name, sku, vendor_name, unit_price, tax_rate</p>
+              <p className="mt-1">Optional: description, is_active</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setImportDialogOpen(false);
+              setImportFile(null);
+              setImportPreview([]);
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleImport}
+              disabled={!importFile || importing}
+              className="bg-[#1e3a8a] hover:bg-[#1e40af]"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import Products
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
