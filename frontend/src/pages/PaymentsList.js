@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Card, CardContent } from "../components/ui/card";
-import { Plus, CreditCard, Loader2, Wallet, Info } from "lucide-react";
+import { Plus, CreditCard, Loader2, Wallet, Info, Eye, Receipt, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 const PaymentsList = () => {
