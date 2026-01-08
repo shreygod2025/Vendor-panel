@@ -726,6 +726,93 @@ const PurchaseOrdersList = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Invoice Dialog */}
+      <Dialog open={viewInvoiceDialog} onOpenChange={setViewInvoiceDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-emerald-600" />
+              Invoice Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedInvoice && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Invoice Number</p>
+                  <p className="font-mono font-medium">{selectedInvoice.invoice_number}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Invoice Date</p>
+                  <p className="font-medium">{formatDate(selectedInvoice.invoice_date)}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">PO Number</p>
+                  <p className="font-mono">{selectedInvoice.po_number || "-"}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Vendor</p>
+                  <p className="font-medium">{selectedInvoice.vendor_name || "-"}</p>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg">
+                <div className="flex justify-between mb-2">
+                  <span className="text-slate-600">Invoice Amount</span>
+                  <span className="font-mono font-medium">{formatCurrency(selectedInvoice.amount)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-slate-600">Logistics Cost</span>
+                  <span className="font-mono">{formatCurrency(selectedInvoice.logistics_cost || 0)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-slate-600">Paid Amount</span>
+                  <span className="font-mono text-emerald-600">{formatCurrency(selectedInvoice.paid_amount || 0)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t font-medium">
+                  <span>Outstanding</span>
+                  <span className="font-mono text-amber-600">{formatCurrency(selectedInvoice.amount - (selectedInvoice.paid_amount || 0))}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className={`badge ${
+                  selectedInvoice.payment_status === "fully_paid" ? "bg-emerald-100 text-emerald-700" :
+                  selectedInvoice.payment_status === "partially_paid" ? "bg-amber-100 text-amber-700" :
+                  "bg-blue-100 text-blue-700"
+                }`}>
+                  {selectedInvoice.payment_status === "fully_paid" ? "Cleared" :
+                   selectedInvoice.payment_status === "partially_paid" ? "Partially Paid" : "Pending"}
+                </span>
+                {selectedInvoice.file_url && (
+                  <a 
+                    href={selectedInvoice.file_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-sm"
+                  >
+                    View Attached File →
+                  </a>
+                )}
+              </div>
+
+              {selectedInvoice.notes && (
+                <div className="p-3 bg-amber-50 rounded-lg">
+                  <p className="text-xs text-amber-600 mb-1">Notes</p>
+                  <p className="text-sm text-amber-800">{selectedInvoice.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewInvoiceDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
