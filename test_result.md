@@ -432,7 +432,7 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Implemented Phase 2 enhancements including: 1) PO form redesigned - products table first, vendor auto-selected, editable quantity/discount/comment per line, final comments section. 2) PO list redesigned with tabs (PO Confirmation/Dispatched/Delivered) and sub-sections (Raised, Confirmed, Changes). 3) Sidebar reorganized with Management section separated from Finance. 4) Returns renamed from 'Returns & Credit Notes'. 5) Added comprehensive sample data. Please test PO creation flow, navigation, and data display."
+    message: "Implemented comprehensive enhancements: 1) PO form - Delivery details first, Receiver Name field, products table below with one row by default. 2) Products page - Import feature with sample CSV download. 3) Invoices - Status (Cleared/Pending/Overdue) with 7-day timeline. 4) Vendor PO list - Hidden draft POs, Mark Delivered button with invoice/logistics popup. 5) Sidebar - Finance above Management. 6) Bulk Import page for historical POs and invoices. Please test all new features."
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE: All 34 backend API tests passed (100% success rate). Key findings: 1) Auth flow working correctly for both OLL admin (olladmin/olladmin) and vendor (vendor/vendor) credentials. 2) Products API returns vendor info correctly. 3) Purchase Orders API supports line_items with comments and final_comments field as requested. 4) All Phase 2 APIs (Deliveries, Issues, Returns, Invoices, Payments) working correctly. 5) Public tracking API working without exposing prices. 6) Dashboard stats working for both roles. All backend requirements from review request are satisfied. Ready for frontend testing if needed."
   - agent: "testing"
