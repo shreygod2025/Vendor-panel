@@ -54,7 +54,8 @@ const PurchaseOrdersList = () => {
     raised: true,
     confirmed: true,
     changes: true,
-    pending_approval: true
+    pending_approval: true,
+    dispatched: true
   });
   
   // Approval dialog state
