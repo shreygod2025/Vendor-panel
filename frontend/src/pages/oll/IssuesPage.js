@@ -74,7 +74,11 @@ const IssuesPage = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      await apiClient.post("/issues", formData);
+      const submitData = {
+        ...formData,
+        affected_items: []
+      };
+      await apiClient.post("/issues", submitData);
       toast.success("Issue created successfully");
       setShowDialog(false);
       setFormData({ po_id: "", issue_type: "", description: "", priority: "medium" });
