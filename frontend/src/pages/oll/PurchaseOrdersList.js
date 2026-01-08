@@ -402,7 +402,7 @@ const PurchaseOrdersList = () => {
                 <div className="flex flex-col items-center gap-1">
                   <Truck className="w-4 h-4" />
                   <span>Dispatched</span>
-                  <span className="text-xs opacity-70">({categorizedOrders.dispatched.length})</span>
+                  <span className="text-xs opacity-70">({categorizedOrders.dispatched.length + categorizedOrders.pending_approval.length})</span>
                 </div>
               </TabsTrigger>
               <TabsTrigger value="delivered" className="py-3 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
