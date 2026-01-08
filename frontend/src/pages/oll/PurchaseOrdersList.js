@@ -53,8 +53,16 @@ const PurchaseOrdersList = () => {
   const [expandedSections, setExpandedSections] = useState({
     raised: true,
     confirmed: true,
-    changes: true
+    changes: true,
+    pending_approval: true
   });
+  
+  // Approval dialog state
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [selectedPO, setSelectedPO] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [approving, setApproving] = useState(false);
 
   useEffect(() => {
     fetchData();
