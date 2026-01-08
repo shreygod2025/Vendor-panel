@@ -839,12 +839,13 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         )
         update_data.update(totals)
     
-    # If OLL edits a confirmed PO, reset status to "sent" for vendor reconfirmation
-    if current_user.get("role") == "oll" and existing["status"] == "confirmed":
+    # If OLL edits a confirmed or sent PO, reset status to "sent" for vendor reconfirmation
+    if current_user.get("role") == "oll" and existing["status"] in ["confirmed", "sent"]:
         update_data["status"] = "sent"
         # Add note about edit
         existing_notes = existing.get("notes", "") or ""
-        update_data["notes"] = existing_notes + " [Edited by OLL - Requires reconfirmation]"
+        if "[Edited by OLL" not in existing_notes:
+            update_data["notes"] = existing_notes + " [Edited by OLL - Requires reconfirmation]"
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
