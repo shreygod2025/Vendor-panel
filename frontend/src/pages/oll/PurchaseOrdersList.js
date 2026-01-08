@@ -61,9 +61,11 @@ const PurchaseOrdersList = () => {
   // Approval dialog state
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [approving, setApproving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchData();
