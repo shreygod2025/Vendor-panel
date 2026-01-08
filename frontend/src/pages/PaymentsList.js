@@ -64,6 +64,20 @@ const PaymentsList = () => {
       ]);
       setPayments(paymentsRes.data);
       setInvoices(invoicesRes.data);
+
+      // Fetch vendor credits for OLL users
+      if (isOLL) {
+        try {
+          const creditsRes = await apiClient.get("/credits/by-vendor");
+          const creditsMap = {};
+          creditsRes.data.forEach(c => {
+            creditsMap[c.vendor_id] = c;
+          });
+          setVendorCredits(creditsMap);
+        } catch (e) {
+          console.log("Could not fetch vendor credits");
+        }
+      }
     } catch (error) {
       toast.error("Failed to fetch data");
     } finally {
