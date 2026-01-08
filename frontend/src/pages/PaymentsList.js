@@ -26,7 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Plus, CreditCard, Loader2 } from "lucide-react";
+import { Card, CardContent } from "../components/ui/card";
+import { Plus, CreditCard, Loader2, Wallet, Info } from "lucide-react";
 import { toast } from "sonner";
 
 const PaymentsList = () => {
@@ -34,9 +35,11 @@ const PaymentsList = () => {
   const isOLL = user?.role === "oll";
   const [payments, setPayments] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [vendorCredits, setVendorCredits] = useState({});
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   
   const [formData, setFormData] = useState({
     invoice_id: "",
@@ -44,7 +47,9 @@ const PaymentsList = () => {
     payment_date: "",
     payment_mode: "",
     reference_id: "",
-    notes: ""
+    notes: "",
+    use_credit: false,
+    credit_amount: ""
   });
 
   useEffect(() => {
