@@ -279,6 +279,11 @@ function AppRoutes() {
           <DashboardLayout><AuditLogs /></DashboardLayout>
         </ProtectedRoute>
       } />
+      <Route path="/oll/bulk-import" element={
+        <ProtectedRoute allowedRoles={["oll"]}>
+          <DashboardLayout><BulkImport /></DashboardLayout>
+        </ProtectedRoute>
+      } />
       <Route path="/oll/users" element={
         <ProtectedRoute allowedRoles={["oll"]}>
           <DashboardLayout><UsersList /></DashboardLayout>
