@@ -200,6 +200,7 @@ const PurchaseOrdersList = () => {
 
   const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
     const canEdit = order.status === "draft" || order.status === "sent" || order.status === "confirmed";
+    const canDelete = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
     
     return (
       <TableRow key={order.id} data-testid={`po-row-${order.id}`}>
@@ -229,6 +230,20 @@ const PurchaseOrdersList = () => {
                   <Edit className="w-4 h-4" />
                 </Button>
               </Link>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedPO(order);
+                  setDeleteDialogOpen(true);
+                }}
+                className="text-red-600 hover:bg-red-50"
+                title="Delete PO"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
             )}
             <Button
               variant="ghost"
