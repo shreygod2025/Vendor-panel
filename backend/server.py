@@ -202,6 +202,7 @@ class POResponse(BaseModel):
     vendor_id: str
     vendor_name: Optional[str] = None
     delivery_address: str
+    receiver_name: Optional[str] = None
     contact_person: str
     contact_number: str
     delivery_date: str
