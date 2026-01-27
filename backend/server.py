@@ -1290,6 +1290,9 @@ async def get_upcoming_deliveries(current_user: dict = Depends(get_current_user)
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
+    elif current_user.get("role") == "distributor":
+        # Distributors can only see deliveries for their POs
+        query["distributor_id"] = current_user["user_id"]
     
     pos = await db.purchase_orders.find(query, {"_id": 0}).sort("delivery_date", 1).to_list(100)
     
@@ -1305,7 +1308,7 @@ async def get_upcoming_deliveries(current_user: dict = Depends(get_current_user)
     result = []
     for p in pos:
         dispatch = dispatch_map.get(p["id"])
-        result.append({
+        item = {
             "id": p["id"],
             "po_number": p["po_number"],
             "vendor_name": vendor_map.get(p["vendor_id"]),
@@ -1313,9 +1316,13 @@ async def get_upcoming_deliveries(current_user: dict = Depends(get_current_user)
             "delivery_address": p["delivery_address"],
             "contact_person": p["contact_person"],
             "status": p["status"],
-            "grand_total": p["grand_total"],
             "dispatch": dispatch,
             "items_count": len(p.get("line_items", []))
+        }
+        # Hide pricing for distributors
+        if current_user.get("role") != "distributor":
+            item["grand_total"] = p["grand_total"]
+        result.append(item)
         })
     
     return result
