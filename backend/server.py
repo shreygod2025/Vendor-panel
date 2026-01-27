@@ -883,7 +883,10 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
     
+    # Access control
     if current_user.get("role") == "vendor" and current_user.get("vendor_id") != po["vendor_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    elif current_user.get("role") == "distributor" and po.get("distributor_id") != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
@@ -894,6 +897,13 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
         po["delivery_date"] = ""
     if "receiver_name" not in po:
         po["receiver_name"] = None
+    # Add distributor fields if missing
+    if "created_by_role" not in po:
+        po["created_by_role"] = "oll"
+    if "created_by_name" not in po:
+        po["created_by_name"] = None
+    if "distributor_id" not in po:
+        po["distributor_id"] = None
     
     return POResponse(**po)
 
