@@ -1323,7 +1323,6 @@ async def get_upcoming_deliveries(current_user: dict = Depends(get_current_user)
         if current_user.get("role") != "distributor":
             item["grand_total"] = p["grand_total"]
         result.append(item)
-        })
     
     return result
 
