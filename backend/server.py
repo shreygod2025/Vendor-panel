@@ -844,8 +844,12 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
     if vendor_id:
         query["vendor_id"] = vendor_id
     
+    # Filter by role
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
+    elif current_user.get("role") == "distributor":
+        # Distributors can only see POs they created
+        query["distributor_id"] = current_user["user_id"]
     
     pos = await db.purchase_orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
@@ -862,6 +866,13 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
             p["delivery_date"] = ""
         if "receiver_name" not in p:
             p["receiver_name"] = None
+        # Add distributor fields if missing
+        if "created_by_role" not in p:
+            p["created_by_role"] = "oll"
+        if "created_by_name" not in p:
+            p["created_by_name"] = None
+        if "distributor_id" not in p:
+            p["distributor_id"] = None
         result.append(POResponse(**p))
     
     return result
