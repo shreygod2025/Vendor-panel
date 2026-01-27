@@ -405,7 +405,7 @@ function AppRoutes() {
       {/* Default redirect */}
       <Route path="/" element={
         user ? (
-          <Navigate to={user.role === "oll" ? "/oll" : "/vendor"} replace />
+          <Navigate to={user.role === "oll" ? "/oll" : user.role === "distributor" ? "/distributor" : "/vendor"} replace />
         ) : (
           <Navigate to="/login" replace />
         )
