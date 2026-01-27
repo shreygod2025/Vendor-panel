@@ -1415,6 +1415,14 @@ async def get_issues(status: Optional[str] = None, priority: Optional[str] = Non
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
+    elif current_user.get("role") == "distributor":
+        # Distributors can only see issues for their POs
+        distributor_pos = await db.purchase_orders.find(
+            {"distributor_id": current_user["user_id"]},
+            {"id": 1, "_id": 0}
+        ).to_list(1000)
+        distributor_po_ids = [p["id"] for p in distributor_pos]
+        query["po_id"] = {"$in": distributor_po_ids}
     
     issues = await db.issues.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
