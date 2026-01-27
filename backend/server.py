@@ -732,6 +732,10 @@ async def get_products(vendor_id: Optional[str] = None, is_active: Optional[bool
     result = []
     for p in products:
         p["vendor_name"] = vendor_map.get(p["vendor_id"])
+        # Hide pricing for distributors
+        if current_user.get("role") == "distributor":
+            p["unit_price"] = 0
+            p["tax_rate"] = 0
         result.append(ProductResponse(**p))
     
     return result
