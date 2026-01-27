@@ -204,15 +204,21 @@ const UsersList = () => {
             </div>
             <div>
               <Label>Role *</Label>
-              <Select value={formData.role} onValueChange={(v) => setFormData(prev => ({ ...prev, role: v }))}>
+              <Select value={formData.role} onValueChange={(v) => setFormData(prev => ({ ...prev, role: v, vendor_id: v === 'vendor' ? prev.vendor_id : '' }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="oll">OLL Admin</SelectItem>
+                  <SelectItem value="distributor">Distributor</SelectItem>
                   <SelectItem value="vendor">Vendor</SelectItem>
                 </SelectContent>
               </Select>
+              {formData.role === "distributor" && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Distributors can create POs and track deliveries. Product pricing is hidden from them.
+                </p>
+              )}
             </div>
             {formData.role === "vendor" && (
               <div>
