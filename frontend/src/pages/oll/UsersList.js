@@ -142,8 +142,12 @@ const UsersList = () => {
                     <TableCell>{user.name || "-"}</TableCell>
                     <TableCell>{user.email || "-"}</TableCell>
                     <TableCell>
-                      <span className={`badge ${user.role === 'oll' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {user.role.toUpperCase()}
+                      <span className={`badge ${
+                        user.role === 'oll' ? 'bg-blue-100 text-blue-700' : 
+                        user.role === 'distributor' ? 'bg-purple-100 text-purple-700' : 
+                        'bg-slate-100 text-slate-600'
+                      }`}>
+                        {user.role === 'oll' ? 'OLL ADMIN' : user.role === 'distributor' ? 'DISTRIBUTOR' : 'VENDOR'}
                       </span>
                     </TableCell>
                     <TableCell className="text-slate-500">{formatDate(user.created_at)}</TableCell>
