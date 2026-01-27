@@ -239,6 +239,10 @@ class POResponse(BaseModel):
     created_at: str
     updated_at: str
     created_by: str
+    # Distributor tracking fields
+    created_by_role: Optional[str] = None
+    created_by_name: Optional[str] = None
+    distributor_id: Optional[str] = None
 
 # Dispatch Models
 class DispatchCreate(BaseModel):
