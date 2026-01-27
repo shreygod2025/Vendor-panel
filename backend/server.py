@@ -788,8 +788,9 @@ async def delete_product(product_id: str, current_user: dict = Depends(get_curre
 
 @api_router.post("/purchase-orders", response_model=POResponse)
 async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") != "oll":
-        raise HTTPException(status_code=403, detail="Only OLL can create purchase orders")
+    # Allow OLL and Distributors to create POs
+    if current_user.get("role") not in ["oll", "distributor"]:
+        raise HTTPException(status_code=403, detail="Only OLL or Distributors can create purchase orders")
     
     vendor = await db.vendors.find_one({"id": po.vendor_id}, {"_id": 0})
     if not vendor:
@@ -799,6 +800,10 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     
     # Set status based on send_immediately flag - default is "sent"
     initial_status = "sent" if po.send_immediately else "draft"
+    
+    # Get user details for distributor tracking
+    user = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
+    user_name = user.get("name") if user else current_user.get("username")
     
     po_doc = {
         "id": str(uuid.uuid4()),
@@ -817,6 +822,9 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
         "status": initial_status,
         "tracking_token": str(uuid.uuid4()),
         "created_by": current_user["user_id"],
+        "created_by_role": current_user.get("role"),
+        "created_by_name": user_name,
+        "distributor_id": current_user["user_id"] if current_user.get("role") == "distributor" else None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         **totals
