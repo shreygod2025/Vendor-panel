@@ -97,7 +97,30 @@ const Sidebar = ({ role, isOpen, onClose }) => {
     }
   ];
 
-  const navItems = role === "oll" ? ollNavItems : vendorNavItems;
+  const distributorNavItems = [
+    {
+      section: "Overview",
+      items: [
+        { path: "/distributor", icon: LayoutDashboard, label: "Dashboard" }
+      ]
+    },
+    {
+      section: "Orders",
+      items: [
+        { path: "/distributor/purchase-orders", icon: FileText, label: "My Orders" },
+        { path: "/distributor/deliveries", icon: CalendarClock, label: "Deliveries" },
+        { path: "/distributor/issues", icon: AlertTriangle, label: "Issues" }
+      ]
+    },
+    {
+      section: "Catalog",
+      items: [
+        { path: "/distributor/products", icon: Package, label: "Products" }
+      ]
+    }
+  ];
+
+  const navItems = role === "oll" ? ollNavItems : role === "distributor" ? distributorNavItems : vendorNavItems;
 
   return (
     <>
