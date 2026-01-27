@@ -197,7 +197,7 @@ function AppRoutes() {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={
-        user ? <Navigate to={user.role === "oll" ? "/oll" : "/vendor"} replace /> : <Login />
+        user ? <Navigate to={user.role === "oll" ? "/oll" : user.role === "distributor" ? "/distributor" : "/vendor"} replace /> : <Login />
       } />
       <Route path="/track/:trackingToken" element={<PublicTracking />} />
       
