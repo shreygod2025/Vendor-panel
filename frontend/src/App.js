@@ -100,7 +100,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={user.role === "oll" ? "/oll" : "/vendor"} replace />;
+    const redirectPath = user.role === "oll" ? "/oll" : user.role === "distributor" ? "/distributor" : "/vendor";
+    return <Navigate to={redirectPath} replace />;
   }
 
   return children;
