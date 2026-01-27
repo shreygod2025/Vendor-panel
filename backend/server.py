@@ -2251,6 +2251,20 @@ async def seed_data():
     }
     await db.users.insert_one(vendor_user2)
     
+    # Create Distributor User
+    distributor_user = {
+        "id": str(uuid.uuid4()),
+        "username": "distributor",
+        "password": hash_password("distributor"),
+        "email": "distributor@oll.com",
+        "role": "distributor",
+        "vendor_id": None,
+        "name": "ABC School Distributor",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(distributor_user)
+    
     # Create Products
     products_data = [
         {"name": "Industrial Pump A100", "sku": "PUMP-A100", "vendor_id": vendors_data[0]["id"], "unit_price": 15000.00, "tax_rate": 18.0, "description": "High-performance industrial pump", "unit": "pcs"},
