@@ -186,7 +186,7 @@ const Sidebar = ({ role, isOpen, onClose }) => {
                 {user?.name || user?.username}
               </p>
               <p className="text-xs text-slate-500 truncate">
-                {role === "oll" ? "Administrator" : "Vendor"}
+                {role === "oll" ? "Administrator" : role === "distributor" ? "Distributor" : "Vendor"}
               </p>
             </div>
           </div>
