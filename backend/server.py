@@ -2055,6 +2055,35 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
             "pending_payment_count": len(pending_invoices),
             "total_pending_amount": total_pending_amount
         }
+    elif current_user.get("role") == "distributor":
+        # Distributor dashboard - filtered to their POs only
+        distributor_id = current_user["user_id"]
+        total_pos = await db.purchase_orders.count_documents({"distributor_id": distributor_id})
+        
+        po_by_status = {}
+        for status in ["sent", "confirmed", "dispatched", "delivered", "closed"]:
+            po_by_status[status] = await db.purchase_orders.count_documents({"distributor_id": distributor_id, "status": status})
+        
+        # Upcoming deliveries
+        upcoming_deliveries = await db.purchase_orders.find(
+            {"distributor_id": distributor_id, "status": {"$in": ["confirmed", "dispatched"]}},
+            {"_id": 0, "grand_total": 0, "subtotal": 0, "total_tax": 0, "total_discount": 0}  # Hide pricing
+        ).sort("delivery_date", 1).to_list(5)
+        
+        # Pending issues (for distributor's POs)
+        distributor_pos = await db.purchase_orders.find(
+            {"distributor_id": distributor_id},
+            {"id": 1, "_id": 0}
+        ).to_list(1000)
+        distributor_po_ids = [p["id"] for p in distributor_pos]
+        pending_issues = await db.issues.count_documents({"po_id": {"$in": distributor_po_ids}, "status": "open"})
+        
+        return {
+            "total_pos": total_pos,
+            "po_by_status": po_by_status,
+            "upcoming_deliveries": upcoming_deliveries,
+            "pending_issues": pending_issues
+        }
     else:
         vendor_id = current_user.get("vendor_id")
         total_pos = await db.purchase_orders.count_documents({"vendor_id": vendor_id})
