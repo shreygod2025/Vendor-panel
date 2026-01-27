@@ -226,7 +226,14 @@ const PurchaseOrdersList = () => {
     return (
       <TableRow key={order.id} data-testid={`po-row-${order.id}`}>
         <TableCell>
-          <span className="font-mono font-medium text-slate-900">{order.po_number}</span>
+          <div className="flex flex-col">
+            <span className="font-mono font-medium text-slate-900">{order.po_number}</span>
+            {order.created_by_role === "distributor" && (
+              <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded mt-1 w-fit">
+                By Distributor: {order.created_by_name || 'Unknown'}
+              </span>
+            )}
+          </div>
         </TableCell>
         <TableCell>{order.vendor_name}</TableCell>
         <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
