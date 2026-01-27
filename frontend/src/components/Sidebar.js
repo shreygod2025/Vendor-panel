@@ -145,7 +145,7 @@ const Sidebar = ({ role, isOpen, onClose }) => {
           </div>
           <div className="mt-3 px-1">
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-              {role === "oll" ? "Admin Portal" : "Vendor Portal"}
+              {role === "oll" ? "Admin Portal" : role === "distributor" ? "Distributor Portal" : "Vendor Portal"}
             </span>
           </div>
         </div>
