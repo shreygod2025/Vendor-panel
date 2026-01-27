@@ -34,6 +34,12 @@ import VendorDispatch from "./pages/vendor/Dispatch";
 import VendorReturns from "./pages/vendor/Returns";
 import VendorInvoices from "./pages/vendor/Invoices";
 
+// Distributor Pages
+import DistributorDashboard from "./pages/distributor/Dashboard";
+import DistributorPurchaseOrders from "./pages/distributor/PurchaseOrders";
+import DistributorPurchaseOrderForm from "./pages/distributor/PurchaseOrderForm";
+import DistributorProducts from "./pages/distributor/Products";
+
 // Layout
 import Sidebar from "./components/Sidebar";
 
