@@ -2536,7 +2536,8 @@ async def seed_data():
         "credentials": {
             "oll_admin": "olladmin/olladmin",
             "vendor1": "vendor/vendor",
-            "vendor2": "supreme/supreme"
+            "vendor2": "supreme/supreme",
+            "distributor": "distributor/distributor"
         }
     }
 
