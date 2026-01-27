@@ -2445,6 +2445,461 @@ async def seed_data():
         }
     }
 
+# ========================
+# EXTERNAL INTEGRATION ENDPOINTS
+# ========================
+# These endpoints are designed for external apps to integrate with this Vendor Management System
+
+# Integration Models
+class IntegrationLineItem(BaseModel):
+    """Line item for integration PO creation"""
+    product_name: str
+    sku: Optional[str] = None
+    quantity: int
+    unit_price: float
+    tax_rate: float = 18.0
+    description: Optional[str] = None
+
+class IntegrationPOCreate(BaseModel):
+    """
+    Model for external apps to raise a PO.
+    Can include student/school/model data as metadata.
+    """
+    vendor_name: str  # Will be matched to existing vendor
+    delivery_address: str
+    receiver_name: str
+    contact_person: str
+    contact_number: str
+    delivery_date: str  # Format: YYYY-MM-DD
+    line_items: List[IntegrationLineItem]
+    notes: Optional[str] = None
+    # Metadata fields for external app data
+    external_reference_id: Optional[str] = None  # Reference ID from calling app
+    student_count: Optional[int] = None
+    school_name: Optional[str] = None
+    model_name: Optional[str] = None
+    batch_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None  # Any additional custom data
+
+class IntegrationPOResponse(BaseModel):
+    """Response for integration PO creation"""
+    success: bool
+    po_id: str
+    po_number: str
+    tracking_token: str
+    tracking_url: str
+    status: str
+    grand_total: float
+    message: str
+
+class BulkTrackingRequest(BaseModel):
+    """Request model for getting multiple tracking links"""
+    po_ids: Optional[List[str]] = None
+    po_numbers: Optional[List[str]] = None
+    external_reference_ids: Optional[List[str]] = None
+
+class TrackingLinkResponse(BaseModel):
+    """Response for tracking link"""
+    po_id: str
+    po_number: str
+    tracking_token: str
+    tracking_url: str
+    status: str
+    delivery_date: Optional[str]
+    dispatch_info: Optional[Dict] = None
+
+# API Key validation for integration endpoints
+INTEGRATION_API_KEY = os.environ.get('INTEGRATION_API_KEY', 'oll-integration-key-2024')
+
+async def verify_integration_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
+    """Verify API key for integration endpoints"""
+    if not x_api_key or x_api_key != INTEGRATION_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return True
+
+@api_router.post("/integration/raise-po", response_model=IntegrationPOResponse)
+async def integration_raise_po(
+    po_data: IntegrationPOCreate,
+    api_key_valid: bool = Depends(verify_integration_api_key)
+):
+    """
+    External Integration Endpoint: Raise a Purchase Order
+    
+    This endpoint allows external apps to create POs by providing:
+    - Vendor name (will be matched to existing vendors)
+    - Delivery details
+    - Line items with product details
+    - Optional metadata (student count, school name, model, etc.)
+    
+    Authentication: Requires X-API-Key header
+    """
+    # Find vendor by name (case-insensitive partial match)
+    vendor = await db.vendors.find_one(
+        {"name": {"$regex": po_data.vendor_name, "$options": "i"}},
+        {"_id": 0}
+    )
+    if not vendor:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Vendor '{po_data.vendor_name}' not found. Please check vendor name."
+        )
+    
+    # Build line items - try to match products or create generic entries
+    processed_line_items = []
+    for item in po_data.line_items:
+        # Try to find matching product
+        product = None
+        if item.sku:
+            product = await db.products.find_one(
+                {"sku": item.sku, "vendor_id": vendor["id"]},
+                {"_id": 0}
+            )
+        if not product and item.product_name:
+            product = await db.products.find_one(
+                {"name": {"$regex": item.product_name, "$options": "i"}, "vendor_id": vendor["id"]},
+                {"_id": 0}
+            )
+        
+        processed_line_items.append({
+            "product_id": product["id"] if product else str(uuid.uuid4()),
+            "product_name": item.product_name,
+            "sku": item.sku or (product["sku"] if product else f"EXT-{uuid.uuid4().hex[:8].upper()}"),
+            "quantity": item.quantity,
+            "unit_price": item.unit_price,
+            "tax_rate": item.tax_rate,
+            "discount_amount": 0.0,
+            "discount_percent": 0.0,
+            "comment": item.description
+        })
+    
+    # Calculate totals
+    subtotal = sum(item["quantity"] * item["unit_price"] for item in processed_line_items)
+    total_tax = sum(
+        item["quantity"] * item["unit_price"] * (item["tax_rate"] / 100) 
+        for item in processed_line_items
+    )
+    grand_total = subtotal + total_tax
+    
+    # Build metadata/notes
+    notes_parts = []
+    if po_data.notes:
+        notes_parts.append(po_data.notes)
+    if po_data.external_reference_id:
+        notes_parts.append(f"External Ref: {po_data.external_reference_id}")
+    if po_data.student_count:
+        notes_parts.append(f"Student Count: {po_data.student_count}")
+    if po_data.school_name:
+        notes_parts.append(f"School: {po_data.school_name}")
+    if po_data.model_name:
+        notes_parts.append(f"Model: {po_data.model_name}")
+    if po_data.batch_id:
+        notes_parts.append(f"Batch ID: {po_data.batch_id}")
+    
+    # Generate PO number
+    count = await db.purchase_orders.count_documents({})
+    po_number = f"PO-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{count + 1:04d}"
+    
+    tracking_token = str(uuid.uuid4())
+    
+    # Create PO document
+    po_doc = {
+        "id": str(uuid.uuid4()),
+        "po_number": po_number,
+        "vendor_id": vendor["id"],
+        "delivery_address": po_data.delivery_address,
+        "receiver_name": po_data.receiver_name,
+        "contact_person": po_data.contact_person,
+        "contact_number": po_data.contact_number,
+        "delivery_date": po_data.delivery_date,
+        "line_items": processed_line_items,
+        "order_discount_amount": 0.0,
+        "order_discount_percent": 0.0,
+        "notes": " | ".join(notes_parts) if notes_parts else None,
+        "final_comments": None,
+        "status": "sent",  # Directly send to vendor
+        "tracking_token": tracking_token,
+        "subtotal": subtotal,
+        "total_discount": 0.0,
+        "total_tax": total_tax,
+        "grand_total": grand_total,
+        "created_by": "integration_api",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        # Store integration metadata
+        "integration_metadata": {
+            "external_reference_id": po_data.external_reference_id,
+            "student_count": po_data.student_count,
+            "school_name": po_data.school_name,
+            "model_name": po_data.model_name,
+            "batch_id": po_data.batch_id,
+            "custom_metadata": po_data.metadata,
+            "source": "external_integration"
+        }
+    }
+    
+    await db.purchase_orders.insert_one(po_doc)
+    
+    # Create audit log
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "CREATE_PO_VIA_INTEGRATION",
+        "entity_type": "purchase_order",
+        "entity_id": po_doc["id"],
+        "user_id": "integration_api",
+        "user_name": "External Integration",
+        "details": {
+            "po_number": po_number,
+            "external_reference_id": po_data.external_reference_id,
+            "vendor_name": vendor["name"]
+        },
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Build tracking URL (base URL from environment or default)
+    base_url = os.environ.get('APP_BASE_URL', 'https://vendorplus-4.preview.emergentagent.com')
+    tracking_url = f"{base_url}/track/{tracking_token}"
+    
+    return IntegrationPOResponse(
+        success=True,
+        po_id=po_doc["id"],
+        po_number=po_number,
+        tracking_token=tracking_token,
+        tracking_url=tracking_url,
+        status="sent",
+        grand_total=grand_total,
+        message=f"PO {po_number} created successfully and sent to vendor {vendor['name']}"
+    )
+
+@api_router.get("/integration/tracking/{identifier}")
+async def integration_get_tracking(
+    identifier: str,
+    by: str = Query("po_id", description="Search by: po_id, po_number, tracking_token, or external_ref"),
+    api_key_valid: bool = Depends(verify_integration_api_key)
+):
+    """
+    External Integration Endpoint: Get Tracking Information
+    
+    Retrieve tracking link and status for a PO.
+    
+    Parameters:
+    - identifier: The value to search for
+    - by: Field to search by (po_id, po_number, tracking_token, external_ref)
+    
+    Authentication: Requires X-API-Key header
+    """
+    # Build query based on search field
+    query = {}
+    if by == "po_id":
+        query["id"] = identifier
+    elif by == "po_number":
+        query["po_number"] = identifier
+    elif by == "tracking_token":
+        query["tracking_token"] = identifier
+    elif by == "external_ref":
+        query["integration_metadata.external_reference_id"] = identifier
+    else:
+        raise HTTPException(status_code=400, detail="Invalid 'by' parameter")
+    
+    po = await db.purchase_orders.find_one(query, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Get dispatch info if available
+    dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
+    
+    base_url = os.environ.get('APP_BASE_URL', 'https://vendorplus-4.preview.emergentagent.com')
+    tracking_url = f"{base_url}/track/{po['tracking_token']}"
+    
+    return TrackingLinkResponse(
+        po_id=po["id"],
+        po_number=po["po_number"],
+        tracking_token=po["tracking_token"],
+        tracking_url=tracking_url,
+        status=po["status"],
+        delivery_date=po.get("delivery_date"),
+        dispatch_info={
+            "courier_partner": dispatch.get("courier_partner"),
+            "tracking_id": dispatch.get("tracking_id"),
+            "dispatch_date": dispatch.get("dispatch_date"),
+            "expected_delivery_date": dispatch.get("expected_delivery_date")
+        } if dispatch else None
+    )
+
+@api_router.post("/integration/tracking/bulk")
+async def integration_get_bulk_tracking(
+    request: BulkTrackingRequest,
+    api_key_valid: bool = Depends(verify_integration_api_key)
+):
+    """
+    External Integration Endpoint: Get Multiple Tracking Links
+    
+    Retrieve tracking information for multiple POs at once.
+    
+    Can search by:
+    - po_ids: List of PO IDs
+    - po_numbers: List of PO numbers
+    - external_reference_ids: List of external reference IDs
+    
+    Authentication: Requires X-API-Key header
+    """
+    results = []
+    errors = []
+    
+    base_url = os.environ.get('APP_BASE_URL', 'https://vendorplus-4.preview.emergentagent.com')
+    
+    # Search by PO IDs
+    if request.po_ids:
+        for po_id in request.po_ids:
+            po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+            if po:
+                dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
+                results.append({
+                    "po_id": po["id"],
+                    "po_number": po["po_number"],
+                    "tracking_token": po["tracking_token"],
+                    "tracking_url": f"{base_url}/track/{po['tracking_token']}",
+                    "status": po["status"],
+                    "delivery_date": po.get("delivery_date"),
+                    "dispatch_info": {
+                        "courier_partner": dispatch.get("courier_partner"),
+                        "tracking_id": dispatch.get("tracking_id")
+                    } if dispatch else None
+                })
+            else:
+                errors.append({"identifier": po_id, "type": "po_id", "error": "Not found"})
+    
+    # Search by PO Numbers
+    if request.po_numbers:
+        for po_number in request.po_numbers:
+            po = await db.purchase_orders.find_one({"po_number": po_number}, {"_id": 0})
+            if po:
+                dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
+                results.append({
+                    "po_id": po["id"],
+                    "po_number": po["po_number"],
+                    "tracking_token": po["tracking_token"],
+                    "tracking_url": f"{base_url}/track/{po['tracking_token']}",
+                    "status": po["status"],
+                    "delivery_date": po.get("delivery_date"),
+                    "dispatch_info": {
+                        "courier_partner": dispatch.get("courier_partner"),
+                        "tracking_id": dispatch.get("tracking_id")
+                    } if dispatch else None
+                })
+            else:
+                errors.append({"identifier": po_number, "type": "po_number", "error": "Not found"})
+    
+    # Search by External Reference IDs
+    if request.external_reference_ids:
+        for ext_ref in request.external_reference_ids:
+            po = await db.purchase_orders.find_one(
+                {"integration_metadata.external_reference_id": ext_ref}, 
+                {"_id": 0}
+            )
+            if po:
+                dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
+                results.append({
+                    "po_id": po["id"],
+                    "po_number": po["po_number"],
+                    "external_reference_id": ext_ref,
+                    "tracking_token": po["tracking_token"],
+                    "tracking_url": f"{base_url}/track/{po['tracking_token']}",
+                    "status": po["status"],
+                    "delivery_date": po.get("delivery_date"),
+                    "dispatch_info": {
+                        "courier_partner": dispatch.get("courier_partner"),
+                        "tracking_id": dispatch.get("tracking_id")
+                    } if dispatch else None
+                })
+            else:
+                errors.append({"identifier": ext_ref, "type": "external_reference_id", "error": "Not found"})
+    
+    return {
+        "success": True,
+        "total_found": len(results),
+        "total_errors": len(errors),
+        "tracking_links": results,
+        "errors": errors if errors else None
+    }
+
+@api_router.get("/integration/vendors")
+async def integration_list_vendors(
+    api_key_valid: bool = Depends(verify_integration_api_key)
+):
+    """
+    External Integration Endpoint: List Available Vendors
+    
+    Returns a list of active vendors that can receive POs.
+    Useful for external apps to validate vendor names before raising POs.
+    
+    Authentication: Requires X-API-Key header
+    """
+    vendors = await db.vendors.find({"is_active": True}, {"_id": 0}).to_list(100)
+    return {
+        "success": True,
+        "vendors": [
+            {
+                "id": v["id"],
+                "name": v["name"],
+                "contact_person": v.get("contact_person"),
+                "email": v.get("email"),
+                "phone": v.get("phone")
+            }
+            for v in vendors
+        ]
+    }
+
+@api_router.get("/integration/products")
+async def integration_list_products(
+    vendor_id: Optional[str] = None,
+    vendor_name: Optional[str] = None,
+    api_key_valid: bool = Depends(verify_integration_api_key)
+):
+    """
+    External Integration Endpoint: List Available Products
+    
+    Returns a list of active products, optionally filtered by vendor.
+    Useful for external apps to get product SKUs and prices.
+    
+    Authentication: Requires X-API-Key header
+    """
+    query = {"is_active": True}
+    
+    if vendor_id:
+        query["vendor_id"] = vendor_id
+    elif vendor_name:
+        vendor = await db.vendors.find_one(
+            {"name": {"$regex": vendor_name, "$options": "i"}},
+            {"_id": 0}
+        )
+        if vendor:
+            query["vendor_id"] = vendor["id"]
+    
+    products = await db.products.find(query, {"_id": 0}).to_list(500)
+    
+    # Get vendor names
+    vendor_ids = list(set(p["vendor_id"] for p in products))
+    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(100)
+    vendor_map = {v["id"]: v["name"] for v in vendors}
+    
+    return {
+        "success": True,
+        "products": [
+            {
+                "id": p["id"],
+                "name": p["name"],
+                "sku": p["sku"],
+                "vendor_id": p["vendor_id"],
+                "vendor_name": vendor_map.get(p["vendor_id"]),
+                "unit_price": p["unit_price"],
+                "tax_rate": p["tax_rate"],
+                "unit": p.get("unit", "pcs"),
+                "description": p.get("description")
+            }
+            for p in products
+        ]
+    }
+
 # Include the router
 app.include_router(api_router)
 
