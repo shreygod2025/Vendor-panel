@@ -365,6 +365,43 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      {/* Distributor Routes */}
+      <Route path="/distributor" element={
+        <ProtectedRoute allowedRoles={["distributor"]}>
+          <DashboardLayout><DistributorDashboard /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/distributor/purchase-orders" element={
+        <ProtectedRoute allowedRoles={["distributor"]}>
+          <DashboardLayout><DistributorPurchaseOrders /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/distributor/purchase-orders/new" element={
+        <ProtectedRoute allowedRoles={["distributor"]}>
+          <DashboardLayout><DistributorPurchaseOrderForm /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/distributor/purchase-orders/:id" element={
+        <ProtectedRoute allowedRoles={["distributor"]}>
+          <DashboardLayout><PurchaseOrderDetail /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/distributor/products" element={
+        <ProtectedRoute allowedRoles={["distributor"]}>
+          <DashboardLayout><DistributorProducts /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/distributor/deliveries" element={
+        <ProtectedRoute allowedRoles={["distributor"]}>
+          <DashboardLayout><DeliveriesPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/distributor/issues" element={
+        <ProtectedRoute allowedRoles={["distributor"]}>
+          <DashboardLayout><IssuesPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      
       {/* Default redirect */}
       <Route path="/" element={
         user ? (
