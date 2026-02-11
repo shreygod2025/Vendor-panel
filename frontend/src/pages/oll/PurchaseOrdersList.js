@@ -360,6 +360,21 @@ const PurchaseOrdersList = () => {
             >
               <Download className="w-4 h-4" />
             </Button>
+            {["dispatched", "delivered", "closed", "pending_approval"].includes(order.status) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedPO(order);
+                  setIssueDialogOpen(true);
+                }}
+                className="text-amber-600 hover:bg-amber-50"
+                title="Raise Issue"
+                data-testid={`raise-issue-${order.id}`}
+              >
+                <AlertTriangle className="w-4 h-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
