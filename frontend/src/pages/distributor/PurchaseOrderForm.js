@@ -37,7 +37,6 @@ const DistributorPurchaseOrderForm = () => {
   const [formData, setFormData] = useState({
     vendor_id: "",
     delivery_address: "",
-    receiver_name: "",
     contact_person: "",
     contact_number: "",
     delivery_date: "",
@@ -64,7 +63,6 @@ const DistributorPurchaseOrderForm = () => {
         setFormData({
           vendor_id: po.vendor_id,
           delivery_address: po.delivery_address,
-          receiver_name: po.receiver_name || "",
           contact_person: po.contact_person,
           contact_number: po.contact_number,
           delivery_date: po.delivery_date,
