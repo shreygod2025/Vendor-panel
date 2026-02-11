@@ -132,6 +132,7 @@ const VendorPurchaseOrders = () => {
       invoice_file: null,
       logistics_cost: "",
       logistics_bill_file: null,
+      delivery_proof_file: null,
       notes: ""
     });
     setDeliveryDialogOpen(true);
@@ -153,6 +154,11 @@ const VendorPurchaseOrders = () => {
       return;
     }
 
+    if (!deliveryForm.delivery_proof_file) {
+      toast.error("Please upload delivery proof image");
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Convert file to base64 for storage
@@ -169,6 +175,7 @@ const VendorPurchaseOrders = () => {
       const logisticsFileBase64 = deliveryForm.logistics_bill_file 
         ? await fileToBase64(deliveryForm.logistics_bill_file) 
         : null;
+      const deliveryProofBase64 = await fileToBase64(deliveryForm.delivery_proof_file);
 
       const deliveryData = {
         invoice_number: deliveryForm.invoice_number,
@@ -177,6 +184,7 @@ const VendorPurchaseOrders = () => {
         logistics_cost: parseFloat(deliveryForm.logistics_cost) || 0,
         invoice_file_url: invoiceFileBase64,
         logistics_bill_url: logisticsFileBase64,
+        delivery_proof_url: deliveryProofBase64,
         notes: deliveryForm.notes
       };
       
