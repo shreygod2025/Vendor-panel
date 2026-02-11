@@ -527,7 +527,21 @@ const PurchaseOrderForm = () => {
                               data-testid={`discount-input-${index}`}
                             />
                           </TableCell>
-                          <TableCell className="text-sm text-center">{item.tax_rate}%</TableCell>
+                          <TableCell className="text-center">
+                            <Select 
+                              value={String(item.tax_rate)} 
+                              onValueChange={(v) => handleItemChange(index, 'tax_rate', v)}
+                            >
+                              <SelectTrigger className="w-24 h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">No GST</SelectItem>
+                                <SelectItem value="5">5%</SelectItem>
+                                <SelectItem value="18">18%</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell className="text-right font-mono font-medium text-slate-900">
                             {item.product_id ? formatCurrency(lineTotal) : "₹0.00"}
                           </TableCell>
