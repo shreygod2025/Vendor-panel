@@ -580,7 +580,7 @@ const VendorPurchaseOrders = () => {
 
       {/* Delivery & Invoice Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="w-5 h-5" />
@@ -594,7 +594,7 @@ const VendorPurchaseOrders = () => {
           <div className="space-y-4 py-4">
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-sm text-amber-800">
-                <strong>Important:</strong> Invoice and logistics details are required to mark delivery complete.
+                <strong>Important:</strong> Invoice, delivery proof, and logistics details are required.
               </p>
             </div>
 
