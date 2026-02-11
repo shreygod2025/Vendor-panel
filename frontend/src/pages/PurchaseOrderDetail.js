@@ -15,6 +15,13 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -33,7 +40,11 @@ import {
   Loader2,
   CheckCircle,
   Clock,
-  Edit
+  Edit,
+  AlertTriangle,
+  FileText,
+  Download,
+  Image
 } from "lucide-react";
 import { toast } from "sonner";
 
