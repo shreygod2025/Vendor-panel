@@ -91,8 +91,8 @@ const PurchaseOrderDetail = () => {
         }
       }
       
-      // Fetch delivery info if delivered
-      if (["delivered", "closed"].includes(response.data.status)) {
+      // Fetch delivery info if delivered or pending approval
+      if (["delivered", "closed", "pending_approval"].includes(response.data.status)) {
         try {
           const invoiceRes = await apiClient.get(`/invoices?po_id=${id}`);
           if (invoiceRes.data && invoiceRes.data.length > 0) {
