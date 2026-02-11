@@ -671,6 +671,23 @@ const VendorPurchaseOrders = () => {
             </div>
 
             <div>
+              <Label className="form-label">Delivery Proof Image *</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setDeliveryForm(prev => ({ ...prev, delivery_proof_file: e.target.files[0] }))}
+                  className="text-sm"
+                  required
+                />
+                {deliveryForm.delivery_proof_file && (
+                  <span className="text-xs text-emerald-600">✓ {deliveryForm.delivery_proof_file.name}</span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Upload photo proof of delivery (required)</p>
+            </div>
+
+            <div>
               <Label className="form-label">Notes</Label>
               <Textarea
                 value={deliveryForm.notes}
