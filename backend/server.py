@@ -928,7 +928,7 @@ def generate_po_pdf(po_data: dict, vendor_data: dict) -> BytesIO:
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=10*mm, bottomMargin=10*mm)
     
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='Title', fontSize=16, fontName='Helvetica-Bold', alignment=TA_CENTER, spaceAfter=2*mm))
+    styles.add(ParagraphStyle(name='POTitle', fontSize=16, fontName='Helvetica-Bold', alignment=TA_CENTER, spaceAfter=2*mm))
     styles.add(ParagraphStyle(name='SubHeader', fontSize=12, fontName='Helvetica-Bold', alignment=TA_LEFT))
     styles.add(ParagraphStyle(name='Normal_R', fontSize=10, fontName='Helvetica', alignment=TA_RIGHT))
     styles.add(ParagraphStyle(name='Small', fontSize=9, fontName='Helvetica', alignment=TA_LEFT, leading=12))
@@ -948,14 +948,14 @@ def generate_po_pdf(po_data: dict, vendor_data: dict) -> BytesIO:
         try:
             logo_img = Image(str(logo_path), width=40*mm, height=15*mm)
         except:
-            logo_img = Paragraph('<b>OLL</b>', styles['Title'])
+            logo_img = Paragraph('<b>OLL</b>', styles['POTitle'])
     else:
-        logo_img = Paragraph('<b>OLL</b>', styles['Title'])
+        logo_img = Paragraph('<b>OLL</b>', styles['POTitle'])
     
     po_date = po_data.get("created_at", "")[:10] if po_data.get("created_at") else ""
     
     header_data = [
-        [logo_img, Paragraph('<b>PURCHASE ORDER</b>', styles['Title']), Paragraph(f'<b>PO NO:</b> {po_data.get("po_number", "")}', styles['Normal_R'])],
+        [logo_img, Paragraph('<b>PURCHASE ORDER</b>', styles['POTitle']), Paragraph(f'<b>PO NO:</b> {po_data.get("po_number", "")}', styles['Normal_R'])],
         ['', '', Paragraph(f'<b>Date:</b> {po_date}', styles['Normal_R'])]
     ]
     header_table = Table(header_data, colWidths=[45*mm, 85*mm, 50*mm])
