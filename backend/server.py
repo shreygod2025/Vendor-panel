@@ -921,6 +921,191 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
     
     return POResponse(**po)
 
+# PDF Generation function
+def generate_po_pdf(po_data: dict, vendor_data: dict) -> BytesIO:
+    """Generate a PDF for a Purchase Order"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=15*mm, bottomMargin=15*mm)
+    
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='Header', fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER))
+    styles.add(ParagraphStyle(name='SubHeader', fontSize=12, fontName='Helvetica-Bold', alignment=TA_LEFT))
+    styles.add(ParagraphStyle(name='Normal_R', fontSize=10, fontName='Helvetica', alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name='Small', fontSize=9, fontName='Helvetica', alignment=TA_LEFT))
+    styles.add(ParagraphStyle(name='Bold', fontSize=10, fontName='Helvetica-Bold', alignment=TA_LEFT))
+    
+    elements = []
+    
+    # Header with PO number and date
+    header_data = [
+        [Paragraph('<b>OLL</b>', styles['Header']), '', Paragraph('<b>PURCHASE ORDER</b>', styles['Header']), '', Paragraph(f'<b>PO NO: {po_data.get("po_number", "")}</b>', styles['Normal_R'])],
+        ['', '', '', '', Paragraph(f'Date: {po_data.get("created_at", "")[:10]}', styles['Normal_R'])]
+    ]
+    header_table = Table(header_data, colWidths=[50*mm, 20*mm, 60*mm, 20*mm, 50*mm])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 10*mm))
+    
+    # Company Info (OLL)
+    company_info = """<b>Clone Futura Solution Pvt Ltd</b><br/>
+Daga Vill, Bungalow No 9 Magruth Towers, 2nd x lane,<br/>
+Near Rajput Dairy, Lonkhandwala Complex, Andheri(w),<br/>
+Mumbai - 400053<br/>
+<b>Phone:</b> 9323835523<br/>
+<b>Email:</b> accounts@clonefutura.com / educstors@oll.com<br/>
+<b>GSTIN:</b> 27AAKCC1113B1ZC"""
+    elements.append(Paragraph(company_info, styles['Small']))
+    elements.append(Spacer(1, 8*mm))
+    
+    # Vendor and Ship To sections
+    vendor_info = f"""<b>VENDOR</b><br/>
+<b>{vendor_data.get('name', '')}</b><br/>
+{vendor_data.get('address', 'N/A')}<br/>
+<b>Phone:</b> {vendor_data.get('phone', 'N/A')}<br/>
+<b>Email:</b> {vendor_data.get('email', 'N/A')}"""
+    
+    ship_to_info = f"""<b>SHIP TO</b><br/>
+<b>{po_data.get('contact_person', '')}</b><br/>
+{po_data.get('delivery_address', '')}<br/>
+<b>Phone:</b> {po_data.get('contact_number', 'N/A')}"""
+    
+    info_data = [[Paragraph(vendor_info, styles['Small']), Paragraph(ship_to_info, styles['Small'])]]
+    info_table = Table(info_data, colWidths=[90*mm, 90*mm])
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 5*mm))
+    
+    # PO Details
+    total_qty = sum(item.get('quantity', 0) for item in po_data.get('line_items', []))
+    details_data = [[
+        Paragraph(f'<b>Total Items:</b> {total_qty}', styles['Small']),
+        Paragraph(f'<b>Delivery Date:</b> {po_data.get("delivery_date", "N/A")}', styles['Small'])
+    ]]
+    details_table = Table(details_data, colWidths=[90*mm, 90*mm])
+    elements.append(details_table)
+    elements.append(Spacer(1, 5*mm))
+    
+    # Line Items Table
+    table_data = [['S.No', 'Item', 'Description', 'Qty', 'Unit Price', 'GST %', 'Total']]
+    
+    for idx, item in enumerate(po_data.get('line_items', []), 1):
+        qty = item.get('quantity', 0)
+        unit_price = item.get('unit_price', 0)
+        tax_rate = item.get('tax_rate', 0)
+        item_total = qty * unit_price
+        tax_amount = item_total * (tax_rate / 100)
+        total_with_tax = item_total + tax_amount
+        
+        table_data.append([
+            str(idx),
+            item.get('product_name', ''),
+            item.get('comment', '-') or '-',
+            str(qty),
+            f"₹{unit_price:,.2f}",
+            f"{tax_rate}%",
+            f"₹{total_with_tax:,.2f}"
+        ])
+    
+    items_table = Table(table_data, colWidths=[12*mm, 45*mm, 35*mm, 15*mm, 25*mm, 18*mm, 30*mm])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (1, 1), (2, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 5*mm))
+    
+    # Summary Section
+    subtotal = po_data.get('subtotal', 0)
+    total_tax = po_data.get('total_tax', 0)
+    total_discount = po_data.get('total_discount', 0)
+    grand_total = po_data.get('grand_total', 0)
+    
+    summary_data = [
+        ['', 'SUB TOTAL', f"₹{subtotal:,.2f}"],
+        ['', 'GST Amount', f"₹{total_tax:,.2f}"],
+        ['', 'DISCOUNT', f"₹{total_discount:,.2f}" if total_discount else '-'],
+        ['', 'GRAND TOTAL', f"₹{grand_total:,.2f}"],
+    ]
+    summary_table = Table(summary_data, colWidths=[100*mm, 40*mm, 40*mm])
+    summary_table.setStyle(TableStyle([
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
+        ('FONTNAME', (1, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LINEABOVE', (1, -1), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 10*mm))
+    
+    # Notes
+    if po_data.get('notes'):
+        elements.append(Paragraph(f'<b>Notes:</b> {po_data.get("notes")}', styles['Small']))
+        elements.append(Spacer(1, 5*mm))
+    
+    # Signature Section
+    sig_data = [
+        ['', ''],
+        ['_______________________', ''],
+        ['Authorized Signature', ''],
+    ]
+    sig_table = Table(sig_data, colWidths=[90*mm, 90*mm])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 15),
+    ]))
+    elements.append(sig_table)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+@api_router.get("/purchase-orders/{po_id}/pdf")
+async def download_po_pdf(po_id: str, current_user: dict = Depends(get_current_user)):
+    """Download Purchase Order as PDF"""
+    po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Access control
+    if current_user.get("role") == "vendor" and current_user.get("vendor_id") != po["vendor_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    elif current_user.get("role") == "distributor" and po.get("distributor_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    if not vendor:
+        vendor = {"name": "Unknown Vendor", "address": "", "phone": "", "email": ""}
+    
+    # Generate PDF
+    pdf_buffer = generate_po_pdf(po, vendor)
+    
+    # Return as downloadable file
+    filename = f"PO-{po['po_number']}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @api_router.put("/purchase-orders/{po_id}", response_model=POResponse)
 async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: dict = Depends(get_current_user)):
     existing = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
