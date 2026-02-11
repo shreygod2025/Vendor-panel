@@ -453,7 +453,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Distributor Role Implementation"
+    - "PO Form Updates - Remove Receiver Name, Add GST Dropdown, Auto-PDF Download"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
