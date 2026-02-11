@@ -328,6 +328,7 @@ class VendorDeliverySubmit(BaseModel):
     logistics_cost: float = 0
     invoice_file_url: Optional[str] = None
     logistics_bill_url: Optional[str] = None
+    delivery_proof_url: Optional[str] = None
     notes: Optional[str] = None
 
 # Invoice Models
