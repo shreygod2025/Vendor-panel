@@ -181,6 +181,51 @@ const PurchaseOrderDetail = () => {
     }
   };
 
+  const handleRaiseIssue = async () => {
+    if (!issueForm.description.trim()) {
+      toast.error("Please provide issue description");
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      await apiClient.post("/issues", {
+        po_id: order.id,
+        vendor_id: order.vendor_id,
+        issue_type: issueForm.issue_type,
+        priority: issueForm.priority,
+        description: issueForm.description
+      });
+      toast.success("Issue raised successfully");
+      setIssueDialogOpen(false);
+      setIssueForm({ issue_type: "quality", priority: "medium", description: "" });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to raise issue");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const downloadPDF = async () => {
+    try {
+      const response = await apiClient.get(`/purchase-orders/${id}/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `PO-${order.po_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("PDF downloaded");
+    } catch (error) {
+      toast.error("Failed to download PDF");
+    }
+  };
+
   const handleClosePO = async () => {
     if (!window.confirm("Are you sure you want to close this PO?")) return;
     
