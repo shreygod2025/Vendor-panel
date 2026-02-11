@@ -264,6 +264,25 @@ const PurchaseOrderForm = () => {
     }));
   };
 
+  const downloadPDF = async (orderId, poNumber) => {
+    try {
+      const response = await apiClient.get(`/purchase-orders/${orderId}/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `PO-${poNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download PDF:", error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -290,11 +309,15 @@ const PurchaseOrderForm = () => {
       if (isEdit) {
         await apiClient.put(`/purchase-orders/${id}`, submitData);
         toast.success("Purchase order updated successfully");
+        navigate("/oll/purchase-orders");
       } else {
-        await apiClient.post("/purchase-orders", submitData);
+        const response = await apiClient.post("/purchase-orders", submitData);
         toast.success("Purchase order created successfully");
+        // Auto-download PDF after creation
+        const createdPO = response.data;
+        await downloadPDF(createdPO.id, createdPO.po_number);
+        navigate("/oll/purchase-orders");
       }
-      navigate("/oll/purchase-orders");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to save purchase order");
     } finally {
