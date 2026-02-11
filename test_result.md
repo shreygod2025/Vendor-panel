@@ -150,17 +150,17 @@ backend:
         agent: "testing"
         comment: "✅ TESTED: GET /api/products returns products with vendor_name field populated correctly. POST /api/products creates products with vendor association. All CRUD operations working."
 
-  - task: "Distributor Role Implementation"
+  - task: "PO Form Updates - Remove Receiver Name, Add GST Dropdown, Auto-PDF Download"
     implemented: true
     working: "NA"
-    file: "/app/backend/server.py, /app/frontend/src/pages/distributor/*"
+    file: "/app/frontend/src/pages/oll/PurchaseOrderForm.js, /app/backend/server.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Implemented new Distributor role with: 1) Backend - modified PO creation, products, deliveries, issues endpoints to support distributor filtering and pricing hiding. 2) Frontend - created Dashboard.js, PurchaseOrders.js, PurchaseOrderForm.js, Products.js for distributor. 3) Updated App.js with distributor routes. 4) Updated Sidebar.js with distributor navigation. 5) POs created by distributors show 'By Distributor: {name}' tag in OLL admin view."
+        comment: "Implemented: 1) Removed receiver_name field from PO form, 2) Changed tax_rate to dropdown with options: No GST (0%), 5%, 18%, 3) Added PDF generation endpoint GET /api/purchase-orders/{id}/pdf, 4) Auto-download PDF when PO is created, 5) Added Download PDF button in PO actions for both admin and vendor"
 
   - task: "Purchase Orders API"
     implemented: true
