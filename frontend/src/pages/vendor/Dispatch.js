@@ -169,11 +169,46 @@ const VendorDispatch = () => {
                   </div>
 
                   <div>
-                    <Label className="form-label">Proof URL (Optional)</Label>
+                    <Label className="form-label">Dispatch Proof (Image/PDF)</Label>
+                    <div className="mt-2">
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          {proofFile ? (
+                            <>
+                              {proofFile.type.startsWith('image/') ? (
+                                <Image className="w-8 h-8 text-emerald-500 mb-2" />
+                              ) : (
+                                <FileText className="w-8 h-8 text-emerald-500 mb-2" />
+                              )}
+                              <p className="text-sm text-slate-700 font-medium">{proofFile.name}</p>
+                              <p className="text-xs text-slate-500">Click to change</p>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-8 h-8 text-slate-400 mb-2" />
+                              <p className="text-sm text-slate-500">Click to upload proof</p>
+                              <p className="text-xs text-slate-400">PNG, JPG, PDF up to 5MB</p>
+                            </>
+                          )}
+                        </div>
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*,.pdf"
+                          onChange={handleFileChange}
+                          data-testid="dispatch-proof-input"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="form-label">Or Paste Proof URL</Label>
                     <Input
                       value={formData.proof_url}
                       onChange={(e) => setFormData(prev => ({ ...prev, proof_url: e.target.value }))}
                       placeholder="https://drive.google.com/..."
+                      disabled={!!proofFile}
                       data-testid="proof-url-input"
                     />
                     <p className="text-xs text-slate-500 mt-1">Upload proof to Google Drive and paste the link here</p>
