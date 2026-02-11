@@ -72,6 +72,15 @@ const PurchaseOrdersList = () => {
   const [viewInvoiceDialog, setViewInvoiceDialog] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
+  // Raise Issue dialog state
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [issueForm, setIssueForm] = useState({
+    issue_type: "quality",
+    priority: "medium",
+    description: ""
+  });
+  const [submittingIssue, setSubmittingIssue] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
