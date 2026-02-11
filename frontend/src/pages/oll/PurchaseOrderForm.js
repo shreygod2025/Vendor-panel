@@ -37,7 +37,6 @@ const PurchaseOrderForm = () => {
   const [formData, setFormData] = useState({
     vendor_id: "",
     delivery_address: "",
-    receiver_name: "",
     contact_person: "",
     contact_number: "",
     delivery_date: "",
