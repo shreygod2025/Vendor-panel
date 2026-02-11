@@ -261,7 +261,7 @@ const VendorPurchaseOrders = () => {
     return (
       <TableRow key={order.id}>
         <TableCell className="font-mono font-medium">{order.po_number}</TableCell>
-        <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
+        <TableCell>{order.contact_person || "-"}</TableCell>
         <TableCell>{order.line_items?.length || 0} items</TableCell>
         <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
         <TableCell>
@@ -273,10 +273,18 @@ const VendorPurchaseOrders = () => {
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-2">
             <Link to={`/vendor/purchase-orders/${order.id}`}>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" title="View">
                 <Eye className="w-4 h-4" />
               </Button>
             </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => downloadPDF(order.id, order.po_number)}
+              title="Download PDF"
+            >
+              <Download className="w-4 h-4" />
+            </Button>
             
             {order.status === "sent" && (
               <>
