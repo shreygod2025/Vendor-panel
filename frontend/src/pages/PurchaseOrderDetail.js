@@ -820,6 +820,76 @@ const PurchaseOrderDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Raise Issue Dialog */}
+      <Dialog open={issueDialogOpen} onOpenChange={setIssueDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Raise Issue for {order?.po_number}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Issue Type</Label>
+              <Select 
+                value={issueForm.issue_type} 
+                onValueChange={(v) => setIssueForm(prev => ({ ...prev, issue_type: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="quality">Quality Issue</SelectItem>
+                  <SelectItem value="quantity">Quantity Mismatch</SelectItem>
+                  <SelectItem value="damage">Damaged Goods</SelectItem>
+                  <SelectItem value="delay">Delivery Delay</SelectItem>
+                  <SelectItem value="wrong_item">Wrong Item</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Priority</Label>
+              <Select 
+                value={issueForm.priority} 
+                onValueChange={(v) => setIssueForm(prev => ({ ...prev, priority: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Description *</Label>
+              <Textarea
+                value={issueForm.description}
+                onChange={(e) => setIssueForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the issue in detail..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIssueDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleRaiseIssue}
+              disabled={actionLoading}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Raise Issue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
