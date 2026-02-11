@@ -258,6 +258,32 @@ const PurchaseOrdersList = () => {
     }
   };
 
+  const handleRaiseIssue = async () => {
+    if (!selectedPO || !issueForm.description.trim()) {
+      toast.error("Please provide issue description");
+      return;
+    }
+    
+    setSubmittingIssue(true);
+    try {
+      await apiClient.post("/issues", {
+        po_id: selectedPO.id,
+        vendor_id: selectedPO.vendor_id,
+        issue_type: issueForm.issue_type,
+        priority: issueForm.priority,
+        description: issueForm.description
+      });
+      toast.success("Issue raised successfully");
+      setIssueDialogOpen(false);
+      setSelectedPO(null);
+      setIssueForm({ issue_type: "quality", priority: "medium", description: "" });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to raise issue");
+    } finally {
+      setSubmittingIssue(false);
+    }
+  };
+
   const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
     const canEdit = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
     const canDelete = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
