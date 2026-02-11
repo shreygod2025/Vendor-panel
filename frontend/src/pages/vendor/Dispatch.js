@@ -6,7 +6,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { ArrowLeft, Save, Loader2, Truck } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Truck, Upload, FileText, Image } from "lucide-react";
 import { toast } from "sonner";
 
 const VendorDispatch = () => {
@@ -15,6 +15,7 @@ const VendorDispatch = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [order, setOrder] = useState(null);
+  const [proofFile, setProofFile] = useState(null);
   
   const [formData, setFormData] = useState({
     po_id: poId,
