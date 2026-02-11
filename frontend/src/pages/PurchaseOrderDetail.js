@@ -311,7 +311,7 @@ const PurchaseOrderDetail = () => {
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => navigate(isOLL ? "/oll/purchase-orders" : "/vendor/purchase-orders")}
+              onClick={() => navigate(-1)}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
@@ -320,7 +320,7 @@ const PurchaseOrderDetail = () => {
               <div className="flex items-center gap-3">
                 <h1 className="page-title">{order.po_number}</h1>
                 <span className={`badge border ${getStatusColor(order.status)}`}>
-                  {order.status}
+                  {order.status === "pending_approval" ? "Pending Approval" : order.status}
                 </span>
               </div>
               <p className="page-subtitle">Created on {formatDate(order.created_at)}</p>
@@ -329,6 +329,11 @@ const PurchaseOrderDetail = () => {
           
           {/* Actions */}
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={downloadPDF}>
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </Button>
+            
             {order.status !== "rejected" && (
               <Button variant="outline" size="sm" onClick={copyTrackingLink}>
                 <ExternalLink className="w-4 h-4 mr-2" />
@@ -336,8 +341,21 @@ const PurchaseOrderDetail = () => {
               </Button>
             )}
             
+            {/* Raise Issue - for delivered POs */}
+            {(isOLL || isDistributor) && ["delivered", "closed", "dispatched"].includes(order.status) && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIssueDialogOpen(true)}
+                className="text-amber-600 border-amber-200 hover:bg-amber-50"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Raise Issue
+              </Button>
+            )}
+            
             {/* Edit button - for draft, sent, and confirmed POs */}
-            {isOLL && (order.status === "draft" || order.status === "sent" || order.status === "confirmed") && (
+            {isOLL && (order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected") && (
               <Link to={`/oll/purchase-orders/${order.id}/edit`}>
                 <Button variant="outline" data-testid="edit-po-btn">
                   <Edit className="w-4 h-4 mr-2" />
@@ -358,7 +376,7 @@ const PurchaseOrderDetail = () => {
               </Button>
             )}
 
-            {!isOLL && order.status === "sent" && (
+            {!isOLL && !isDistributor && order.status === "sent" && (
               <>
                 <Button
                   variant="outline"
