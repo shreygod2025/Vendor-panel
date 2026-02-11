@@ -311,16 +311,6 @@ const DistributorPurchaseOrderForm = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="receiver_name">Receiver Name *</Label>
-                  <Input
-                    id="receiver_name"
-                    value={formData.receiver_name}
-                    onChange={(e) => setFormData({ ...formData, receiver_name: e.target.value })}
-                    placeholder="Name of person receiving delivery"
-                    required
-                  />
-                </div>
-                <div>
                   <Label htmlFor="delivery_date">Expected Delivery Date *</Label>
                   <Input
                     id="delivery_date"
