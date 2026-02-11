@@ -296,11 +296,7 @@ const PurchaseOrdersList = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                const backendUrl = process.env.REACT_APP_BACKEND_URL;
-                const token = localStorage.getItem('token');
-                window.open(`${backendUrl}/api/purchase-orders/${order.id}/pdf?token=${token}`, '_blank');
-              }}
+              onClick={() => downloadPDF(order.id, order.po_number)}
               title="Download PDF"
               data-testid={`download-pdf-${order.id}`}
             >
