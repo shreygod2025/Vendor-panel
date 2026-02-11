@@ -82,12 +82,24 @@ const PurchaseOrderDetail = () => {
       setOrder(response.data);
       
       // Fetch dispatch details if dispatched
-      if (["dispatched", "delivered", "closed"].includes(response.data.status)) {
+      if (["dispatched", "delivered", "closed", "pending_approval"].includes(response.data.status)) {
         try {
           const dispatchRes = await apiClient.get(`/dispatch/${id}`);
           setDispatch(dispatchRes.data);
         } catch (e) {
           // No dispatch yet
+        }
+      }
+      
+      // Fetch delivery info if delivered
+      if (["delivered", "closed"].includes(response.data.status)) {
+        try {
+          const invoiceRes = await apiClient.get(`/invoices?po_id=${id}`);
+          if (invoiceRes.data && invoiceRes.data.length > 0) {
+            setDeliveryInfo(invoiceRes.data[0]);
+          }
+        } catch (e) {
+          // No delivery info
         }
       }
 
@@ -103,7 +115,7 @@ const PurchaseOrderDetail = () => {
       })));
     } catch (error) {
       toast.error("Failed to fetch purchase order");
-      navigate(isOLL ? "/oll/purchase-orders" : "/vendor/purchase-orders");
+      navigate(-1);
     } finally {
       setLoading(false);
     }
