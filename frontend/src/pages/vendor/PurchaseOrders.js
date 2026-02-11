@@ -224,6 +224,26 @@ const VendorPurchaseOrders = () => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
+  const downloadPDF = async (orderId, poNumber) => {
+    try {
+      const response = await apiClient.get(`/purchase-orders/${orderId}/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `PO-${poNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("PDF downloaded successfully");
+    } catch (error) {
+      toast.error("Failed to download PDF");
+    }
+  };
+
   // Categorize orders by status
   const categorizedOrders = {
     // PO Confirmation section
