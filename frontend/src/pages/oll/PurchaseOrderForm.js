@@ -370,16 +370,6 @@ const PurchaseOrderForm = () => {
                   <p className="text-xs text-slate-500 mt-1">Auto-selected from products</p>
                 </div>
                 <div>
-                  <Label className="form-label">Receiver Name *</Label>
-                  <Input
-                    value={formData.receiver_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, receiver_name: e.target.value }))}
-                    required
-                    placeholder="Person receiving the delivery"
-                    data-testid="receiver-name-input"
-                  />
-                </div>
-                <div>
                   <Label className="form-label">Delivery Date *</Label>
                   <Input
                     type="date"
