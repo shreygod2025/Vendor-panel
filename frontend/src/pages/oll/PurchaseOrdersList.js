@@ -276,6 +276,19 @@ const PurchaseOrdersList = () => {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => {
+                const backendUrl = process.env.REACT_APP_BACKEND_URL;
+                const token = localStorage.getItem('token');
+                window.open(`${backendUrl}/api/purchase-orders/${order.id}/pdf?token=${token}`, '_blank');
+              }}
+              title="Download PDF"
+              data-testid={`download-pdf-${order.id}`}
+            >
+              <Download className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => copyTrackingLink(order.tracking_token)}
               title="Copy tracking link"
               data-testid={`copy-tracking-${order.id}`}
