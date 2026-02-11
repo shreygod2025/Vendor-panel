@@ -240,8 +240,9 @@ const PurchaseOrdersList = () => {
   };
 
   const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
-    const canEdit = order.status === "draft" || order.status === "sent" || order.status === "confirmed";
+    const canEdit = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
     const canDelete = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
+    const canReRaise = order.status === "rejected";
     
     return (
       <TableRow key={order.id} data-testid={`po-row-${order.id}`}>
