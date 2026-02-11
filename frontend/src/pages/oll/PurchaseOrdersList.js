@@ -239,6 +239,16 @@ const PurchaseOrdersList = () => {
     }
   };
 
+  const handleReRaisePO = async (orderId) => {
+    try {
+      await apiClient.put(`/purchase-orders/${orderId}`, { status: "sent" });
+      toast.success("PO re-raised and sent to vendor");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to re-raise PO");
+    }
+  };
+
   const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
     const canEdit = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
     const canDelete = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
