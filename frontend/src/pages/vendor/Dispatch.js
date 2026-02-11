@@ -52,13 +52,40 @@ const VendorDispatch = () => {
     setSaving(true);
     
     try {
-      await apiClient.post("/dispatch", formData);
+      let proofBase64 = null;
+      if (proofFile) {
+        proofBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(proofFile);
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (error) => reject(error);
+        });
+      }
+      
+      const submitData = {
+        ...formData,
+        proof_url: proofBase64 || formData.proof_url
+      };
+      
+      await apiClient.post("/dispatch", submitData);
       toast.success("Dispatch details added successfully");
       navigate("/vendor/purchase-orders");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to add dispatch details");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File size must be less than 5MB");
+        return;
+      }
+      setProofFile(file);
     }
   };
 
