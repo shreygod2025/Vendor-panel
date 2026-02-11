@@ -146,6 +146,26 @@ const PurchaseOrdersList = () => {
     toast.success("Tracking link copied to clipboard");
   };
 
+  const downloadPDF = async (orderId, poNumber) => {
+    try {
+      const response = await apiClient.get(`/purchase-orders/${orderId}/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `PO-${poNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("PDF downloaded successfully");
+    } catch (error) {
+      toast.error("Failed to download PDF");
+    }
+  };
+
   // Filter orders by search and vendor
   const filteredOrders = orders.filter((order) => {
     const matchesSearch = order.po_number.toLowerCase().includes(search.toLowerCase());
