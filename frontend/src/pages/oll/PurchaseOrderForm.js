@@ -137,8 +137,27 @@ const PurchaseOrderForm = () => {
     }
 
     const totalDiscount = totalItemDiscount + orderDiscount;
-    const taxableAmount = subtotal - totalDiscount;
-    totalTax = taxableAmount * 0.18;
+    // Recalculate tax after order discount if any
+    if (orderDiscount > 0) {
+      totalTax = 0;
+      formData.line_items.forEach(item => {
+        if (!item.product_id) return;
+        const itemTotal = item.quantity * item.unit_price;
+        let itemDiscount = 0;
+        if (item.discount_percent > 0) {
+          itemDiscount = itemTotal * (item.discount_percent / 100);
+        } else {
+          itemDiscount = item.discount_amount || 0;
+        }
+        const itemAfterDiscount = itemTotal - itemDiscount;
+        // Apply proportional order discount
+        const proportionalOrderDiscount = orderDiscount * (itemAfterDiscount / (subtotal - totalItemDiscount));
+        const taxableAmount = itemAfterDiscount - proportionalOrderDiscount;
+        const itemTax = taxableAmount * (item.tax_rate / 100);
+        totalTax += itemTax;
+      });
+    }
+    
     const grandTotal = subtotal - totalDiscount + totalTax;
 
     setTotals({
