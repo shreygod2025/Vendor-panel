@@ -53,14 +53,24 @@ const PurchaseOrderDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isOLL = user?.role === "oll";
+  const isDistributor = user?.role === "distributor";
 
   const [order, setOrder] = useState(null);
   const [dispatch, setDispatch] = useState(null);
+  const [deliveryInfo, setDeliveryInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [deliveryDialog, setDeliveryDialog] = useState(false);
   const [deliveryItems, setDeliveryItems] = useState([]);
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  
+  // Raise Issue Dialog State
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [issueForm, setIssueForm] = useState({
+    issue_type: "quality",
+    priority: "medium",
+    description: ""
+  });
 
   useEffect(() => {
     fetchOrder();
