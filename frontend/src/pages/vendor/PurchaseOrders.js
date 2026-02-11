@@ -55,6 +55,7 @@ const VendorPurchaseOrders = () => {
     invoice_file: null,
     logistics_cost: "",
     logistics_bill_file: null,
+    delivery_proof_file: null,
     notes: ""
   });
   const [submitting, setSubmitting] = useState(false);
