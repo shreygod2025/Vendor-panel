@@ -142,9 +142,10 @@ const VendorInvoices = () => {
               <TableHeader>
                 <TableRow className="bg-slate-50">
                   <TableHead>Invoice #</TableHead>
-                  <TableHead>PO ID</TableHead>
+                  <TableHead>PO Number</TableHead>
                   <TableHead>Invoice Date</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>Payment Status</TableHead>
                   <TableHead>Uploaded</TableHead>
                 </TableRow>
               </TableHeader>
@@ -152,9 +153,25 @@ const VendorInvoices = () => {
                 {invoices.map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-mono font-medium">{invoice.invoice_number}</TableCell>
-                    <TableCell className="font-mono text-sm">{invoice.po_id.slice(0, 8)}...</TableCell>
+                    <TableCell className="font-mono text-sm">{invoice.po_number || invoice.po_id?.slice(0, 8) + '...'}</TableCell>
                     <TableCell>{invoice.invoice_date}</TableCell>
                     <TableCell className="font-mono font-medium">{formatCurrency(invoice.amount)}</TableCell>
+                    <TableCell>
+                      <span className={`badge ${
+                        invoice.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                        invoice.payment_status === 'partially_paid' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {invoice.payment_status === 'paid' ? 'Paid' :
+                         invoice.payment_status === 'partially_paid' ? 'Partially Paid' :
+                         'Pending'}
+                      </span>
+                      {invoice.payment_status === 'partially_paid' && invoice.paid_amount && (
+                        <span className="text-xs text-slate-500 block mt-1">
+                          Paid: {formatCurrency(invoice.paid_amount)}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-slate-500">{formatDate(invoice.created_at)}</TableCell>
                   </TableRow>
                 ))}
