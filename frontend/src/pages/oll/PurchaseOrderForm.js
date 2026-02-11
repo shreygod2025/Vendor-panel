@@ -90,7 +90,6 @@ const PurchaseOrderForm = () => {
         setFormData({
           vendor_id: poRes.data.vendor_id,
           delivery_address: poRes.data.delivery_address,
-          receiver_name: poRes.data.receiver_name || "",
           contact_person: poRes.data.contact_person,
           contact_number: poRes.data.contact_number,
           delivery_date: poRes.data.delivery_date || "",
