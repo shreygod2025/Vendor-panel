@@ -194,7 +194,7 @@ const PublicTracking = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <p className="text-sm text-slate-500">Courier Partner</p>
                   <p className="font-medium">{data.dispatch.courier_partner || '-'}</p>
@@ -208,6 +208,48 @@ const PublicTracking = () => {
                   <p className="font-medium">{data.dispatch.dispatch_date || '-'}</p>
                 </div>
               </div>
+              {data.dispatch.expected_delivery_date && (
+                <div className="mb-4">
+                  <p className="text-sm text-slate-500">Expected Delivery</p>
+                  <p className="font-medium text-emerald-600">{data.dispatch.expected_delivery_date}</p>
+                </div>
+              )}
+              {data.dispatch.proof_url && (
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-slate-500 mb-2">Dispatch Proof</p>
+                  {data.dispatch.proof_url.startsWith('data:image') ? (
+                    <img 
+                      src={data.dispatch.proof_url} 
+                      alt="Dispatch Proof" 
+                      className="max-w-xs rounded-lg border"
+                    />
+                  ) : data.dispatch.proof_url.startsWith('data:application/pdf') ? (
+                    <a 
+                      href={data.dispatch.proof_url} 
+                      download="dispatch_proof.pdf"
+                      className="inline-flex items-center gap-2 text-blue-600 hover:underline"
+                    >
+                      <Package className="w-4 h-4" />
+                      Download Dispatch Proof (PDF)
+                    </a>
+                  ) : (
+                    <a 
+                      href={data.dispatch.proof_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      View Dispatch Proof
+                    </a>
+                  )}
+                </div>
+              )}
+              {data.dispatch.notes && (
+                <div className="pt-4 border-t mt-4">
+                  <p className="text-sm text-slate-500">Notes</p>
+                  <p className="text-slate-700">{data.dispatch.notes}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
