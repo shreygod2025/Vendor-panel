@@ -643,7 +643,7 @@ const PurchaseOrderForm = () => {
                     <span className="font-mono text-red-600">-{formatCurrency(totals.total_discount)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>Tax (GST @ 18%)</span>
+                    <span>Tax (GST)</span>
                     <span className="font-mono">{formatCurrency(totals.total_tax)}</span>
                   </div>
                   <div className="border-t pt-3 mt-3">
