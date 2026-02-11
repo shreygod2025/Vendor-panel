@@ -1754,19 +1754,34 @@ async def track_order(tracking_token: str):
     
     vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
     dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
+    invoice = await db.invoices.find_one({"po_id": po["id"]}, {"_id": 0})
     
     # Build status timeline
     timeline = [
-        {"status": "draft", "label": "Order Created", "date": po["created_at"], "completed": True}
+        {"status": "created", "label": "Order Created", "date": po["created_at"], "completed": True}
     ]
     
-    status_order = ["draft", "sent", "confirmed", "dispatched", "delivered", "closed"]
-    current_idx = status_order.index(po["status"]) if po["status"] in status_order else 0
+    # Map status for timeline (handle pending_approval as dispatched)
+    current_status = po["status"]
+    if current_status == "pending_approval":
+        current_status = "dispatched"  # Treat as dispatched for timeline purposes
+    
+    status_order = ["created", "sent", "confirmed", "dispatched", "delivered", "closed"]
+    status_labels = {
+        "created": "Order Created",
+        "sent": "Sent to Vendor", 
+        "confirmed": "Confirmed by Vendor",
+        "dispatched": "Dispatched",
+        "delivered": "Delivered",
+        "closed": "Completed"
+    }
+    
+    current_idx = status_order.index(current_status) if current_status in status_order else 0
     
     for idx, status in enumerate(status_order[1:], 1):
         timeline.append({
             "status": status,
-            "label": status.replace("_", " ").title(),
+            "label": status_labels.get(status, status.replace("_", " ").title()),
             "date": po["updated_at"] if idx <= current_idx else None,
             "completed": idx <= current_idx
         })
@@ -1780,6 +1795,16 @@ async def track_order(tracking_token: str):
             "quantity": item.get("quantity")
         })
     
+    # Get delivery info
+    delivery_info = None
+    if invoice:
+        delivery_info = {
+            "invoice_number": invoice.get("invoice_number"),
+            "logistics_cost": invoice.get("logistics_cost", 0),
+            "delivery_proof_url": invoice.get("delivery_proof_url"),
+            "delivered_at": invoice.get("created_at")
+        }
+    
     return {
         "po_number": po["po_number"],
         "status": po["status"],
@@ -1792,8 +1817,11 @@ async def track_order(tracking_token: str):
             "courier_partner": dispatch.get("courier_partner") if dispatch else None,
             "tracking_id": dispatch.get("tracking_id") if dispatch else None,
             "dispatch_date": dispatch.get("dispatch_date") if dispatch else None,
-            "expected_delivery_date": dispatch.get("expected_delivery_date") if dispatch else None
+            "expected_delivery_date": dispatch.get("expected_delivery_date") if dispatch else None,
+            "proof_url": dispatch.get("proof_url") if dispatch else None,
+            "notes": dispatch.get("notes") if dispatch else None
         } if dispatch else None,
+        "delivery": delivery_info,
         "timeline": timeline
     }
 
