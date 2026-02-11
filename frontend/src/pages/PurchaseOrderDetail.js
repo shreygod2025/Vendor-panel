@@ -567,7 +567,7 @@ const PurchaseOrderDetail = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-slate-500">Courier Partner</p>
                       <p className="font-medium">{dispatch.courier_partner}</p>
@@ -580,13 +580,132 @@ const PurchaseOrderDetail = () => {
                       <p className="text-sm text-slate-500">Dispatch Date</p>
                       <p className="font-medium">{dispatch.dispatch_date}</p>
                     </div>
-                    {dispatch.notes && (
+                    {dispatch.expected_delivery_date && (
                       <div>
-                        <p className="text-sm text-slate-500">Notes</p>
-                        <p className="text-sm">{dispatch.notes}</p>
+                        <p className="text-sm text-slate-500">Expected Delivery</p>
+                        <p className="font-medium text-emerald-600">{dispatch.expected_delivery_date}</p>
                       </div>
                     )}
                   </div>
+                  {dispatch.notes && (
+                    <div className="mb-4">
+                      <p className="text-sm text-slate-500">Notes</p>
+                      <p className="text-sm">{dispatch.notes}</p>
+                    </div>
+                  )}
+                  {dispatch.proof_url && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm text-slate-500 mb-2">Dispatch Proof</p>
+                      {dispatch.proof_url.startsWith('data:image') ? (
+                        <img 
+                          src={dispatch.proof_url} 
+                          alt="Dispatch Proof" 
+                          className="max-w-xs rounded-lg border"
+                        />
+                      ) : dispatch.proof_url.startsWith('data:application/pdf') ? (
+                        <a 
+                          href={dispatch.proof_url} 
+                          download="dispatch_proof.pdf"
+                          className="inline-flex items-center gap-2 text-blue-600 hover:underline"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Download Dispatch Proof (PDF)
+                        </a>
+                      ) : (
+                        <a 
+                          href={dispatch.proof_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          View Dispatch Proof
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Delivery Info */}
+            {deliveryInfo && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-emerald-600" />
+                    Delivery Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm text-slate-500">Invoice Number</p>
+                      <p className="font-mono font-medium">{deliveryInfo.invoice_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Invoice Amount</p>
+                      <p className="font-medium">{formatCurrency(deliveryInfo.amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Logistics Cost</p>
+                      <p className="font-medium">{formatCurrency(deliveryInfo.logistics_cost || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Payment Status</p>
+                      <span className={`badge ${
+                        deliveryInfo.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                        deliveryInfo.payment_status === 'partially_paid' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {deliveryInfo.payment_status}
+                      </span>
+                    </div>
+                  </div>
+                  {deliveryInfo.invoice_url && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm text-slate-500 mb-2">Invoice Document</p>
+                      {deliveryInfo.invoice_url.startsWith('data:') ? (
+                        <a 
+                          href={deliveryInfo.invoice_url} 
+                          download={`Invoice-${deliveryInfo.invoice_number}.pdf`}
+                          className="inline-flex items-center gap-2 text-blue-600 hover:underline"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Download Invoice
+                        </a>
+                      ) : (
+                        <a 
+                          href={deliveryInfo.invoice_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          View Invoice
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {deliveryInfo.delivery_proof_url && (
+                    <div className="pt-4 border-t mt-4">
+                      <p className="text-sm text-slate-500 mb-2">Delivery Proof</p>
+                      {deliveryInfo.delivery_proof_url.startsWith('data:image') ? (
+                        <img 
+                          src={deliveryInfo.delivery_proof_url} 
+                          alt="Delivery Proof" 
+                          className="max-w-xs rounded-lg border"
+                        />
+                      ) : (
+                        <a 
+                          href={deliveryInfo.delivery_proof_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          View Delivery Proof
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
