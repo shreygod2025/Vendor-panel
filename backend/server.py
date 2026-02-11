@@ -1118,10 +1118,10 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         if po_update.status not in ["confirmed", "rejected"]:
             raise HTTPException(status_code=403, detail="Vendors can only confirm or reject POs")
     
-    # OLL can only edit draft, sent, or confirmed POs
+    # OLL can only edit draft, sent, confirmed, or rejected POs
     if current_user.get("role") == "oll":
-        if existing["status"] not in ["draft", "sent", "confirmed"]:
-            raise HTTPException(status_code=400, detail="Only draft, sent, or confirmed POs can be edited")
+        if existing["status"] not in ["draft", "sent", "confirmed", "rejected"]:
+            raise HTTPException(status_code=400, detail="Only draft, sent, confirmed, or rejected POs can be edited")
     
     update_data = {k: v for k, v in po_update.model_dump().items() if v is not None}
     
@@ -1134,12 +1134,15 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         )
         update_data.update(totals)
     
-    # If OLL edits a confirmed or sent PO, reset status to "sent" for vendor reconfirmation
-    if current_user.get("role") == "oll" and existing["status"] in ["confirmed", "sent"]:
+    # If OLL edits a confirmed, sent, or rejected PO, reset status to "sent" for vendor reconfirmation
+    if current_user.get("role") == "oll" and existing["status"] in ["confirmed", "sent", "rejected"]:
         update_data["status"] = "sent"
-        # Add note about edit
+        # Add note about edit/re-raise
         existing_notes = existing.get("notes", "") or ""
-        if "[Edited by OLL" not in existing_notes:
+        if existing["status"] == "rejected":
+            if "[Re-raised by OLL" not in existing_notes:
+                update_data["notes"] = existing_notes + " [Re-raised by OLL after rejection]"
+        elif "[Edited by OLL" not in existing_notes:
             update_data["notes"] = existing_notes + " [Edited by OLL - Requires reconfirmation]"
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
