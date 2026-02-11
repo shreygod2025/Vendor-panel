@@ -304,6 +304,18 @@ const PurchaseOrdersList = () => {
                 <Trash2 className="w-4 h-4" />
               </Button>
             )}
+            {canReRaise && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleReRaisePO(order.id)}
+                className="text-blue-600 hover:bg-blue-50"
+                title="Re-raise PO"
+                data-testid={`reraise-po-${order.id}`}
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
