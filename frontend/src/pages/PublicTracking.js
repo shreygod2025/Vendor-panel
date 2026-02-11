@@ -254,6 +254,61 @@ const PublicTracking = () => {
           </Card>
         )}
 
+        {/* Delivery Details */}
+        {data.delivery && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+                Delivery Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {data.delivery.invoice_number && (
+                  <div>
+                    <p className="text-sm text-slate-500">Invoice Number</p>
+                    <p className="font-mono font-medium">{data.delivery.invoice_number}</p>
+                  </div>
+                )}
+                {data.delivery.logistics_cost > 0 && (
+                  <div>
+                    <p className="text-sm text-slate-500">Logistics Cost</p>
+                    <p className="font-medium">Rs. {data.delivery.logistics_cost.toLocaleString()}</p>
+                  </div>
+                )}
+                {data.delivery.delivered_at && (
+                  <div>
+                    <p className="text-sm text-slate-500">Delivered On</p>
+                    <p className="font-medium">{formatDate(data.delivery.delivered_at)}</p>
+                  </div>
+                )}
+              </div>
+              {data.delivery.delivery_proof_url && (
+                <div className="pt-4 border-t">
+                  <p className="text-sm text-slate-500 mb-2">Delivery Proof</p>
+                  {data.delivery.delivery_proof_url.startsWith('data:image') ? (
+                    <img 
+                      src={data.delivery.delivery_proof_url} 
+                      alt="Delivery Proof" 
+                      className="max-w-xs rounded-lg border"
+                    />
+                  ) : (
+                    <a 
+                      href={data.delivery.delivery_proof_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      View Delivery Proof
+                    </a>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Order Items - Without Prices */}
         <Card>
           <CardHeader>
