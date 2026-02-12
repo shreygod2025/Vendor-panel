@@ -272,22 +272,92 @@ const PurchaseOrdersList = () => {
     
     setSubmittingIssue(true);
     try {
+      let attachmentUrl = null;
+      if (issueAttachment) {
+        const reader = new FileReader();
+        attachmentUrl = await new Promise((resolve) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(issueAttachment);
+        });
+      }
+      
       await apiClient.post("/issues", {
         po_id: selectedPO.id,
         vendor_id: selectedPO.vendor_id,
         issue_type: issueForm.issue_type,
         priority: issueForm.priority,
-        description: issueForm.description
+        description: issueForm.description,
+        attachment_url: attachmentUrl,
+        affected_items: []
       });
       toast.success("Issue raised successfully");
       setIssueDialogOpen(false);
       setSelectedPO(null);
-      setIssueForm({ issue_type: "quality", priority: "medium", description: "" });
+      setIssueForm({ issue_type: "quality", priority: "medium", description: "", attachment_url: "" });
+      setIssueAttachment(null);
+      // Refresh PO issues if dialog is open
+      if (poIssuesDialogOpen && selectedPO) {
+        fetchPoIssues(selectedPO.id);
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to raise issue");
     } finally {
       setSubmittingIssue(false);
     }
+  };
+
+  const handleIssueAttachmentChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        toast.error("Only PNG, JPEG, and PDF files are allowed");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File size must be less than 5MB");
+        return;
+      }
+      setIssueAttachment(file);
+    }
+  };
+
+  const fetchPoIssues = async (poId) => {
+    setLoadingPoIssues(true);
+    try {
+      const response = await apiClient.get(`/issues?po_id=${poId}`);
+      setPoIssues(response.data);
+    } catch (error) {
+      toast.error("Failed to fetch issues for this PO");
+      setPoIssues([]);
+    } finally {
+      setLoadingPoIssues(false);
+    }
+  };
+
+  const openPoIssuesDialog = async (order) => {
+    setSelectedPO(order);
+    setPoIssuesDialogOpen(true);
+    await fetchPoIssues(order.id);
+  };
+
+  const getIssueStatusColor = (status) => {
+    const colors = {
+      open: "bg-red-100 text-red-700",
+      in_progress: "bg-blue-100 text-blue-700",
+      resolved: "bg-emerald-100 text-emerald-700"
+    };
+    return colors[status] || "bg-slate-100 text-slate-600";
+  };
+
+  const getIssuePriorityColor = (priority) => {
+    const colors = {
+      critical: "bg-red-100 text-red-700",
+      high: "bg-orange-100 text-orange-700",
+      medium: "bg-yellow-100 text-yellow-700",
+      low: "bg-slate-100 text-slate-600"
+    };
+    return colors[priority] || "bg-slate-100 text-slate-600";
   };
 
   const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
