@@ -866,8 +866,11 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
     
-    # Handle custom PO number
-    po_number = po.custom_po_number.strip() if po.custom_po_number and po.custom_po_number.strip() else generate_po_number()
+    # Handle custom PO number or generate sequential
+    if po.custom_po_number and po.custom_po_number.strip():
+        po_number = po.custom_po_number.strip().upper()
+    else:
+        po_number = await generate_po_number_sequential()
     
     # Check for duplicate PO number
     existing_po = await db.purchase_orders.find_one({"po_number": po_number}, {"_id": 0})
