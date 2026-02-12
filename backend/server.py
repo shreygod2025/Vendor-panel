@@ -490,7 +490,31 @@ async def create_audit_log(action: str, entity_type: str, entity_id: str, user: 
     }
     await db.audit_logs.insert_one(log)
 
+async def generate_po_number_sequential():
+    """Generate sequential PO number like PO-001, PO-002, etc."""
+    # Find the highest PO number
+    last_po = await db.purchase_orders.find_one(
+        {"po_number": {"$regex": "^PO-\\d+$"}},
+        {"po_number": 1, "_id": 0},
+        sort=[("po_number", -1)]
+    )
+    
+    if last_po and last_po.get("po_number"):
+        try:
+            # Extract the number part
+            last_num = int(last_po["po_number"].split("-")[1])
+            next_num = last_num + 1
+        except (ValueError, IndexError):
+            next_num = 1
+    else:
+        # Check total count to start from correct number
+        count = await db.purchase_orders.count_documents({})
+        next_num = count + 1 if count > 0 else 1
+    
+    return f"PO-{next_num:03d}"
+
 def generate_po_number():
+    # Fallback sync version - uses UUID
     return f"PO-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
 
 def generate_return_number():
@@ -499,7 +523,15 @@ def generate_return_number():
 def generate_credit_note_number():
     return f"CN-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
 
+async def generate_issue_number_for_po(po_number: str):
+    """Generate issue number like PO-001-ISS-001"""
+    # Count existing issues for this PO
+    count = await db.issues.count_documents({"po_number": po_number})
+    issue_num = count + 1
+    return f"{po_number}-ISS-{issue_num:03d}"
+
 def generate_issue_number():
+    # Fallback sync version
     return f"ISS-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}"
 
 def calculate_po_totals(line_items: List[POLineItem], order_discount_amount: float = 0, order_discount_percent: float = 0):
