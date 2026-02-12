@@ -778,6 +778,86 @@ async def create_product(product: ProductCreate, current_user: dict = Depends(ge
     product_doc["vendor_name"] = vendor.get("name")
     return ProductResponse(**product_doc)
 
+class ProductImportItem(BaseModel):
+    name: str
+    sku: str
+    vendor_name: str
+    unit_price: float = 0
+    tax_rate: float = 18
+    description: Optional[str] = ""
+    is_active: bool = True
+
+class ProductImportRequest(BaseModel):
+    products: List[ProductImportItem]
+
+@api_router.post("/products/import")
+async def import_products(import_data: ProductImportRequest, current_user: dict = Depends(get_current_user)):
+    """Bulk import products from a list. Maps vendor names to IDs."""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can import products")
+    
+    # Get all vendors for mapping
+    vendors = await db.vendors.find({}, {"_id": 0}).to_list(1000)
+    vendor_map = {v["name"].lower(): v["id"] for v in vendors}
+    
+    success_count = 0
+    fail_count = 0
+    errors = []
+    imported_products = []
+    
+    for idx, item in enumerate(import_data.products):
+        try:
+            # Find vendor by name (case-insensitive)
+            vendor_id = vendor_map.get(item.vendor_name.lower())
+            
+            if not vendor_id:
+                fail_count += 1
+                errors.append(f"Row {idx + 1}: Vendor '{item.vendor_name}' not found")
+                continue
+            
+            # Check if SKU already exists
+            existing = await db.products.find_one({"sku": item.sku}, {"_id": 0})
+            if existing:
+                fail_count += 1
+                errors.append(f"Row {idx + 1}: SKU '{item.sku}' already exists")
+                continue
+            
+            product_doc = {
+                "id": str(uuid.uuid4()),
+                "name": item.name,
+                "sku": item.sku,
+                "vendor_id": vendor_id,
+                "unit_price": float(item.unit_price),
+                "tax_rate": float(item.tax_rate),
+                "description": item.description or "",
+                "is_active": item.is_active,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            await db.products.insert_one(product_doc)
+            success_count += 1
+            imported_products.append({"name": item.name, "sku": item.sku})
+            
+        except Exception as e:
+            fail_count += 1
+            errors.append(f"Row {idx + 1}: {str(e)}")
+    
+    # Create audit log for the import
+    await create_audit_log("IMPORT_PRODUCTS", "product", "bulk", current_user, {
+        "success_count": success_count,
+        "fail_count": fail_count
+    })
+    
+    return {
+        "success": True,
+        "message": f"Imported {success_count} products. {fail_count} failed." if fail_count else f"Successfully imported {success_count} products.",
+        "success_count": success_count,
+        "fail_count": fail_count,
+        "errors": errors[:10],  # Return first 10 errors
+        "imported": imported_products
+    }
+
 @api_router.get("/products", response_model=List[ProductResponse])
 async def get_products(vendor_id: Optional[str] = None, is_active: Optional[bool] = None, current_user: dict = Depends(get_current_user)):
     query = {}
