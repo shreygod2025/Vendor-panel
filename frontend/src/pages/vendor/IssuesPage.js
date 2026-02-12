@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../../components/ui/dialog";
-import { AlertTriangle, Loader2, Eye, MessageSquare, Paperclip, Send, FileText, X, CheckCircle, ChevronRight } from "lucide-react";
+import { AlertTriangle, Loader2, Eye, MessageSquare, Paperclip, Send, FileText, X, CheckCircle, ChevronRight, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 const VendorIssuesPage = () => {
