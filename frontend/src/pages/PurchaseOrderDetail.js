@@ -656,64 +656,100 @@ const PurchaseOrderDetail = () => {
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Logistics Cost</p>
-                      <p className="font-medium">{formatCurrency(deliveryInfo.logistics_cost || 0)}</p>
+                      <p className="font-medium">{deliveryInfo.logistics_cost > 0 ? formatCurrency(deliveryInfo.logistics_cost) : '-'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Payment Status</p>
                       <span className={`badge ${
-                        deliveryInfo.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                        deliveryInfo.payment_status === 'paid' || deliveryInfo.payment_status === 'fully_paid' ? 'bg-emerald-100 text-emerald-700' :
                         deliveryInfo.payment_status === 'partially_paid' ? 'bg-amber-100 text-amber-700' :
                         'bg-red-100 text-red-700'
                       }`}>
-                        {deliveryInfo.payment_status}
+                        {deliveryInfo.payment_status === 'fully_paid' ? 'Paid' : deliveryInfo.payment_status}
                       </span>
                     </div>
                   </div>
-                  {deliveryInfo.invoice_url && (
-                    <div className="pt-4 border-t">
-                      <p className="text-sm text-slate-500 mb-2">Invoice Document</p>
-                      {deliveryInfo.invoice_url.startsWith('data:') ? (
+                  
+                  {/* Documents Section */}
+                  <div className="space-y-4 pt-4 border-t">
+                    {/* Invoice Document */}
+                    {(deliveryInfo.file_url || deliveryInfo.invoice_url) && (
+                      <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-blue-800">Invoice Document</p>
+                            <p className="text-xs text-blue-600">Uploaded by vendor</p>
+                          </div>
+                        </div>
                         <a 
-                          href={deliveryInfo.invoice_url} 
+                          href={deliveryInfo.file_url || deliveryInfo.invoice_url} 
                           download={`Invoice-${deliveryInfo.invoice_number}.pdf`}
-                          className="inline-flex items-center gap-2 text-blue-600 hover:underline"
+                          className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
-                          <FileText className="w-4 h-4" />
-                          Download Invoice
+                          <Download className="w-4 h-4" />
+                          Download
                         </a>
-                      ) : (
+                      </div>
+                    )}
+
+                    {/* Logistics Bill */}
+                    {deliveryInfo.logistics_bill_url && (
+                      <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-amber-800">Logistics Bill</p>
+                            <p className="text-xs text-amber-600">Transportation invoice</p>
+                          </div>
+                        </div>
                         <a 
-                          href={deliveryInfo.invoice_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
+                          href={deliveryInfo.logistics_bill_url} 
+                          download="logistics_bill.pdf"
+                          className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
                         >
-                          View Invoice
+                          <Download className="w-4 h-4" />
+                          Download
                         </a>
-                      )}
-                    </div>
-                  )}
-                  {deliveryInfo.delivery_proof_url && (
-                    <div className="pt-4 border-t mt-4">
-                      <p className="text-sm text-slate-500 mb-2">Delivery Proof</p>
-                      {deliveryInfo.delivery_proof_url.startsWith('data:image') ? (
-                        <img 
-                          src={deliveryInfo.delivery_proof_url} 
-                          alt="Delivery Proof" 
-                          className="max-w-xs rounded-lg border"
-                        />
-                      ) : (
-                        <a 
-                          href={deliveryInfo.delivery_proof_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          View Delivery Proof
-                        </a>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+
+                    {/* Delivery Proof Image */}
+                    {deliveryInfo.delivery_proof_url && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                            <Image className="w-5 h-5 text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-emerald-800">Delivery Proof</p>
+                            <p className="text-xs text-emerald-600">Photo proof of delivery</p>
+                          </div>
+                        </div>
+                        {deliveryInfo.delivery_proof_url.startsWith('data:image') ? (
+                          <img 
+                            src={deliveryInfo.delivery_proof_url} 
+                            alt="Delivery Proof" 
+                            className="max-w-full max-h-64 rounded-lg border mx-auto"
+                          />
+                        ) : (
+                          <a 
+                            href={deliveryInfo.delivery_proof_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-emerald-600 hover:underline"
+                          >
+                            <Download className="w-4 h-4" />
+                            View Delivery Proof
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
