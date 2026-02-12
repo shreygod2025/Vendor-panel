@@ -856,6 +856,12 @@ async def delete_product(product_id: str, current_user: dict = Depends(get_curre
 # PURCHASE ORDER ENDPOINTS
 # ========================
 
+@api_router.get("/purchase-orders/next-po-number")
+async def get_next_po_number(current_user: dict = Depends(get_current_user)):
+    """Get the next sequential PO number for display in form"""
+    next_po = await generate_po_number_sequential()
+    return {"next_po_number": next_po}
+
 @api_router.post("/purchase-orders", response_model=POResponse)
 async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_current_user)):
     # Allow OLL and Distributors to create POs
