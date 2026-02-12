@@ -420,7 +420,13 @@ const VendorIssuesPage = () => {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="p-2 bg-slate-50 rounded">
                         <p className="text-xs text-slate-500">PO Number</p>
-                        <p className="font-mono text-sm">{selectedIssue.po_number}</p>
+                        <Link 
+                          to={`/vendor/orders/${selectedIssue.po_number}`}
+                          className="font-mono text-sm text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                        >
+                          {selectedIssue.po_number}
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
                       </div>
                       <div className="p-2 bg-slate-50 rounded">
                         <p className="text-xs text-slate-500">Type</p>
