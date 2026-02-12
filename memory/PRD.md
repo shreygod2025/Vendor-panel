@@ -109,3 +109,4 @@ Build a Vendor Management System for OLL organization with the following capabil
 
 ## Changelog
 - Feb 12, 2025: Issues system with replies, Custom PO Number, Vendor UI improvements
+- Feb 12, 2025: **Product Import feature fixed** - Bulk import via CSV/XLSX with vendor name mapping, SKU duplicate check, error handling
