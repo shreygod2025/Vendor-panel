@@ -253,6 +253,8 @@ class POResponse(BaseModel):
     created_by_role: Optional[str] = None
     created_by_name: Optional[str] = None
     distributor_id: Optional[str] = None
+    # Rejection reason
+    rejection_reason: Optional[str] = None
 
 # Dispatch Models
 class DispatchCreate(BaseModel):
