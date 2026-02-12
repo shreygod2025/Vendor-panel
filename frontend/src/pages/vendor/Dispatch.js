@@ -159,6 +159,17 @@ const VendorDispatch = () => {
                   </div>
 
                   <div>
+                    <Label className="form-label">Tracking URL (Optional)</Label>
+                    <Input
+                      value={formData.tracking_url}
+                      onChange={(e) => setFormData(prev => ({ ...prev, tracking_url: e.target.value }))}
+                      placeholder="e.g., https://www.delhivery.com/track/AWB123456789"
+                      data-testid="tracking-url-input"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Paste the courier's tracking page URL for real-time tracking</p>
+                  </div>
+
+                  <div>
                     <Label className="form-label">Dispatch Date *</Label>
                     <Input
                       type="date"
