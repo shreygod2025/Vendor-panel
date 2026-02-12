@@ -892,6 +892,9 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
             p["created_by_name"] = None
         if "distributor_id" not in p:
             p["distributor_id"] = None
+        # Add rejection reason if missing
+        if "rejection_reason" not in p:
+            p["rejection_reason"] = None
         result.append(POResponse(**p))
     
     return result
