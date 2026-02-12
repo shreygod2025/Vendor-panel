@@ -1702,10 +1702,15 @@ async def create_issue(issue: IssueCreate, current_user: dict = Depends(get_curr
     creator = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
     creator_name = creator.get("name") or creator.get("username") if creator else None
     
+    # Generate issue number based on PO number
+    po_number = po.get("po_number", "UNKNOWN")
+    issue_number = await generate_issue_number_for_po(po_number)
+    
     issue_doc = {
         "id": str(uuid.uuid4()),
-        "issue_number": generate_issue_number(),
+        "issue_number": issue_number,
         "po_id": issue.po_id,
+        "po_number": po_number,  # Store PO number for reference
         "vendor_id": po["vendor_id"],
         "issue_type": issue.issue_type,
         "description": issue.description,
