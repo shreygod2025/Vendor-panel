@@ -294,12 +294,26 @@ class DeliveryConfirmation(BaseModel):
     notes: Optional[str] = None
 
 # Issue Models
+class IssueReply(BaseModel):
+    message: str
+    attachment_url: Optional[str] = None
+
+class IssueReplyResponse(BaseModel):
+    id: str
+    message: str
+    attachment_url: Optional[str] = None
+    created_by: str
+    created_by_name: Optional[str] = None
+    created_by_role: str
+    created_at: str
+
 class IssueCreate(BaseModel):
     po_id: str
     issue_type: str  # delivery_delay, missing_components, damaged_goods, quality_issue, other
     description: str
     affected_items: List[Dict] = []
     priority: str = "medium"  # low, medium, high, critical
+    attachment_url: Optional[str] = None  # Support for attachments
 
 class IssueUpdate(BaseModel):
     status: Optional[str] = None
@@ -319,9 +333,13 @@ class IssueResponse(BaseModel):
     priority: str
     status: str
     resolution: Optional[str]
+    attachment_url: Optional[str] = None
+    replies: List[Dict] = []
     created_at: str
     updated_at: str
     created_by: str
+    created_by_name: Optional[str] = None
+    created_by_role: Optional[str] = None
     resolved_by: Optional[str]
 
 # Vendor Delivery Submission Model
