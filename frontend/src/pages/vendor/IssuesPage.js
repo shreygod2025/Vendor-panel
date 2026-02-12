@@ -243,11 +243,21 @@ const VendorIssuesPage = () => {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button
-                            variant="ghost"
                             size="sm"
                             onClick={() => viewIssue(issue)}
-                            className="text-blue-600 hover:bg-blue-50"
-                            title="View & Reply"
+                            className={issue.status === "open" ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-600 hover:bg-slate-700"}
+                            data-testid={`reply-issue-${issue.id}`}
+                          >
+                            <MessageSquare className="w-4 h-4 mr-1" />
+                            {issue.status === "open" ? "Reply" : "View"}
+                          </Button>
+                          {issue.replies?.length > 0 && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                              {issue.replies.length}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
