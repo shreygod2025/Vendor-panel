@@ -831,6 +831,7 @@ async def import_products(import_data: ProductImportRequest, current_user: dict 
                 "unit_price": float(item.unit_price),
                 "tax_rate": float(item.tax_rate),
                 "description": item.description or "",
+                "unit": item.unit or "pcs",
                 "is_active": item.is_active,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
