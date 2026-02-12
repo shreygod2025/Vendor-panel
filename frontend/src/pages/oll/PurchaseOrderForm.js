@@ -430,11 +430,13 @@ const PurchaseOrderForm = () => {
                   <Input
                     value={formData.custom_po_number}
                     onChange={(e) => setFormData(prev => ({ ...prev, custom_po_number: e.target.value.toUpperCase() }))}
-                    placeholder="e.g., PO-2024-001"
+                    placeholder={nextPoNumber || "Auto-generated"}
                     data-testid="custom-po-number-input"
                     disabled={isEdit}
                   />
-                  <p className="text-xs text-slate-500 mt-1">Leave blank to auto-generate</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {nextPoNumber ? `Next: ${nextPoNumber} (leave blank to use)` : "Leave blank to auto-generate"}
+                  </p>
                 </div>
                 <div>
                   <Label className="form-label">Delivery Date *</Label>
