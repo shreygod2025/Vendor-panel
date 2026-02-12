@@ -479,11 +479,3 @@ const VendorIssuesPage = () => {
 };
 
 export default VendorIssuesPage;
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-export default VendorIssuesPage;
