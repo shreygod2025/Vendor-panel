@@ -140,7 +140,7 @@ const PublicTracking = () => {
                 <p className="text-sm text-slate-500 mt-1">Order from {data.vendor_name}</p>
               </div>
               <div className={`badge px-4 py-2 text-sm font-medium rounded-full ${getStatusColor(data.status)}`}>
-                {data.status.charAt(0).toUpperCase() + data.status.slice(1)}
+                {getStatusLabel(data.status)}
               </div>
             </div>
           </CardHeader>
