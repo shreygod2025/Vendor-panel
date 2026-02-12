@@ -1,90 +1,111 @@
 # OLL Vendor Management System - PRD
 
 ## Original Problem Statement
-Create a vendor management system for OLL with comprehensive vendor, product, purchase order management, delivery tracking, invoicing, payments, returns, and credit notes functionality.
+Build a Vendor Management System for OLL organization with the following capabilities:
+- Vendor & Product Management
+- Purchase Order (PO) Creation with custom PO numbers
+- Vendor Actions (Confirm, Reject, Dispatch, Deliver)
+- Delivery Tracking & Confirmation
+- Invoicing & Returns
+- Role-Based Views (Admin, Vendor, Distributor)
+- Issues Management with Reply System
 
 ## User Personas
-1. **OLL Administrator** - Internal procurement team managing vendors, creating POs, tracking deliveries, processing payments
-2. **Vendor User** - External suppliers receiving POs, confirming orders, adding dispatch details, uploading invoices
+1. **OLL Administrator** - Full system access, manages vendors, products, POs, issues
+2. **Vendor** - Views assigned POs, confirms/rejects, dispatches, marks delivered, replies to issues
+3. **Distributor** - Limited access, creates POs, tracks own orders (no pricing visibility)
 
-## Core Requirements
-- Single login portal with role-based redirection
-- Username/password authentication (olladmin/olladmin for OLL, vendor/vendor for Vendor)
-- INR currency with GST tax calculations
-- Full audit logging
-- Public tracking links for orders
+## Core Features Implemented
 
-## What's Been Implemented (January 2025)
+### Phase 1 - MVP (Completed)
+- User authentication with JWT
+- Vendor & Product CRUD
+- Purchase Order creation, editing, status management
+- Vendor actions: Confirm, Reject, Dispatch, Deliver
+- Invoice management
+- Returns/Credit Notes
+- Role-based access control
 
-### Backend (FastAPI + MongoDB)
-- [x] JWT-based authentication with role management
-- [x] Vendor CRUD operations
-- [x] Product CRUD with vendor mapping and GST settings
-- [x] Purchase Order workflow (Draft → Sent → Confirmed → Dispatched → Delivered → Closed)
-- [x] Dispatch management with courier tracking
-- [x] Public tracking endpoint
-- [x] Invoice management
-- [x] Payment recording with status tracking
-- [x] Returns and Credit Notes
-- [x] Audit logging for all actions
-- [x] Dashboard statistics endpoints
-- [x] User management
+### Phase 2 - Enhancements (Completed)
+- Navbar/Sidebar reorganization
+- Dashboard KPIs
+- PO Management improvements:
+  - Custom PO Number field with duplicate validation
+  - Delivery date tracking
+  - Line-item comments
+  - PDF generation with company logo/signature
+  - Re-raise rejected POs
+- Delivery & Invoicing:
+  - Proof upload for dispatch/delivery (mandatory for delivery)
+  - Logistics bill upload
+  - OLL admin delivery approval
+- Vendor Reject Dialog with prefilled reasons
+- Tracking URL field in dispatch
+- Public tracking page improvements
 
-### Frontend (React + Shadcn/UI + Tailwind)
-- [x] Professional corporate design with OLL branding
-- [x] Login page with demo credentials display
-- [x] OLL Admin Dashboard with stats and quick actions
-- [x] Vendor Dashboard with pending actions
-- [x] Vendors list with CRUD
-- [x] Products list with vendor filtering
-- [x] Purchase Orders creation with line items, discounts, GST
-- [x] PO Detail view with status timeline
-- [x] Vendor PO confirmation/rejection
-- [x] Dispatch entry form
-- [x] Public tracking page
-- [x] Delivery confirmation dialog
-- [x] Returns management
-- [x] Credit notes issuance
-- [x] Invoice upload
-- [x] Payment recording
-- [x] Audit logs viewer
-- [x] User management
+### Phase 2.5 - Issues System (Completed - Feb 12, 2025)
+- **Issues Management**:
+  - Create issues with attachments (PNG/JPEG/PDF)
+  - View all issues for a specific PO
+  - Issue status tracking (Open, In Progress, Resolved)
+  - Priority levels (Low, Medium, High, Critical)
+- **Reply/Conversation System**:
+  - Vendors can reply to issues raised by OLL
+  - Replies visible to both parties
+  - Attachment support in replies
+  - Improved dialog with reply input at top (sticky)
+- **UI Improvements**:
+  - Clear "Reply" button for vendors
+  - Collapsible issue details
+  - Conversation history display
 
-## Prioritized Backlog
+## Technical Architecture
 
-### P0 (Critical) - Completed
-- [x] Core authentication
-- [x] Vendor/Product management
-- [x] PO creation and workflow
-- [x] Role-based views
+### Backend (FastAPI)
+- `/app/backend/server.py` - Main API server
+- MongoDB database via MONGO_URL
+- JWT authentication
+- PDF generation with reportlab
 
-### P1 (High Priority) - Pending
-- [ ] Email notifications (Resend integration ready, needs API key)
-- [ ] Google Drive integration for file uploads (needs OAuth credentials)
-- [ ] Report generation and download (CSV/PDF)
-- [ ] Bulk PO operations
+### Frontend (React)
+- `/app/frontend/src/` - React application
+- Tailwind CSS + Shadcn/UI components
+- Role-based routing
 
-### P2 (Medium Priority) - Pending
-- [ ] Advanced search and filtering
-- [ ] Dashboard charts and analytics
-- [ ] Vendor performance metrics
-- [ ] Payment due reminders
-- [ ] Mobile responsive improvements
+### Key API Endpoints
+- `POST /api/purchase-orders` - Create PO with optional custom_po_number
+- `GET /api/issues?po_id={id}` - Get issues for a PO
+- `POST /api/issues/{id}/reply` - Add reply to issue
+- `GET /api/track/{token}` - Public tracking
 
-### P3 (Nice to Have) - Pending
-- [ ] Multi-language support
-- [ ] Dark mode
-- [ ] Customizable dashboard widgets
-- [ ] API rate limiting
-- [ ] Webhook integrations
+## Database Schema Updates
+- **PurchaseOrder**: Added `custom_po_number` field
+- **Issue**: Added `attachment_url`, `replies[]`, `created_by_name`, `created_by_role`
+- **IssueReply**: `id`, `message`, `attachment_url`, `created_by`, `created_by_name`, `created_by_role`, `created_at`
 
-## Technical Stack
-- **Backend**: FastAPI, MongoDB, JWT, bcrypt
-- **Frontend**: React 19, Tailwind CSS, Shadcn/UI, Axios, React Router
-- **Database**: MongoDB (Motor async driver)
+## Test Credentials
+- Admin: `olladmin` / `olladmin`
+- Vendor: `vendor1` / `vendor1`
+- Distributor: `distributor` / `distributor`
 
-## Next Tasks
-1. Integrate Resend for email notifications (user needs to provide RESEND_API_KEY)
-2. Set up Google Drive OAuth for file uploads
-3. Add downloadable reports functionality
-4. Implement advanced search features
+## Pending Tasks
+
+### P0 - Critical (From Previous Session)
+1. ~~Product Import Feature~~ - Still needs fixing
+2. ~~Distributor Role Bugs~~ - Needs verification
+
+### P1 - High Priority
+1. Bulk import for past POs and invoices
+2. AuditLogs page implementation
+
+### P2 - Medium Priority
+1. Downloadable reports
+2. Email notifications (Resend integration)
+3. Google Drive integration
+
+## Known Issues
+- Product import from XLSX/CSV not functional (backend endpoint missing)
+- Distributor role JWT handling needs audit
+
+## Changelog
+- Feb 12, 2025: Issues system with replies, Custom PO Number, Vendor UI improvements
