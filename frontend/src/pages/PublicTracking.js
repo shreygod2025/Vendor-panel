@@ -289,7 +289,7 @@ const PublicTracking = () => {
                 {data.delivery.logistics_cost > 0 && (
                   <div>
                     <p className="text-sm text-slate-500">Logistics Cost</p>
-                    <p className="font-medium">Rs. {data.delivery.logistics_cost.toLocaleString()}</p>
+                    <p className="font-medium">₹{data.delivery.logistics_cost.toLocaleString()}</p>
                   </div>
                 )}
                 {data.delivery.delivered_at && (
