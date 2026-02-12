@@ -90,6 +90,7 @@ const PurchaseOrderForm = () => {
         const poRes = await apiClient.get(`/purchase-orders/${id}`);
         setFormData({
           vendor_id: poRes.data.vendor_id,
+          custom_po_number: poRes.data.po_number || "",
           delivery_address: poRes.data.delivery_address,
           contact_person: poRes.data.contact_person,
           contact_number: poRes.data.contact_number,
