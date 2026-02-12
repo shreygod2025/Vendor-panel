@@ -259,6 +259,7 @@ class DispatchCreate(BaseModel):
     po_id: str
     courier_partner: str
     tracking_id: str
+    tracking_url: Optional[str] = None
     dispatch_date: str
     expected_delivery_date: Optional[str] = None
     proof_url: Optional[str] = None
@@ -269,6 +270,7 @@ class DispatchResponse(BaseModel):
     po_id: str
     courier_partner: str
     tracking_id: str
+    tracking_url: Optional[str] = None
     dispatch_date: str
     expected_delivery_date: Optional[str]
     proof_url: Optional[str]
