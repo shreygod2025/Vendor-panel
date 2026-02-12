@@ -977,13 +977,12 @@ def generate_po_pdf(po_data: dict, vendor_data: dict) -> BytesIO:
     elements.append(Spacer(1, 5*mm))
     
     # Company Info (OLL)
-    company_info = """<b>Clone Futura Solution Pvt Ltd</b><br/>
-Daga Vill, Bungalow No 9 Magruth Towers, 2nd x lane,<br/>
-Near Rajput Dairy, Lokhandwala Complex, Andheri(w),<br/>
-Mumbai - 400053<br/>
-<b>Phone:</b> 9323835523<br/>
-<b>Email:</b> accounts@clonefutura.com / educators@oll.com<br/>
-<b>GSTIN:</b> 27AAKCC1113B1ZC"""
+    company_info = """<b><i>Clonefutura Live Solutions Pvt Ltd.</i></b><br/>
+103 1st floor - Kshitij building, Veera Desai Rd,<br/>
+Dattaguru Nagar, Azad Nagar, Andheri West,<br/>
+Mumbai, Maharashtra 400053<br/>
+<b>Phone:</b> +919699188188<br/>
+<b>GST No:</b> 27AAKCC1113B1ZC"""
     elements.append(Paragraph(company_info, styles['Small']))
     elements.append(Spacer(1, 6*mm))
     
