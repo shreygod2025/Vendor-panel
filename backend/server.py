@@ -834,6 +834,14 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
     
+    # Handle custom PO number
+    po_number = po.custom_po_number.strip() if po.custom_po_number and po.custom_po_number.strip() else generate_po_number()
+    
+    # Check for duplicate PO number
+    existing_po = await db.purchase_orders.find_one({"po_number": po_number}, {"_id": 0})
+    if existing_po:
+        raise HTTPException(status_code=400, detail=f"PO number '{po_number}' already exists. Please use a unique PO number.")
+    
     totals = calculate_po_totals(po.line_items, po.order_discount_amount, po.order_discount_percent)
     
     # Set status based on send_immediately flag - default is "sent"
@@ -845,7 +853,7 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     
     po_doc = {
         "id": str(uuid.uuid4()),
-        "po_number": generate_po_number(),
+        "po_number": po_number,
         "vendor_id": po.vendor_id,
         "delivery_address": po.delivery_address,
         "receiver_name": po.receiver_name,
