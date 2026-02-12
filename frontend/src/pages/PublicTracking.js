@@ -223,6 +223,20 @@ const PublicTracking = () => {
                   <p className="font-medium">{data.dispatch.dispatch_date || '-'}</p>
                 </div>
               </div>
+              {data.dispatch.tracking_url && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-slate-500 mb-1">Track Your Shipment</p>
+                  <a 
+                    href={data.dispatch.tracking_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-medium flex items-center gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open Courier Tracking Page
+                  </a>
+                </div>
+              )}
               {data.dispatch.expected_delivery_date && (
                 <div className="mb-4">
                   <p className="text-sm text-slate-500">Expected Delivery</p>
