@@ -926,6 +926,9 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
         po["created_by_name"] = None
     if "distributor_id" not in po:
         po["distributor_id"] = None
+    # Add rejection reason if missing
+    if "rejection_reason" not in po:
+        po["rejection_reason"] = None
     
     return POResponse(**po)
 
