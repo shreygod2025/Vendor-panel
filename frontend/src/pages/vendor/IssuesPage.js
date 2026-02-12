@@ -226,7 +226,15 @@ const VendorIssuesPage = () => {
                   {filteredIssues.map((issue) => (
                     <TableRow key={issue.id}>
                       <TableCell className="font-mono font-medium">{issue.issue_number}</TableCell>
-                      <TableCell className="font-mono text-sm">{issue.po_number}</TableCell>
+                      <TableCell className="font-mono text-sm">
+                        <Link 
+                          to={`/vendor/orders/${issue.po_number}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                        >
+                          {issue.po_number}
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </TableCell>
                       <TableCell className="capitalize">{issue.issue_type?.replace('_', ' ')}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{issue.description}</TableCell>
                       <TableCell>
