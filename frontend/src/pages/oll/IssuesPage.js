@@ -38,17 +38,23 @@ const IssuesPage = () => {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [showResolveDialog, setShowResolveDialog] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [saving, setSaving] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [replyMessage, setReplyMessage] = useState("");
+  const [replyAttachment, setReplyAttachment] = useState(null);
+  const [sendingReply, setSendingReply] = useState(false);
   
   const [formData, setFormData] = useState({
     po_id: "",
     issue_type: "",
     description: "",
-    priority: "medium"
+    priority: "medium",
+    attachment_url: ""
   });
 
+  const [attachmentFile, setAttachmentFile] = useState(null);
   const [resolution, setResolution] = useState("");
 
   useEffect(() => {
