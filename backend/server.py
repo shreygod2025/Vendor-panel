@@ -785,6 +785,7 @@ class ProductImportItem(BaseModel):
     unit_price: float = 0
     tax_rate: float = 18
     description: Optional[str] = ""
+    unit: str = "pcs"
     is_active: bool = True
 
 class ProductImportRequest(BaseModel):
