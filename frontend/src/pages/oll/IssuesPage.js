@@ -478,6 +478,37 @@ const IssuesPage = () => {
                 required
               />
             </div>
+            <div>
+              <Label>Attachment (Optional)</Label>
+              <div className="mt-2">
+                <Input
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.pdf"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+                <p className="text-xs text-slate-500 mt-1">Supported: PNG, JPEG, PDF (max 5MB)</p>
+              </div>
+              {attachmentFile && (
+                <div className="mt-2 flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                  {attachmentFile.type.startsWith('image/') ? (
+                    <Image className="w-4 h-4 text-blue-600" />
+                  ) : (
+                    <FileText className="w-4 h-4 text-blue-600" />
+                  )}
+                  <span className="text-sm text-blue-700 flex-1 truncate">{attachmentFile.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAttachmentFile(null)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
               <Button type="submit" className="bg-[#1e3a8a] hover:bg-[#1e40af]" disabled={saving}>
