@@ -479,35 +479,6 @@ const VendorIssuesPage = () => {
 };
 
 export default VendorIssuesPage;
-                          <button onClick={() => setReplyAttachment(null)}>
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <Button 
-                      onClick={handleSendReply}
-                      disabled={sendingReply || (!replyMessage.trim() && !replyAttachment)}
-                      size="sm"
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      {sendingReply ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-1" />
-                          Send Reply
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          <DialogFooter className="border-t pt-4">
-            <Button variant="outline" onClick={() => setShowViewDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
