@@ -1749,6 +1749,15 @@ async def get_issue(issue_id: str, current_user: dict = Depends(get_current_user
     
     issue["vendor_name"] = vendor.get("name") if vendor else None
     issue["po_number"] = po.get("po_number") if po else None
+    # Ensure new fields have defaults
+    if "attachment_url" not in issue:
+        issue["attachment_url"] = None
+    if "replies" not in issue:
+        issue["replies"] = []
+    if "created_by_name" not in issue:
+        issue["created_by_name"] = None
+    if "created_by_role" not in issue:
+        issue["created_by_role"] = "oll"
     
     return IssueResponse(**issue)
 
