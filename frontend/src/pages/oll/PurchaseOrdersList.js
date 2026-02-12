@@ -459,6 +459,15 @@ const PurchaseOrdersList = () => {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => openPoIssuesDialog(order)}
+              title="View Issues"
+              data-testid={`view-issues-${order.id}`}
+            >
+              <Eye className="w-4 h-4 text-slate-500" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => copyTrackingLink(order.tracking_token)}
               title="Copy tracking link"
               data-testid={`copy-tracking-${order.id}`}
