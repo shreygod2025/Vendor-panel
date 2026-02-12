@@ -21,6 +21,7 @@ const VendorDispatch = () => {
     po_id: poId,
     courier_partner: "",
     tracking_id: "",
+    tracking_url: "",
     dispatch_date: new Date().toISOString().split('T')[0],
     proof_url: "",
     notes: ""
