@@ -1825,6 +1825,7 @@ async def track_order(tracking_token: str):
         "dispatch": {
             "courier_partner": dispatch.get("courier_partner") if dispatch else None,
             "tracking_id": dispatch.get("tracking_id") if dispatch else None,
+            "tracking_url": dispatch.get("tracking_url") if dispatch else None,
             "dispatch_date": dispatch.get("dispatch_date") if dispatch else None,
             "expected_delivery_date": dispatch.get("expected_delivery_date") if dispatch else None,
             "proof_url": dispatch.get("proof_url") if dispatch else None,
