@@ -188,6 +188,7 @@ class POLineItem(BaseModel):
 
 class POCreate(BaseModel):
     vendor_id: str
+    custom_po_number: Optional[str] = None  # Optional custom PO number
     delivery_address: str
     receiver_name: Optional[str] = None
     contact_person: str
