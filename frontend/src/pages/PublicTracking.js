@@ -18,7 +18,8 @@ import {
   AlertCircle,
   MapPin,
   Calendar,
-  CheckCircle
+  CheckCircle,
+  ExternalLink
 } from "lucide-react";
 import axios from "axios";
 
