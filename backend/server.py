@@ -1654,6 +1654,10 @@ async def create_issue(issue: IssueCreate, current_user: dict = Depends(get_curr
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
     
+    # Get creator info
+    creator = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
+    creator_name = creator.get("name") or creator.get("username") if creator else None
+    
     issue_doc = {
         "id": str(uuid.uuid4()),
         "issue_number": generate_issue_number(),
@@ -1665,7 +1669,11 @@ async def create_issue(issue: IssueCreate, current_user: dict = Depends(get_curr
         "priority": issue.priority,
         "status": "open",
         "resolution": None,
+        "attachment_url": issue.attachment_url,
+        "replies": [],
         "created_by": current_user["user_id"],
+        "created_by_name": creator_name,
+        "created_by_role": current_user.get("role", "oll"),
         "resolved_by": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
