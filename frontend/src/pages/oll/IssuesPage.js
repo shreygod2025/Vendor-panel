@@ -80,19 +80,111 @@ const IssuesPage = () => {
     e.preventDefault();
     setSaving(true);
     try {
+      let attachmentUrl = null;
+      if (attachmentFile) {
+        // Convert file to base64
+        const reader = new FileReader();
+        attachmentUrl = await new Promise((resolve) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(attachmentFile);
+        });
+      }
+      
       const submitData = {
         ...formData,
+        attachment_url: attachmentUrl,
         affected_items: []
       };
       await apiClient.post("/issues", submitData);
       toast.success("Issue created successfully");
       setShowDialog(false);
-      setFormData({ po_id: "", issue_type: "", description: "", priority: "medium" });
+      setFormData({ po_id: "", issue_type: "", description: "", priority: "medium", attachment_url: "" });
+      setAttachmentFile(null);
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to create issue");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        toast.error("Only PNG, JPEG, and PDF files are allowed");
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File size must be less than 5MB");
+        return;
+      }
+      setAttachmentFile(file);
+    }
+  };
+
+  const handleReplyFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        toast.error("Only PNG, JPEG, and PDF files are allowed");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File size must be less than 5MB");
+        return;
+      }
+      setReplyAttachment(file);
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!replyMessage.trim() && !replyAttachment) {
+      toast.error("Please enter a message or attach a file");
+      return;
+    }
+    
+    setSendingReply(true);
+    try {
+      let attachmentUrl = null;
+      if (replyAttachment) {
+        const reader = new FileReader();
+        attachmentUrl = await new Promise((resolve) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(replyAttachment);
+        });
+      }
+      
+      const response = await apiClient.post(`/issues/${selectedIssue.id}/reply`, {
+        message: replyMessage.trim(),
+        attachment_url: attachmentUrl
+      });
+      
+      setSelectedIssue(response.data);
+      setReplyMessage("");
+      setReplyAttachment(null);
+      toast.success("Reply sent successfully");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to send reply");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const viewIssue = async (issue) => {
+    try {
+      const response = await apiClient.get(`/issues/${issue.id}`);
+      setSelectedIssue(response.data);
+      setShowViewDialog(true);
+      setReplyMessage("");
+      setReplyAttachment(null);
+    } catch (error) {
+      toast.error("Failed to load issue details");
     }
   };
 
