@@ -33,6 +33,7 @@ import VendorPurchaseOrders from "./pages/vendor/PurchaseOrders";
 import VendorDispatch from "./pages/vendor/Dispatch";
 import VendorReturns from "./pages/vendor/Returns";
 import VendorInvoices from "./pages/vendor/Invoices";
+import VendorIssuesPage from "./pages/vendor/IssuesPage";
 
 // Distributor Pages
 import DistributorDashboard from "./pages/distributor/Dashboard";
