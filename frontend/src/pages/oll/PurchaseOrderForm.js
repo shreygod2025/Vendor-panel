@@ -68,6 +68,8 @@ const PurchaseOrderForm = () => {
     grand_total: 0
   });
 
+  const [nextPoNumber, setNextPoNumber] = useState("");
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -85,6 +87,16 @@ const PurchaseOrderForm = () => {
       ]);
       setVendors(vendorsRes.data);
       setProducts(productsRes.data);
+
+      // Fetch next PO number for new POs
+      if (!isEdit) {
+        try {
+          const nextPORes = await apiClient.get("/purchase-orders/next-po-number");
+          setNextPoNumber(nextPORes.data.next_po_number);
+        } catch (e) {
+          // Ignore if endpoint doesn't exist yet
+        }
+      }
 
       if (isEdit) {
         const poRes = await apiClient.get(`/purchase-orders/${id}`);
