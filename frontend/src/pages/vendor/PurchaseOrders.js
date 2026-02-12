@@ -27,6 +27,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../../components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import { 
   Eye, FileText, Truck, Check, X, Package, Loader2, Clock, 
   ChevronDown, ChevronRight, Circle, Receipt, Download
@@ -110,16 +117,54 @@ const VendorPurchaseOrders = () => {
     }
   };
 
-  const handleReject = async (id) => {
-    const reason = prompt("Enter reason for rejection:");
-    if (reason === null) return;
+  // Reject dialog state
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [selectedRejectPO, setSelectedRejectPO] = useState(null);
+  const [selectedRejectReason, setSelectedRejectReason] = useState("");
+  const [customRejectReason, setCustomRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+
+  const rejectReasons = [
+    "Delivery timeline too short",
+    "Material not available",
+    "Price discrepancy",
+    "Quantity too high",
+    "Product discontinued",
+    "Unable to fulfill order",
+    "Other (specify below)"
+  ];
+
+  const openRejectDialog = (order) => {
+    setSelectedRejectPO(order);
+    setSelectedRejectReason("");
+    setCustomRejectReason("");
+    setRejectDialogOpen(true);
+  };
+
+  const handleReject = async () => {
+    if (!selectedRejectPO) return;
     
+    let reason = selectedRejectReason;
+    if (selectedRejectReason === "Other (specify below)" && customRejectReason.trim()) {
+      reason = customRejectReason.trim();
+    } else if (!reason) {
+      toast.error("Please select a reason for rejection");
+      return;
+    }
+    
+    setRejecting(true);
     try {
-      await apiClient.post(`/purchase-orders/${id}/reject?reason=${encodeURIComponent(reason)}`);
+      await apiClient.post(`/purchase-orders/${selectedRejectPO.id}/reject?reason=${encodeURIComponent(reason)}`);
       toast.success("PO rejected");
+      setRejectDialogOpen(false);
+      setSelectedRejectPO(null);
+      setSelectedRejectReason("");
+      setCustomRejectReason("");
       fetchOrders();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to reject PO");
+    } finally {
+      setRejecting(false);
     }
   };
 
