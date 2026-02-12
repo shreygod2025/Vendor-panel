@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { apiClient, useAuth } from "../../App";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -27,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { Plus, AlertTriangle, Loader2, Trash2, CheckCircle, Eye, MessageSquare, Paperclip, Send, Image, FileText, X } from "lucide-react";
+import { Plus, AlertTriangle, Loader2, Trash2, CheckCircle, Eye, MessageSquare, Paperclip, Send, Image, FileText, X, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 const IssuesPage = () => {
