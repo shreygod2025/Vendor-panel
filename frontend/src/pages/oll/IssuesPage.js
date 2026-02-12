@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { Plus, AlertTriangle, Loader2, Edit, Trash2, CheckCircle } from "lucide-react";
+import { Plus, AlertTriangle, Loader2, Trash2, CheckCircle, Eye, MessageSquare, Paperclip, Send, Image, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 
 const IssuesPage = () => {
