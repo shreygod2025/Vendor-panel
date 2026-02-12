@@ -314,7 +314,16 @@ const VendorPurchaseOrders = () => {
   const renderOrderRow = (order) => {
     return (
       <TableRow key={order.id}>
-        <TableCell className="font-mono font-medium">{order.po_number}</TableCell>
+        <TableCell>
+          <div className="flex flex-col">
+            <span className="font-mono font-medium">{order.po_number}</span>
+            {order.status === "rejected" && order.rejection_reason && (
+              <span className="text-xs text-red-600 mt-1 max-w-[200px] truncate" title={order.rejection_reason}>
+                Reason: {order.rejection_reason}
+              </span>
+            )}
+          </div>
+        </TableCell>
         <TableCell>{order.contact_person || "-"}</TableCell>
         <TableCell>{order.line_items?.length || 0} items</TableCell>
         <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
