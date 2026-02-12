@@ -356,7 +356,15 @@ const IssuesPage = () => {
                   {filteredIssues.map((issue) => (
                     <TableRow key={issue.id}>
                       <TableCell className="font-mono font-medium">{issue.issue_number}</TableCell>
-                      <TableCell className="font-mono text-sm">{issue.po_number}</TableCell>
+                      <TableCell>
+                        <Link 
+                          to={`/oll/purchase-orders/${issue.po_id}`}
+                          className="font-mono text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                        >
+                          {issue.po_number}
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </TableCell>
                       <TableCell className="capitalize">{issue.issue_type.replace('_', ' ')}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{issue.description}</TableCell>
                       <TableCell>
