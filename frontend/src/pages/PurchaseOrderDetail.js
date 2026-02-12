@@ -496,9 +496,17 @@ const PurchaseOrderDetail = () => {
                     <p className="text-sm text-slate-500">{order.contact_number}</p>
                   </div>
                 </div>
-                <div>
-                  <p className="text-sm text-slate-500">Delivery Address</p>
-                  <p className="font-medium">{order.delivery_address}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-slate-500">Delivery Address</p>
+                    <p className="font-medium">{order.delivery_address}</p>
+                  </div>
+                  {order.delivery_date && (
+                    <div>
+                      <p className="text-sm text-slate-500">Expected Delivery Date</p>
+                      <p className="font-medium text-emerald-600">{order.delivery_date}</p>
+                    </div>
+                  )}
                 </div>
                 {order.notes && (
                   <div>
