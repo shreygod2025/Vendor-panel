@@ -362,7 +362,7 @@ function AppRoutes() {
       } />
       <Route path="/vendor/issues" element={
         <ProtectedRoute allowedRoles={["vendor"]}>
-          <DashboardLayout><IssuesPage /></DashboardLayout>
+          <DashboardLayout><VendorIssuesPage /></DashboardLayout>
         </ProtectedRoute>
       } />
       
