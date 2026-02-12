@@ -27,7 +27,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle, Clock, Truck, Package, ChevronDown, ChevronRight, AlertTriangle, RotateCcw, MoreHorizontal, Edit, CheckCircle, XCircle, Loader2, Trash2, Receipt, Download } from "lucide-react";
+import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle, Clock, Truck, Package, ChevronDown, ChevronRight, AlertTriangle, RotateCcw, MoreHorizontal, Edit, CheckCircle, XCircle, Loader2, Trash2, Receipt, Download, Image, X, MessageSquare, Paperclip } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
