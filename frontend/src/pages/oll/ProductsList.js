@@ -167,46 +167,52 @@ const ProductsList = () => {
         try {
           const data = parseCSV(event.target.result);
           
-          // Map vendor names to IDs
-          const productsToImport = data.map(row => {
-            const vendor = vendors.find(v => 
-              v.name.toLowerCase() === (row.vendor_name || '').toLowerCase()
-            );
-            return {
-              name: row.name,
-              sku: row.sku,
-              vendor_id: vendor?.id || '',
-              unit_price: row.unit_price || 0,
-              tax_rate: row.tax_rate || 18,
-              description: row.description || '',
-              is_active: row.is_active !== false
-            };
-          });
-
-          // Import products one by one
-          let successCount = 0;
-          let failCount = 0;
+          if (data.length === 0) {
+            toast.error("No valid data found in file");
+            setImporting(false);
+            return;
+          }
           
-          for (const product of productsToImport) {
-            if (!product.vendor_id) {
-              failCount++;
-              continue;
-            }
-            try {
-              await apiClient.post("/products", product);
-              successCount++;
-            } catch (err) {
-              failCount++;
-            }
+          // Prepare products for bulk import
+          const productsToImport = data.map(row => ({
+            name: row.name || '',
+            sku: row.sku || '',
+            vendor_name: row.vendor_name || '',
+            unit_price: parseFloat(row.unit_price) || 0,
+            tax_rate: parseFloat(row.tax_rate) || 18,
+            description: row.description || '',
+            is_active: row.is_active !== 'false' && row.is_active !== false
+          })).filter(p => p.name && p.sku && p.vendor_name);
+
+          if (productsToImport.length === 0) {
+            toast.error("No valid products found. Ensure name, sku, and vendor_name columns are filled.");
+            setImporting(false);
+            return;
           }
 
-          toast.success(`Imported ${successCount} products. ${failCount > 0 ? `${failCount} failed.` : ''}`);
+          // Call bulk import endpoint
+          const response = await apiClient.post("/products/import", {
+            products: productsToImport
+          });
+
+          if (response.data.success_count > 0) {
+            toast.success(response.data.message);
+          } else {
+            toast.error(response.data.message || "Import failed");
+          }
+          
+          // Show errors if any
+          if (response.data.errors && response.data.errors.length > 0) {
+            console.log("Import errors:", response.data.errors);
+          }
+
           setImportDialogOpen(false);
           setImportFile(null);
           setImportPreview([]);
           fetchData();
         } catch (error) {
-          toast.error("Failed to import products");
+          console.error("Import error:", error);
+          toast.error(error.response?.data?.detail || "Failed to import products");
         } finally {
           setImporting(false);
         }
