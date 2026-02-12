@@ -373,7 +373,7 @@ class TestCleanup:
             deleted_count = 0
             for issue in issues:
                 # Delete test issues
-                if "TEST_" in issue.get("description", "") or "TEST_" in issue.get("resolution", ""):
+                if "TEST_" in issue.get("description", "") or "TEST_" in (issue.get("resolution") or ""):
                     del_response = requests.delete(f"{BASE_URL}/api/issues/{issue['id']}", headers=headers)
                     if del_response.status_code == 200:
                         deleted_count += 1
