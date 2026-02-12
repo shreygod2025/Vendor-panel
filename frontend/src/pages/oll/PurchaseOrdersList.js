@@ -300,6 +300,11 @@ const PurchaseOrdersList = () => {
                 By Distributor: {order.created_by_name || 'Unknown'}
               </span>
             )}
+            {order.status === "rejected" && order.rejection_reason && (
+              <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded mt-1 max-w-[250px] truncate" title={order.rejection_reason}>
+                Rejected: {order.rejection_reason}
+              </span>
+            )}
           </div>
         </TableCell>
         <TableCell>{order.vendor_name}</TableCell>
