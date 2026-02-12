@@ -371,6 +371,20 @@ const IssuesPage = () => {
                       <TableCell className="text-slate-500">{formatDate(issue.created_at)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => viewIssue(issue)}
+                            className="text-blue-600 hover:bg-blue-50"
+                            title="View Issue"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {issue.replies?.length > 0 && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                              {issue.replies.length}
+                            </span>
+                          )}
                           {issue.status !== "resolved" && isOLL && (
                             <Button
                               variant="ghost"
