@@ -1091,6 +1091,37 @@ const PurchaseOrdersList = () => {
                 rows={4}
               />
             </div>
+            <div>
+              <Label>Attachment (Optional)</Label>
+              <div className="mt-2">
+                <Input
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.pdf"
+                  onChange={handleIssueAttachmentChange}
+                  className="cursor-pointer"
+                />
+                <p className="text-xs text-slate-500 mt-1">Supported: PNG, JPEG, PDF (max 5MB)</p>
+              </div>
+              {issueAttachment && (
+                <div className="mt-2 flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                  {issueAttachment.type.startsWith('image/') ? (
+                    <Image className="w-4 h-4 text-blue-600" />
+                  ) : (
+                    <FileText className="w-4 h-4 text-blue-600" />
+                  )}
+                  <span className="text-sm text-blue-700 flex-1 truncate">{issueAttachment.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIssueAttachment(null)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIssueDialogOpen(false)}>Cancel</Button>
@@ -1102,6 +1133,114 @@ const PurchaseOrdersList = () => {
               {submittingIssue ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Raise Issue
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View PO Issues Dialog */}
+      <Dialog open={poIssuesDialogOpen} onOpenChange={setPoIssuesDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                Issues for {selectedPO?.po_number}
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setIssueDialogOpen(true);
+                }}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Issue
+              </Button>
+            </DialogTitle>
+            <DialogDescription>
+              View all issues raised for this purchase order
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto">
+            {loadingPoIssues ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+              </div>
+            ) : poIssues.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">No issues found</p>
+                <p className="text-sm">No issues have been raised for this PO yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {poIssues.map((issue) => (
+                  <div key={issue.id} className="p-4 border rounded-lg hover:bg-slate-50">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <span className="font-mono font-medium text-sm">{issue.issue_number}</span>
+                        <span className="mx-2 text-slate-300">|</span>
+                        <span className="capitalize text-sm">{issue.issue_type?.replace('_', ' ')}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`badge text-xs ${getIssuePriorityColor(issue.priority)}`}>
+                          {issue.priority}
+                        </span>
+                        <span className={`badge text-xs ${getIssueStatusColor(issue.status)}`}>
+                          {issue.status?.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-2">{issue.description}</p>
+                    {issue.attachment_url && (
+                      <div className="mb-2">
+                        {issue.attachment_url.startsWith('data:image') ? (
+                          <img 
+                            src={issue.attachment_url} 
+                            alt="Attachment" 
+                            className="max-w-[200px] max-h-[100px] rounded border"
+                          />
+                        ) : (
+                          <a 
+                            href={issue.attachment_url} 
+                            download="attachment.pdf"
+                            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            Download Attachment
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>
+                        Created by {issue.created_by_name || 'Unknown'} ({issue.created_by_role || 'oll'})
+                      </span>
+                      <span>{new Date(issue.created_at).toLocaleDateString('en-IN')}</span>
+                    </div>
+                    {issue.replies?.length > 0 && (
+                      <div className="mt-2 pt-2 border-t">
+                        <div className="flex items-center gap-1 text-xs text-blue-600">
+                          <MessageSquare className="w-3 h-3" />
+                          {issue.replies.length} {issue.replies.length === 1 ? 'reply' : 'replies'}
+                        </div>
+                      </div>
+                    )}
+                    {issue.resolution && (
+                      <div className="mt-2 p-2 bg-emerald-50 rounded text-sm">
+                        <span className="font-medium text-emerald-700">Resolution: </span>
+                        <span className="text-emerald-600">{issue.resolution}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="border-t pt-4">
+            <Button variant="outline" onClick={() => setPoIssuesDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
