@@ -552,6 +552,196 @@ const IssuesPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Issue Dialog with Replies */}
+      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              Issue {selectedIssue?.issue_number}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedIssue && (
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {/* Issue Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">PO Number</p>
+                  <p className="font-mono font-medium">{selectedIssue.po_number}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Vendor</p>
+                  <p className="font-medium">{selectedIssue.vendor_name}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Type</p>
+                  <p className="font-medium capitalize">{selectedIssue.issue_type?.replace('_', ' ')}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Status</p>
+                  <span className={`badge ${getStatusColor(selectedIssue.status)}`}>
+                    {selectedIssue.status?.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Description */}
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-600 mb-1">Description</p>
+                <p className="text-sm">{selectedIssue.description}</p>
+                {selectedIssue.attachment_url && (
+                  <div className="mt-3 pt-3 border-t border-amber-200">
+                    <p className="text-xs text-amber-600 mb-2">Attachment</p>
+                    {selectedIssue.attachment_url.startsWith('data:image') ? (
+                      <img 
+                        src={selectedIssue.attachment_url} 
+                        alt="Attachment" 
+                        className="max-w-full max-h-48 rounded-lg border"
+                      />
+                    ) : (
+                      <a 
+                        href={selectedIssue.attachment_url} 
+                        download="attachment.pdf"
+                        className="inline-flex items-center gap-2 text-amber-700 hover:underline"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Download Attachment
+                      </a>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-amber-500 mt-2">
+                  Reported by {selectedIssue.created_by_name || 'Unknown'} ({selectedIssue.created_by_role}) on {formatDate(selectedIssue.created_at)}
+                </p>
+              </div>
+              
+              {/* Resolution */}
+              {selectedIssue.resolution && (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <p className="text-xs text-emerald-600 mb-1">Resolution</p>
+                  <p className="text-sm">{selectedIssue.resolution}</p>
+                </div>
+              )}
+              
+              {/* Replies Section */}
+              <div>
+                <h4 className="font-medium text-slate-700 mb-3 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  Conversation ({selectedIssue.replies?.length || 0})
+                </h4>
+                
+                {selectedIssue.replies?.length > 0 ? (
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {selectedIssue.replies.map((reply, index) => (
+                      <div 
+                        key={reply.id || index}
+                        className={`p-3 rounded-lg ${
+                          reply.created_by_role === 'vendor' 
+                            ? 'bg-blue-50 border border-blue-200 ml-4' 
+                            : 'bg-slate-50 border border-slate-200 mr-4'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs font-medium ${
+                            reply.created_by_role === 'vendor' ? 'text-blue-700' : 'text-slate-700'
+                          }`}>
+                            {reply.created_by_name || 'Unknown'} 
+                            <span className="font-normal">({reply.created_by_role})</span>
+                          </span>
+                          <span className="text-xs text-slate-400">{formatDate(reply.created_at)}</span>
+                        </div>
+                        <p className="text-sm">{reply.message}</p>
+                        {reply.attachment_url && (
+                          <div className="mt-2 pt-2 border-t">
+                            {reply.attachment_url.startsWith('data:image') ? (
+                              <img 
+                                src={reply.attachment_url} 
+                                alt="Attachment" 
+                                className="max-w-full max-h-32 rounded border"
+                              />
+                            ) : (
+                              <a 
+                                href={reply.attachment_url} 
+                                download="attachment.pdf"
+                                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                              >
+                                <Paperclip className="w-3 h-3" />
+                                View Attachment
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 text-center py-4">No replies yet</p>
+                )}
+              </div>
+              
+              {/* Reply Input */}
+              {selectedIssue.status !== "resolved" && (
+                <div className="border-t pt-4">
+                  <Label className="text-sm font-medium mb-2 block">Add Reply</Label>
+                  <Textarea
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="Type your reply..."
+                    rows={2}
+                    className="mb-2"
+                  />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer">
+                        <Input
+                          type="file"
+                          accept=".png,.jpg,.jpeg,.pdf"
+                          onChange={handleReplyFileChange}
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-1 text-sm text-slate-600 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50">
+                          <Paperclip className="w-4 h-4" />
+                          Attach
+                        </div>
+                      </label>
+                      {replyAttachment && (
+                        <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                          <Paperclip className="w-3 h-3" />
+                          {replyAttachment.name.slice(0, 15)}...
+                          <button onClick={() => setReplyAttachment(null)}>
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <Button 
+                      onClick={handleSendReply}
+                      disabled={sendingReply || (!replyMessage.trim() && !replyAttachment)}
+                      size="sm"
+                      className="bg-[#1e3a8a] hover:bg-[#1e40af]"
+                    >
+                      {sendingReply ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-1" />
+                          Send
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter className="border-t pt-4">
+            <Button variant="outline" onClick={() => setShowViewDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
