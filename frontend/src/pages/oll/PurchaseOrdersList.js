@@ -75,11 +75,16 @@ const PurchaseOrdersList = () => {
 
   // Raise Issue dialog state
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [poIssuesDialogOpen, setPoIssuesDialogOpen] = useState(false);
+  const [poIssues, setPoIssues] = useState([]);
+  const [loadingPoIssues, setLoadingPoIssues] = useState(false);
   const [issueForm, setIssueForm] = useState({
     issue_type: "quality",
     priority: "medium",
-    description: ""
+    description: "",
+    attachment_url: ""
   });
+  const [issueAttachment, setIssueAttachment] = useState(null);
   const [submittingIssue, setSubmittingIssue] = useState(false);
 
   useEffect(() => {
