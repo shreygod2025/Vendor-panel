@@ -78,10 +78,24 @@ const PublicTracking = () => {
       sent: "bg-blue-100 text-blue-700",
       confirmed: "bg-indigo-100 text-indigo-700",
       dispatched: "bg-amber-100 text-amber-700",
+      pending_approval: "bg-purple-100 text-purple-700",
       delivered: "bg-emerald-100 text-emerald-700",
-      closed: "bg-slate-200 text-slate-600"
+      closed: "bg-slate-700 text-white"
     };
     return colors[status] || "bg-slate-100 text-slate-600";
+  };
+
+  const getStatusLabel = (status) => {
+    const labels = {
+      draft: "Draft",
+      sent: "Sent",
+      confirmed: "Confirmed",
+      dispatched: "In Transit",
+      pending_approval: "Pending Approval",
+      delivered: "Delivered",
+      closed: "Closed"
+    };
+    return labels[status] || status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   if (loading) {
