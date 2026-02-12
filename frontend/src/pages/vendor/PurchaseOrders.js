@@ -879,6 +879,83 @@ const VendorPurchaseOrders = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reject PO Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="w-5 h-5" />
+              Reject Purchase Order
+            </DialogTitle>
+            <DialogDescription>
+              Please select a reason for rejecting PO {selectedRejectPO?.po_number}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="form-label mb-2 block">Reason for Rejection *</Label>
+              <Select
+                value={selectedRejectReason}
+                onValueChange={setSelectedRejectReason}
+              >
+                <SelectTrigger data-testid="reject-reason-select">
+                  <SelectValue placeholder="Select a reason..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {rejectReasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {selectedRejectReason === "Other (specify below)" && (
+              <div>
+                <Label className="form-label mb-2 block">Custom Reason</Label>
+                <Textarea
+                  value={customRejectReason}
+                  onChange={(e) => setCustomRejectReason(e.target.value)}
+                  placeholder="Enter your reason..."
+                  rows={3}
+                  data-testid="custom-reject-reason"
+                />
+              </div>
+            )}
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                <strong>Note:</strong> Once rejected, OLL admin will be notified and may contact you for clarification.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReject}
+              disabled={rejecting || (!selectedRejectReason || (selectedRejectReason === "Other (specify below)" && !customRejectReason.trim()))}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="confirm-reject-btn"
+            >
+              {rejecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Rejecting...
+                </>
+              ) : (
+                <>
+                  <X className="w-4 h-4 mr-2" />
+                  Reject PO
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
