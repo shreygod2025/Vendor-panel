@@ -345,8 +345,9 @@ const VendorPurchaseOrders = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleReject(order.id)}
+                  onClick={() => openRejectDialog(order)}
                   className="text-red-600 hover:bg-red-50"
+                  data-testid={`reject-po-${order.id}`}
                 >
                   <X className="w-4 h-4" />
                 </Button>
