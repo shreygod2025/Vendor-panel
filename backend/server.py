@@ -1689,12 +1689,14 @@ async def create_issue(issue: IssueCreate, current_user: dict = Depends(get_curr
     return IssueResponse(**issue_doc)
 
 @api_router.get("/issues", response_model=List[IssueResponse])
-async def get_issues(status: Optional[str] = None, priority: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+async def get_issues(status: Optional[str] = None, priority: Optional[str] = None, po_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     query = {}
     if status:
         query["status"] = status
     if priority:
         query["priority"] = priority
+    if po_id:
+        query["po_id"] = po_id
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
@@ -1723,6 +1725,15 @@ async def get_issues(status: Optional[str] = None, priority: Optional[str] = Non
     for i in issues:
         i["vendor_name"] = vendor_map.get(i["vendor_id"])
         i["po_number"] = po_map.get(i["po_id"])
+        # Ensure new fields have defaults
+        if "attachment_url" not in i:
+            i["attachment_url"] = None
+        if "replies" not in i:
+            i["replies"] = []
+        if "created_by_name" not in i:
+            i["created_by_name"] = None
+        if "created_by_role" not in i:
+            i["created_by_role"] = "oll"
         result.append(IssueResponse(**i))
     
     return result
