@@ -880,6 +880,9 @@ async def get_products(vendor_id: Optional[str] = None, is_active: Optional[bool
     result = []
     for p in products:
         p["vendor_name"] = vendor_map.get(p["vendor_id"])
+        # Ensure unit field exists
+        if "unit" not in p:
+            p["unit"] = "pcs"
         # Hide pricing for distributors
         if current_user.get("role") == "distributor":
             p["unit_price"] = 0
@@ -899,6 +902,9 @@ async def get_product(product_id: str, current_user: dict = Depends(get_current_
     
     vendor = await db.vendors.find_one({"id": product["vendor_id"]}, {"_id": 0})
     product["vendor_name"] = vendor.get("name") if vendor else None
+    # Ensure unit field exists
+    if "unit" not in product:
+        product["unit"] = "pcs"
     
     return ProductResponse(**product)
 
