@@ -463,7 +463,7 @@ const PurchaseOrdersList = () => {
               title="View Issues"
               data-testid={`view-issues-${order.id}`}
             >
-              <Eye className="w-4 h-4 text-slate-500" />
+              <MessageSquare className="w-4 h-4 text-amber-600" />
             </Button>
             <Button
               variant="ghost"
