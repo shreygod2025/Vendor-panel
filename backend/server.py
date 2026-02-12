@@ -1782,6 +1782,70 @@ async def update_issue(issue_id: str, issue_update: IssueUpdate, current_user: d
     
     updated["vendor_name"] = vendor.get("name") if vendor else None
     updated["po_number"] = po.get("po_number") if po else None
+    # Ensure new fields have defaults
+    if "attachment_url" not in updated:
+        updated["attachment_url"] = None
+    if "replies" not in updated:
+        updated["replies"] = []
+    if "created_by_name" not in updated:
+        updated["created_by_name"] = None
+    if "created_by_role" not in updated:
+        updated["created_by_role"] = "oll"
+    
+    return IssueResponse(**updated)
+
+@api_router.post("/issues/{issue_id}/reply", response_model=IssueResponse)
+async def add_issue_reply(issue_id: str, reply: IssueReply, current_user: dict = Depends(get_current_user)):
+    """Add a reply to an issue. Both OLL and vendors can reply."""
+    issue = await db.issues.find_one({"id": issue_id}, {"_id": 0})
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    
+    # Vendors can only reply to their own issues
+    if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
+        if issue["vendor_id"] != current_user["vendor_id"]:
+            raise HTTPException(status_code=403, detail="You can only reply to your own issues")
+    
+    # Get replier info
+    replier = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
+    replier_name = replier.get("name") or replier.get("username") if replier else None
+    
+    reply_doc = {
+        "id": str(uuid.uuid4()),
+        "message": reply.message,
+        "attachment_url": reply.attachment_url,
+        "created_by": current_user["user_id"],
+        "created_by_name": replier_name,
+        "created_by_role": current_user.get("role", "oll"),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Add reply to issue
+    await db.issues.update_one(
+        {"id": issue_id},
+        {
+            "$push": {"replies": reply_doc},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+    
+    await create_audit_log("ADD_ISSUE_REPLY", "issue", issue_id, current_user, {"reply_id": reply_doc["id"]})
+    
+    # Return updated issue
+    updated = await db.issues.find_one({"id": issue_id}, {"_id": 0})
+    vendor = await db.vendors.find_one({"id": updated["vendor_id"]}, {"_id": 0})
+    po = await db.purchase_orders.find_one({"id": updated["po_id"]}, {"_id": 0})
+    
+    updated["vendor_name"] = vendor.get("name") if vendor else None
+    updated["po_number"] = po.get("po_number") if po else None
+    if "attachment_url" not in updated:
+        updated["attachment_url"] = None
+    if "replies" not in updated:
+        updated["replies"] = []
+    if "created_by_name" not in updated:
+        updated["created_by_name"] = None
+    if "created_by_role" not in updated:
+        updated["created_by_role"] = "oll"
     
     return IssueResponse(**updated)
 
