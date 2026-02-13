@@ -1072,14 +1072,15 @@ const PurchaseOrdersList = () => {
                     <span className="text-sm font-medium">Logistics Bill</span>
                   </div>
                   {selectedPOInvoice?.logistics_bill_url ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <a
+                      href={selectedPOInvoice?.logistics_bill_url}
+                      download="logistics_bill.pdf"
                       className="w-full"
-                      onClick={() => window.open(selectedPOInvoice?.logistics_bill_url, '_blank')}
                     >
-                      <Eye className="w-3 h-3 mr-1" /> View Bill
-                    </Button>
+                      <Button variant="outline" size="sm" className="w-full">
+                        <Download className="w-3 h-3 mr-1" /> Download Bill
+                      </Button>
+                    </a>
                   ) : (
                     <p className="text-xs text-slate-400 text-center py-1">Not uploaded</p>
                   )}
