@@ -88,6 +88,7 @@ const PurchaseOrdersList = () => {
   const [submittingIssue, setSubmittingIssue] = useState(false);
 
   useEffect(() => {
+    document.title = "OLL - Purchase Orders";
     fetchData();
   }, []);
 
