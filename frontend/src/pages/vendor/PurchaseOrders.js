@@ -73,6 +73,7 @@ const VendorPurchaseOrders = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   useEffect(() => {
+    document.title = "OLL - Vendor Orders";
     fetchOrders();
   }, []);
 
