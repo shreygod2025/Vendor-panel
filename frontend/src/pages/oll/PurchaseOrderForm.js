@@ -71,6 +71,80 @@ const PurchaseOrderForm = () => {
 
   const [nextPoNumber, setNextPoNumber] = useState("");
 
+  // School search state
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState("");
+  const [schoolSuggestions, setSchoolSuggestions] = useState([]);
+  const [showSchoolSuggestions, setShowSchoolSuggestions] = useState(false);
+  const [loadingSchools, setLoadingSchools] = useState(false);
+  const schoolSearchRef = useRef(null);
+  const schoolDropdownRef = useRef(null);
+
+  // Debounce school search
+  const searchSchools = useCallback(async (query) => {
+    if (!query || query.length < 2) {
+      setSchoolSuggestions([]);
+      return;
+    }
+    
+    setLoadingSchools(true);
+    try {
+      const response = await apiClient.get(`/schools/search?q=${encodeURIComponent(query)}&limit=10`);
+      setSchoolSuggestions(response.data.schools || []);
+    } catch (error) {
+      console.error("Failed to search schools:", error);
+      setSchoolSuggestions([]);
+    } finally {
+      setLoadingSchools(false);
+    }
+  }, []);
+
+  // Debounce effect for school search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (schoolSearchQuery) {
+        searchSchools(schoolSearchQuery);
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [schoolSearchQuery, searchSchools]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        schoolSearchRef.current && 
+        !schoolSearchRef.current.contains(event.target) &&
+        schoolDropdownRef.current &&
+        !schoolDropdownRef.current.contains(event.target)
+      ) {
+        setShowSchoolSuggestions(false);
+      }
+    };
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Handle school selection
+  const handleSchoolSelect = (school) => {
+    // Build full address from components
+    const addressParts = [school.address, school.city, school.state].filter(Boolean);
+    const fullAddress = addressParts.join(", ");
+    
+    setFormData(prev => ({
+      ...prev,
+      school_name: school.school_name,
+      delivery_address: fullAddress || prev.delivery_address,
+      contact_person: school.contact_name || prev.contact_person,
+      contact_number: school.contact_phone || prev.contact_number,
+    }));
+    
+    setSchoolSearchQuery(school.school_name);
+    setShowSchoolSuggestions(false);
+    toast.success(`School "${school.school_name}" selected and details auto-filled`);
+  };
+
   useEffect(() => {
     fetchInitialData();
   }, []);
