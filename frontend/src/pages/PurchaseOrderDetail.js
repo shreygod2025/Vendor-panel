@@ -485,6 +485,12 @@ const PurchaseOrderDetail = () => {
                 <CardTitle>Delivery Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {order.school_name && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-600">School/Institution</p>
+                    <p className="font-semibold text-blue-800">{order.school_name}</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-slate-500">Vendor</p>
