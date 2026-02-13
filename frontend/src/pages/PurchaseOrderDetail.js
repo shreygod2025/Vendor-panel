@@ -668,7 +668,7 @@ const PurchaseOrderDetail = () => {
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Logistics Cost</p>
-                      <p className="font-medium">{deliveryInfo.logistics_cost > 0 ? formatCurrency(deliveryInfo.logistics_cost) : '-'}</p>
+                      <p className="font-medium">{deliveryInfo.logistics_cost != null && deliveryInfo.logistics_cost > 0 ? formatCurrency(deliveryInfo.logistics_cost) : '-'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Payment Status</p>
