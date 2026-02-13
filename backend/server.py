@@ -2247,6 +2247,14 @@ async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str
             inv["paid_amount"] = 0
         if "due_date" not in inv:
             inv["due_date"] = None
+        if "logistics_cost" not in inv:
+            inv["logistics_cost"] = 0
+        if "logistics_bill_url" not in inv:
+            inv["logistics_bill_url"] = None
+        if "delivery_proof_url" not in inv:
+            inv["delivery_proof_url"] = None
+        if "invoice_url" not in inv:
+            inv["invoice_url"] = inv.get("file_url")
         result.append(InvoiceResponse(**inv))
     
     return result
