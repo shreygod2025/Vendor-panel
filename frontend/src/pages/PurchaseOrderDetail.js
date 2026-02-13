@@ -76,6 +76,12 @@ const PurchaseOrderDetail = () => {
     fetchOrder();
   }, [id]);
 
+  useEffect(() => {
+    if (order?.po_number) {
+      document.title = `OLL - ${order.po_number}`;
+    }
+  }, [order]);
+
   const fetchOrder = async () => {
     try {
       const response = await apiClient.get(`/purchase-orders/${id}`);
