@@ -3132,6 +3132,32 @@ async def get_po_line_items_external(po_number: str, _: bool = Depends(verify_ex
         "grand_total": po.get("grand_total", 0)
     }
 
+@api_router.get("/external/po/{po_number}/pdf")
+async def get_po_pdf_external(po_number: str, _: bool = Depends(verify_external_api_key)):
+    """
+    External API to download PO as PDF.
+    
+    Authentication: Requires X-API-Key header
+    """
+    po = await db.purchase_orders.find_one({"po_number": po_number.upper()}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail=f"Purchase order '{po_number}' not found")
+    
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    if not vendor:
+        vendor = {"name": "Unknown Vendor", "address": "", "phone": "", "email": ""}
+    
+    # Generate PDF
+    pdf_buffer = generate_po_pdf(po, vendor)
+    
+    # Return as downloadable file
+    filename = f"PO-{po['po_number']}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # ========================
 # SEED DATA
 # ========================
