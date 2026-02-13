@@ -526,14 +526,81 @@ const PurchaseOrderForm = () => {
                 </div>
               </div>
 
-              <div>
-                <Label className="form-label">School Name (Optional)</Label>
-                <Input
-                  value={formData.school_name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, school_name: e.target.value }))}
-                  placeholder="Enter school/institution name"
-                  data-testid="school-name-input"
-                />
+              <div className="relative">
+                <Label className="form-label flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  School Name (Optional)
+                </Label>
+                <div className="relative" ref={schoolSearchRef}>
+                  <div className="relative">
+                    <Input
+                      value={schoolSearchQuery || formData.school_name}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSchoolSearchQuery(value);
+                        setFormData(prev => ({ ...prev, school_name: value }));
+                        if (value.length >= 2) {
+                          setShowSchoolSuggestions(true);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (schoolSearchQuery.length >= 2 || schoolSuggestions.length > 0) {
+                          setShowSchoolSuggestions(true);
+                        }
+                      }}
+                      placeholder="Search or enter school name..."
+                      data-testid="school-name-input"
+                      className="pr-10"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                      {loadingSchools ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Search className="w-4 h-4" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* School Suggestions Dropdown */}
+                  {showSchoolSuggestions && schoolSuggestions.length > 0 && (
+                    <div 
+                      ref={schoolDropdownRef}
+                      className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-y-auto"
+                    >
+                      {schoolSuggestions.map((school) => (
+                        <button
+                          key={school.id}
+                          type="button"
+                          onClick={() => handleSchoolSelect(school)}
+                          className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b border-slate-100 last:border-0 transition-colors"
+                          data-testid={`school-suggestion-${school.id}`}
+                        >
+                          <div className="font-medium text-slate-900">{school.school_name}</div>
+                          {(school.city || school.state) && (
+                            <div className="text-sm text-slate-500 mt-0.5">
+                              {[school.city, school.state].filter(Boolean).join(", ")}
+                            </div>
+                          )}
+                          {school.contact_name && (
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              Contact: {school.contact_name} {school.contact_phone && `• ${school.contact_phone}`}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* No results message */}
+                  {showSchoolSuggestions && schoolSearchQuery.length >= 2 && !loadingSchools && schoolSuggestions.length === 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-4 text-center text-slate-500">
+                      <p>No schools found. You can enter a custom name.</p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Type to search schools. Select to auto-fill address & contact details.
+                </p>
               </div>
 
               <div>
