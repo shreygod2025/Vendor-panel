@@ -2731,16 +2731,17 @@ SCHOOLS_API_URL = os.environ.get('SCHOOLS_API_URL', '')
 SCHOOLS_API_KEY = os.environ.get('SCHOOLS_API_KEY', '')
 
 @api_router.get("/schools/search")
-async def search_schools(q: str = "", limit: int = 10, current_user: dict = Depends(get_current_user)):
+async def search_schools(q: str = "", limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Search schools from external API and return suggestions"""
     if not SCHOOLS_API_URL or not SCHOOLS_API_KEY:
         raise HTTPException(status_code=500, detail="Schools API not configured")
     
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # Fetch all schools (up to 500) from external API
             response = await client.get(
                 SCHOOLS_API_URL,
-                params={"limit": limit},
+                params={"limit": 500},
                 headers={"X-API-Key": SCHOOLS_API_KEY}
             )
             response.raise_for_status()
@@ -2770,7 +2771,7 @@ async def search_schools(q: str = "", limit: int = 10, current_user: dict = Depe
                     "contact_email": school.get("contact", {}).get("email") or "",
                 })
             
-            return {"schools": results}
+            return {"schools": results, "total": len(schools)}
             
     except httpx.RequestError as e:
         logger.error(f"Schools API request error: {e}")
