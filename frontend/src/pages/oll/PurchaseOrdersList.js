@@ -68,6 +68,8 @@ const PurchaseOrdersList = () => {
   const [rejectionReason, setRejectionReason] = useState("");
   const [approving, setApproving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [approvalConfirmed, setApprovalConfirmed] = useState(false);
+  const [selectedPOInvoice, setSelectedPOInvoice] = useState(null);
 
   // View Invoice dialog state
   const [viewInvoiceDialog, setViewInvoiceDialog] = useState(false);
