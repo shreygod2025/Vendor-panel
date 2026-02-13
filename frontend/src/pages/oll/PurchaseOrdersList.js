@@ -1086,6 +1086,32 @@ const PurchaseOrdersList = () => {
                   )}
                 </div>
               </div>
+              
+              {/* Delivery Proof Image */}
+              {selectedPOInvoice?.delivery_proof_url && (
+                <div className="mt-3 border rounded-lg p-3 bg-emerald-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Image className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-medium text-emerald-800">Delivery Proof</span>
+                  </div>
+                  <div className="flex gap-3">
+                    <img 
+                      src={selectedPOInvoice.delivery_proof_url} 
+                      alt="Delivery Proof" 
+                      className="max-h-32 rounded border cursor-pointer hover:opacity-80"
+                      onClick={() => window.open(selectedPOInvoice.delivery_proof_url, '_blank')}
+                    />
+                    <a
+                      href={selectedPOInvoice.delivery_proof_url}
+                      download="delivery_proof.png"
+                    >
+                      <Button variant="outline" size="sm">
+                        <Download className="w-3 h-3 mr-1" /> Download
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Confirmation Checkbox */}
