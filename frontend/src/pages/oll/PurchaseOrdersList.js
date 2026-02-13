@@ -1023,9 +1023,24 @@ const PurchaseOrdersList = () => {
                     variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => window.open(`${process.env.REACT_APP_BACKEND_URL}/api/purchase-orders/${selectedPO?.id}/pdf`, '_blank')}
+                    onClick={async () => {
+                      try {
+                        const response = await apiClient.get(`/purchase-orders/${selectedPO?.id}/pdf`, {
+                          responseType: 'blob'
+                        });
+                        const blob = new Blob([response.data], { type: 'application/pdf' });
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `${selectedPO?.po_number || 'PO'}.pdf`;
+                        link.click();
+                        window.URL.revokeObjectURL(url);
+                      } catch (error) {
+                        toast.error("Failed to download PO PDF");
+                      }
+                    }}
                   >
-                    <Eye className="w-3 h-3 mr-1" /> View PO
+                    <Download className="w-3 h-3 mr-1" /> Download PO
                   </Button>
                 </div>
 
@@ -1036,14 +1051,15 @@ const PurchaseOrdersList = () => {
                     <span className="text-sm font-medium">Invoice</span>
                   </div>
                   {selectedPOInvoice?.file_url || selectedPOInvoice?.invoice_url ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <a
+                      href={selectedPOInvoice?.file_url || selectedPOInvoice?.invoice_url}
+                      download={`Invoice-${selectedPOInvoice?.invoice_number || 'invoice'}.pdf`}
                       className="w-full"
-                      onClick={() => window.open(selectedPOInvoice?.file_url || selectedPOInvoice?.invoice_url, '_blank')}
                     >
-                      <Eye className="w-3 h-3 mr-1" /> View Invoice
-                    </Button>
+                      <Button variant="outline" size="sm" className="w-full">
+                        <Download className="w-3 h-3 mr-1" /> Download Invoice
+                      </Button>
+                    </a>
                   ) : (
                     <p className="text-xs text-slate-400 text-center py-1">Not uploaded</p>
                   )}
