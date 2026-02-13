@@ -37,6 +37,10 @@ db = client[os.environ['DB_NAME']]
 SECRET_KEY = os.environ.get('SECRET_KEY', 'oll-vendor-management-secret-key-2024')
 ALGORITHM = "HS256"
 
+# PO Sync Webhook Configuration
+PO_SYNC_WEBHOOK_URL = os.environ.get('PO_SYNC_WEBHOOK_URL', '')
+PO_SYNC_WEBHOOK_SECRET = os.environ.get('PO_SYNC_WEBHOOK_SECRET', '')
+
 # Create the main app
 app = FastAPI(title="OLL Vendor Management System")
 
