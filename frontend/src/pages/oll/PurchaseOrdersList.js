@@ -398,7 +398,16 @@ const PurchaseOrdersList = () => {
           </div>
         </TableCell>
         <TableCell>{order.vendor_name}</TableCell>
-        <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
+        <TableCell>
+          <div className="flex flex-col">
+            {order.school_name && (
+              <span className="font-medium text-slate-900">{order.school_name}</span>
+            )}
+            <span className={order.school_name ? "text-sm text-slate-500" : ""}>
+              {order.receiver_name || order.contact_person || "-"}
+            </span>
+          </div>
+        </TableCell>
         <TableCell>{order.line_items?.length || 0} items</TableCell>
         <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
         <TableCell>
@@ -613,7 +622,16 @@ const PurchaseOrdersList = () => {
                   </div>
                 </TableCell>
                 <TableCell>{order.vendor_name}</TableCell>
-                <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
+                <TableCell>
+          <div className="flex flex-col">
+            {order.school_name && (
+              <span className="font-medium text-slate-900">{order.school_name}</span>
+            )}
+            <span className={order.school_name ? "text-sm text-slate-500" : ""}>
+              {order.receiver_name || order.contact_person || "-"}
+            </span>
+          </div>
+        </TableCell>
                 <TableCell>{order.line_items?.length || 0} items</TableCell>
                 <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
                 <TableCell className="font-mono text-slate-600">
