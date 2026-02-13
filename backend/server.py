@@ -1377,7 +1377,7 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
     return POResponse(**updated)
 
 @api_router.delete("/purchase-orders/{po_id}")
-async def delete_purchase_order(po_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_purchase_order(po_id: str, force: bool = False, current_user: dict = Depends(get_current_user)):
     if current_user.get("role") != "oll":
         raise HTTPException(status_code=403, detail="Only OLL can delete POs")
     
@@ -1385,9 +1385,33 @@ async def delete_purchase_order(po_id: str, current_user: dict = Depends(get_cur
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
     
-    # Allow delete for draft, sent, confirmed, and rejected POs
+    # TEMPORARY: Allow force delete for any status (for cleaning test data)
+    if force:
+        # Delete related data
+        deleted_invoices = await db.invoices.delete_many({"po_id": po_id})
+        deleted_dispatches = await db.dispatches.delete_many({"po_id": po_id})
+        deleted_payments = await db.payments.delete_many({"po_id": po_id})
+        deleted_issues = await db.issues.delete_many({"po_id": po_id})
+        
+        await db.purchase_orders.delete_one({"id": po_id})
+        await create_audit_log("FORCE_DELETE_PO", "purchase_order", po_id, current_user, {
+            "deleted_invoices": deleted_invoices.deleted_count,
+            "deleted_dispatches": deleted_dispatches.deleted_count,
+            "deleted_payments": deleted_payments.deleted_count,
+            "deleted_issues": deleted_issues.deleted_count
+        })
+        
+        return {
+            "message": "Purchase order and all related data deleted successfully",
+            "deleted_invoices": deleted_invoices.deleted_count,
+            "deleted_dispatches": deleted_dispatches.deleted_count,
+            "deleted_payments": deleted_payments.deleted_count,
+            "deleted_issues": deleted_issues.deleted_count
+        }
+    
+    # Normal delete - only for certain statuses
     if po["status"] not in ["draft", "sent", "confirmed", "rejected"]:
-        raise HTTPException(status_code=400, detail="Only draft, sent, confirmed, or rejected POs can be deleted")
+        raise HTTPException(status_code=400, detail="Only draft, sent, confirmed, or rejected POs can be deleted. Use force=true for delivered POs.")
     
     await db.purchase_orders.delete_one({"id": po_id})
     await create_audit_log("DELETE_PO", "purchase_order", po_id, current_user)
