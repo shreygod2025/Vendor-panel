@@ -299,6 +299,11 @@ function AppRoutes() {
           <DashboardLayout><Analytics /></DashboardLayout>
         </ProtectedRoute>
       } />
+      <Route path="/oll/api-keys" element={
+        <ProtectedRoute allowedRoles={["oll"]}>
+          <DashboardLayout><APIKeysPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
       <Route path="/oll/users" element={
         <ProtectedRoute allowedRoles={["oll"]}>
           <DashboardLayout><UsersList /></DashboardLayout>
