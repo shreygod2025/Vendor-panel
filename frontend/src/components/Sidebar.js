@@ -68,7 +68,8 @@ const Sidebar = ({ role, isOpen, onClose }) => {
       items: [
         { path: "/oll/analytics", icon: BarChart3, label: "Analytics" },
         { path: "/oll/bulk-import", icon: Upload, label: "Bulk Import" },
-        { path: "/oll/audit-logs", icon: History, label: "Audit Logs" }
+        { path: "/oll/audit-logs", icon: History, label: "Audit Logs" },
+        { path: "/oll/api-keys", icon: Key, label: "API Keys" }
       ]
     }
   ];
