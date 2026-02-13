@@ -468,30 +468,41 @@ const PurchaseOrdersList = () => {
             >
               <Download className="w-4 h-4" />
             </Button>
-            {["dispatched", "delivered", "closed", "pending_approval"].includes(order.status) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedPO(order);
-                  setIssueDialogOpen(true);
-                }}
-                className="text-amber-600 hover:bg-amber-50"
-                title="Raise Issue"
-                data-testid={`raise-issue-${order.id}`}
-              >
-                <AlertTriangle className="w-4 h-4" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openPoIssuesDialog(order)}
-              title="View Issues"
-              data-testid={`view-issues-${order.id}`}
-            >
-              <MessageSquare className="w-4 h-4 text-amber-600" />
-            </Button>
+            {/* Combined Issues Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-amber-600 hover:bg-amber-50"
+                  title="Issues"
+                  data-testid={`issues-${order.id}`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem 
+                  onClick={() => openPoIssuesDialog(order)}
+                  className="flex items-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  View Issues
+                </DropdownMenuItem>
+                {["dispatched", "delivered", "closed", "pending_approval"].includes(order.status) && (
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setSelectedPO(order);
+                      setIssueDialogOpen(true);
+                    }}
+                    className="flex items-center gap-2 text-amber-600"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Raise New Issue
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="ghost"
               size="sm"
