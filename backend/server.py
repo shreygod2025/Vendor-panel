@@ -189,6 +189,7 @@ class POLineItem(BaseModel):
 class POCreate(BaseModel):
     vendor_id: str
     custom_po_number: Optional[str] = None  # Optional custom PO number
+    school_name: Optional[str] = None  # Optional school name
     delivery_address: str
     receiver_name: Optional[str] = None
     contact_person: str
@@ -202,6 +203,7 @@ class POCreate(BaseModel):
     send_immediately: bool = True  # Default to sending immediately
 
 class POUpdate(BaseModel):
+    school_name: Optional[str] = None
     delivery_address: Optional[str] = None
     receiver_name: Optional[str] = None
     contact_person: Optional[str] = None
