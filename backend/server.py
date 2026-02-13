@@ -987,6 +987,7 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
         "id": str(uuid.uuid4()),
         "po_number": po_number,
         "vendor_id": po.vendor_id,
+        "school_name": po.school_name,
         "delivery_address": po.delivery_address,
         "receiver_name": po.receiver_name,
         "contact_person": po.contact_person,
