@@ -531,10 +531,28 @@ const PurchaseOrderForm = () => {
               </div>
 
               <div className="relative">
-                <Label className="form-label flex items-center gap-2">
-                  <Building2 className="w-4 h-4" />
-                  School Name (Optional)
-                </Label>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="form-label flex items-center gap-2 mb-0">
+                    <Building2 className="w-4 h-4" />
+                    School Name (Optional)
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        school_name: "OLL Office",
+                        delivery_address: "103 1st floor - Kshitij building, Veera Desai Rd, Dattaguru Nagar, Azad Nagar, Andheri West, Mumbai, Maharashtra 400053"
+                      }));
+                      setSchoolSearchQuery("OLL Office");
+                      toast.success("OLL Office address filled");
+                    }}
+                    className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 transition-colors flex items-center gap-1"
+                  >
+                    <MapPin className="w-3 h-3" />
+                    OLL Office
+                  </button>
+                </div>
                 <div className="relative" ref={schoolSearchRef}>
                   <div className="relative">
                     <Input
