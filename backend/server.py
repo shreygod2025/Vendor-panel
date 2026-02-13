@@ -3021,7 +3021,12 @@ async def get_po_external(po_number: str, _: bool = Depends(verify_external_api_
         dispatch_info=dispatch_info,
         tracking_link=tracking_link,
         invoice_info=invoice_info,
-        public_tracking_url=public_tracking_url
+        public_tracking_url=public_tracking_url,
+        # File URLs
+        po_pdf_url=f"{app_base_url}/api/purchase-orders/{po['id']}/pdf" if app_base_url else None,
+        invoice_file_url=invoice.get("file_url") or invoice.get("invoice_url") if invoice else None,
+        logistics_bill_url=invoice.get("logistics_bill_url") if invoice else None,
+        delivery_proof_url=invoice.get("delivery_proof_url") if invoice else None
     )
 
 @api_router.get("/external/po")
