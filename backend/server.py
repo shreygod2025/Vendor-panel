@@ -1169,10 +1169,15 @@ Mumbai, Maharashtra 400053<br/>
 <b>Phone:</b> {vendor_data.get('phone', 'N/A')}<br/>
 <b>Email:</b> {vendor_data.get('email', 'N/A')}"""
     
-    ship_to_info = f"""<b>SHIP TO</b><br/>
-<b>{po_data.get('contact_person', '')}</b><br/>
-{po_data.get('delivery_address', '')}<br/>
-<b>Phone:</b> {po_data.get('contact_number', 'N/A')}"""
+    # Build ship to info with optional school name
+    school_name = po_data.get('school_name', '')
+    ship_to_lines = ['<b>SHIP TO</b><br/>']
+    if school_name:
+        ship_to_lines.append(f'<b>{school_name}</b><br/>')
+    ship_to_lines.append(f'<b>{po_data.get("contact_person", "")}</b><br/>')
+    ship_to_lines.append(f'{po_data.get("delivery_address", "")}<br/>')
+    ship_to_lines.append(f'<b>Phone:</b> {po_data.get("contact_number", "N/A")}')
+    ship_to_info = ''.join(ship_to_lines)
     
     info_data = [[Paragraph(vendor_info, styles['Small']), Paragraph(ship_to_info, styles['Small'])]]
     info_table = Table(info_data, colWidths=[90*mm, 90*mm])
