@@ -415,7 +415,7 @@ const PurchaseOrdersList = () => {
             {order.status === "pending_approval" ? "Pending Approval" : order.status}
           </span>
         </TableCell>
-        <TableCell className="text-slate-500">{formatDate(order.created_at)}</TableCell>
+        <TableCell className="text-slate-500">{order.delivery_date ? formatDate(order.delivery_date) : "-"}</TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-1">
             <Link to={`/oll/purchase-orders/${order.id}`}>
