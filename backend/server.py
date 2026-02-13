@@ -576,6 +576,27 @@ def calculate_po_totals(line_items: List[POLineItem], order_discount_amount: flo
         "grand_total": round(grand_total, 2)
     }
 
+async def trigger_po_sync_webhook():
+    """Trigger the PO sync webhook to update external panel"""
+    if not PO_SYNC_WEBHOOK_URL or not PO_SYNC_WEBHOOK_SECRET:
+        logger.warning("PO sync webhook not configured, skipping sync")
+        return False
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{PO_SYNC_WEBHOOK_URL}?secret={PO_SYNC_WEBHOOK_SECRET}"
+            )
+            if response.status_code == 200:
+                logger.info("PO sync webhook triggered successfully")
+                return True
+            else:
+                logger.error(f"PO sync webhook failed with status {response.status_code}: {response.text}")
+                return False
+    except Exception as e:
+        logger.error(f"PO sync webhook error: {e}")
+        return False
+
 # ========================
 # AUTH ENDPOINTS
 # ========================
