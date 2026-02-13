@@ -2860,6 +2860,31 @@ async def get_school_details(school_id: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=404, detail="School not found")
 
 # ========================
+# PO SYNC WEBHOOK TRIGGER (Manual)
+# ========================
+
+@api_router.post("/sync/trigger-po-webhook")
+async def manual_trigger_po_sync(current_user: dict = Depends(get_current_user)):
+    """Manually trigger PO sync webhook (Admin only)"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can trigger sync")
+    
+    success = await trigger_po_sync_webhook()
+    if success:
+        return {"message": "PO sync webhook triggered successfully", "status": "success"}
+    else:
+        return {"message": "PO sync webhook failed or not configured", "status": "failed"}
+
+@api_router.post("/sync/cron-trigger")
+async def cron_trigger_po_sync(secret: str = ""):
+    """Cron endpoint to trigger PO sync (requires secret)"""
+    if secret != PO_SYNC_WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid secret")
+    
+    success = await trigger_po_sync_webhook()
+    return {"triggered": success, "timestamp": datetime.now(timezone.utc).isoformat()}
+
+# ========================
 # EXTERNAL API (for other applications)
 # ========================
 
