@@ -1408,6 +1408,9 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
     await db.purchase_orders.update_one({"id": po_id}, {"$set": update_data})
     await create_audit_log("UPDATE_PO", "purchase_order", po_id, current_user, update_data)
     
+    # Trigger webhook to sync PO data to external panel
+    asyncio.create_task(trigger_po_sync_webhook())
+    
     updated = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
     vendor = await db.vendors.find_one({"id": updated["vendor_id"]}, {"_id": 0})
     updated["vendor_name"] = vendor.get("name") if vendor else None
