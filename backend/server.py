@@ -1038,6 +1038,9 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     await db.purchase_orders.insert_one(po_doc)
     await create_audit_log("CREATE_PO", "purchase_order", po_doc["id"], current_user, {"po_number": po_doc["po_number"], "status": initial_status})
     
+    # Trigger webhook to sync PO data to external panel
+    asyncio.create_task(trigger_po_sync_webhook())
+    
     po_doc["vendor_name"] = vendor.get("name")
     return POResponse(**po_doc)
 
