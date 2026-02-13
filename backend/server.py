@@ -15,6 +15,7 @@ import jwt
 import bcrypt
 import asyncio
 from io import BytesIO
+import httpx
 
 # PDF Generation imports
 from reportlab.lib.pagesizes import A4
