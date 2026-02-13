@@ -453,6 +453,16 @@ const PurchaseOrderForm = () => {
               </div>
 
               <div>
+                <Label className="form-label">School Name (Optional)</Label>
+                <Input
+                  value={formData.school_name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, school_name: e.target.value }))}
+                  placeholder="Enter school/institution name"
+                  data-testid="school-name-input"
+                />
+              </div>
+
+              <div>
                 <Label className="form-label">Delivery Address *</Label>
                 <Textarea
                   value={formData.delivery_address}
