@@ -1045,6 +1045,9 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
             p["delivery_date"] = ""
         if "receiver_name" not in p:
             p["receiver_name"] = None
+        # Add school_name if missing
+        if "school_name" not in p:
+            p["school_name"] = None
         # Add distributor fields if missing
         if "created_by_role" not in p:
             p["created_by_role"] = "oll"
@@ -1079,6 +1082,9 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
         po["delivery_date"] = ""
     if "receiver_name" not in po:
         po["receiver_name"] = None
+    # Add school_name if missing
+    if "school_name" not in po:
+        po["school_name"] = None
     # Add distributor fields if missing
     if "created_by_role" not in po:
         po["created_by_role"] = "oll"
