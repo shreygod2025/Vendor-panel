@@ -1677,6 +1677,9 @@ async def vendor_submit_delivery(po_id: str, delivery: VendorDeliverySubmit, cur
         "invoice_amount": delivery.invoice_amount
     })
     
+    # Trigger webhook to sync PO data
+    asyncio.create_task(trigger_po_sync_webhook())
+    
     return {"message": "Delivery submitted for approval", "invoice_id": invoice_doc["id"]}
 
 @api_router.post("/purchase-orders/{po_id}/approve-delivery")
@@ -1703,6 +1706,10 @@ async def approve_delivery(po_id: str, current_user: dict = Depends(get_current_
     )
     
     await create_audit_log("APPROVE_DELIVERY", "purchase_order", po_id, current_user)
+    
+    # Trigger webhook to sync PO data
+    asyncio.create_task(trigger_po_sync_webhook())
+    
     return {"message": "Delivery approved successfully"}
 
 @api_router.post("/purchase-orders/{po_id}/reject-delivery")
