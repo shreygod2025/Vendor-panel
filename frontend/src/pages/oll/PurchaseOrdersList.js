@@ -254,6 +254,21 @@ const PurchaseOrdersList = () => {
     }
   };
 
+  // TEMPORARY: Force delete for delivered POs (includes related invoices, payments, etc.)
+  const handleForceDeletePO = async (order) => {
+    if (!window.confirm(`⚠️ PERMANENT DELETE\n\nThis will delete PO ${order.po_number} and ALL related data:\n- Invoices\n- Payments\n- Dispatches\n- Issues\n\nThis cannot be undone. Continue?`)) {
+      return;
+    }
+    
+    try {
+      const response = await apiClient.delete(`/purchase-orders/${order.id}?force=true`);
+      toast.success(`Deleted PO and ${response.data.deleted_invoices || 0} invoices, ${response.data.deleted_payments || 0} payments`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to delete PO");
+    }
+  };
+
   const handleReRaisePO = async (orderId) => {
     try {
       await apiClient.put(`/purchase-orders/${orderId}`, { status: "sent" });
