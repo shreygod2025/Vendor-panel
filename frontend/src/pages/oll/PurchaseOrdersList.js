@@ -573,7 +573,7 @@ const PurchaseOrdersList = () => {
             <TableHead>Items</TableHead>
             <TableHead>Grand Total</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Date</TableHead>
+            <TableHead>Delivery Date</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
