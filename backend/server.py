@@ -2724,6 +2724,95 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
     return {"message": "User deleted successfully"}
 
 # ========================
+# SCHOOLS API (External)
+# ========================
+
+SCHOOLS_API_URL = os.environ.get('SCHOOLS_API_URL', '')
+SCHOOLS_API_KEY = os.environ.get('SCHOOLS_API_KEY', '')
+
+@api_router.get("/schools/search")
+async def search_schools(q: str = "", limit: int = 10, current_user: dict = Depends(get_current_user)):
+    """Search schools from external API and return suggestions"""
+    if not SCHOOLS_API_URL or not SCHOOLS_API_KEY:
+        raise HTTPException(status_code=500, detail="Schools API not configured")
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                SCHOOLS_API_URL,
+                params={"limit": limit},
+                headers={"X-API-Key": SCHOOLS_API_KEY}
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            schools = data.get("data", [])
+            
+            # Filter by search query if provided
+            if q:
+                q_lower = q.lower()
+                schools = [
+                    s for s in schools 
+                    if q_lower in s.get("school_name", "").lower()
+                ]
+            
+            # Transform to simpler format for frontend
+            results = []
+            for school in schools[:limit]:
+                results.append({
+                    "id": school.get("id"),
+                    "school_name": school.get("school_name", ""),
+                    "address": school.get("location", {}).get("address") or "",
+                    "city": school.get("location", {}).get("city") or "",
+                    "state": school.get("location", {}).get("state") or "",
+                    "contact_name": school.get("contact", {}).get("name") or "",
+                    "contact_phone": school.get("contact", {}).get("phone") or "",
+                    "contact_email": school.get("contact", {}).get("email") or "",
+                })
+            
+            return {"schools": results}
+            
+    except httpx.RequestError as e:
+        logger.error(f"Schools API request error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to connect to schools API")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Schools API status error: {e}")
+        raise HTTPException(status_code=500, detail="Schools API returned an error")
+
+@api_router.get("/schools/{school_id}")
+async def get_school_details(school_id: str, current_user: dict = Depends(get_current_user)):
+    """Get detailed school info by ID"""
+    if not SCHOOLS_API_URL or not SCHOOLS_API_KEY:
+        raise HTTPException(status_code=500, detail="Schools API not configured")
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{SCHOOLS_API_URL}/{school_id}",
+                headers={"X-API-Key": SCHOOLS_API_KEY}
+            )
+            response.raise_for_status()
+            school = response.json()
+            
+            return {
+                "id": school.get("id"),
+                "school_name": school.get("school_name", ""),
+                "address": school.get("location", {}).get("address") or "",
+                "city": school.get("location", {}).get("city") or "",
+                "state": school.get("location", {}).get("state") or "",
+                "contact_name": school.get("contact", {}).get("name") or "",
+                "contact_phone": school.get("contact", {}).get("phone") or "",
+                "contact_email": school.get("contact", {}).get("email") or "",
+            }
+            
+    except httpx.RequestError as e:
+        logger.error(f"Schools API request error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to connect to schools API")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Schools API status error: {e}")
+        raise HTTPException(status_code=404, detail="School not found")
+
+# ========================
 # SEED DATA
 # ========================
 
