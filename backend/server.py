@@ -1503,6 +1503,10 @@ async def confirm_po(po_id: str, current_user: dict = Depends(get_current_user))
     )
     
     await create_audit_log("CONFIRM_PO", "purchase_order", po_id, current_user)
+    
+    # Trigger webhook to sync PO data
+    asyncio.create_task(trigger_po_sync_webhook())
+    
     return {"message": "PO confirmed successfully"}
 
 @api_router.post("/purchase-orders/{po_id}/reject")
@@ -1527,6 +1531,10 @@ async def reject_po(po_id: str, reason: Optional[str] = None, current_user: dict
     )
     
     await create_audit_log("REJECT_PO", "purchase_order", po_id, current_user, {"reason": reason})
+    
+    # Trigger webhook to sync PO data
+    asyncio.create_task(trigger_po_sync_webhook())
+    
     return {"message": "PO rejected"}
 
 @api_router.post("/purchase-orders/{po_id}/deliver")
