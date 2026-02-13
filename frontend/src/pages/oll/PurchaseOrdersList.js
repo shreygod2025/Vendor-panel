@@ -870,36 +870,236 @@ const PurchaseOrdersList = () => {
         )}
       </div>
 
-      {/* Approve Delivery Dialog */}
-      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
-        <DialogContent>
+      {/* Approve Delivery Dialog - Enhanced */}
+      <Dialog open={approvalDialogOpen} onOpenChange={(open) => {
+        setApprovalDialogOpen(open);
+        if (!open) {
+          setApprovalConfirmed(false);
+          setSelectedPOInvoice(null);
+        }
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-emerald-600" />
-              Approve Delivery
+              Approve Delivery - {selectedPO?.po_number}
             </DialogTitle>
             <DialogDescription>
-              Approve the delivery for PO {selectedPO?.po_number}? This will mark the order as delivered.
+              Review all details before approving this delivery.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <p className="text-sm text-emerald-800">
-                <strong>Vendor:</strong> {selectedPO?.vendor_name}<br />
-                <strong>Items:</strong> {selectedPO?.line_items?.length || 0} items<br />
-                <strong>Total:</strong> {formatCurrency(selectedPO?.grand_total || 0)}
-              </p>
+          
+          <div className="space-y-4 py-4">
+            {/* Vendor & School Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-500 mb-1">Vendor</p>
+                <p className="font-medium">{selectedPO?.vendor_name}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-500 mb-1">School</p>
+                <p className="font-medium">{selectedPO?.school_name || "-"}</p>
+              </div>
+            </div>
+
+            {/* Financial Comparison Table */}
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="text-left p-3 font-medium">Description</th>
+                    <th className="text-right p-3 font-medium">PO Amount</th>
+                    <th className="text-right p-3 font-medium">Invoice Amount</th>
+                    <th className="text-right p-3 font-medium">Difference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Subtotal/Base Amount */}
+                  <tr className="border-t">
+                    <td className="p-3">Subtotal (Before Tax)</td>
+                    <td className="p-3 text-right font-mono">{formatCurrency(selectedPO?.subtotal || 0)}</td>
+                    <td className="p-3 text-right font-mono">
+                      {formatCurrency((selectedPOInvoice?.amount || 0) / 1.18)}
+                    </td>
+                    <td className="p-3 text-right font-mono">
+                      {(() => {
+                        const poSubtotal = selectedPO?.subtotal || 0;
+                        const invSubtotal = (selectedPOInvoice?.amount || 0) / 1.18;
+                        const diff = invSubtotal - poSubtotal;
+                        return (
+                          <span className={diff !== 0 ? (diff > 0 ? "text-red-600" : "text-green-600") : ""}>
+                            {diff !== 0 ? (diff > 0 ? "+" : "") + formatCurrency(diff) : "-"}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                  </tr>
+                  
+                  {/* GST on PO vs Invoice */}
+                  <tr className="border-t">
+                    <td className="p-3">GST (18%)</td>
+                    <td className="p-3 text-right font-mono">{formatCurrency(selectedPO?.total_tax || 0)}</td>
+                    <td className="p-3 text-right font-mono">
+                      {formatCurrency((selectedPOInvoice?.amount || 0) - (selectedPOInvoice?.amount || 0) / 1.18)}
+                    </td>
+                    <td className="p-3 text-right font-mono">
+                      {(() => {
+                        const poTax = selectedPO?.total_tax || 0;
+                        const invTax = (selectedPOInvoice?.amount || 0) - (selectedPOInvoice?.amount || 0) / 1.18;
+                        const diff = invTax - poTax;
+                        return (
+                          <span className={diff !== 0 ? (diff > 0 ? "text-red-600" : "text-green-600") : ""}>
+                            {diff !== 0 ? (diff > 0 ? "+" : "") + formatCurrency(diff) : "-"}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                  </tr>
+
+                  {/* Total Amount */}
+                  <tr className="border-t bg-blue-50">
+                    <td className="p-3 font-medium">Total Amount</td>
+                    <td className="p-3 text-right font-mono font-medium">{formatCurrency(selectedPO?.grand_total || 0)}</td>
+                    <td className="p-3 text-right font-mono font-medium">{formatCurrency(selectedPOInvoice?.amount || 0)}</td>
+                    <td className="p-3 text-right font-mono font-medium">
+                      {(() => {
+                        const poTotal = selectedPO?.grand_total || 0;
+                        const invTotal = selectedPOInvoice?.amount || 0;
+                        const diff = invTotal - poTotal;
+                        return (
+                          <span className={diff !== 0 ? (diff > 0 ? "text-red-600" : "text-green-600") : ""}>
+                            {diff !== 0 ? (diff > 0 ? "+" : "") + formatCurrency(diff) : "-"}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                  </tr>
+
+                  {/* Logistics Cost */}
+                  <tr className="border-t">
+                    <td className="p-3">Logistics Cost</td>
+                    <td className="p-3 text-right font-mono text-slate-400">N/A</td>
+                    <td className="p-3 text-right font-mono">{formatCurrency(selectedPOInvoice?.logistics_cost || 0)}</td>
+                    <td className="p-3 text-right font-mono">-</td>
+                  </tr>
+
+                  {/* GST on Logistics */}
+                  <tr className="border-t">
+                    <td className="p-3">GST on Logistics (18%)</td>
+                    <td className="p-3 text-right font-mono text-slate-400">N/A</td>
+                    <td className="p-3 text-right font-mono">
+                      {formatCurrency((selectedPOInvoice?.logistics_cost || 0) * 0.18)}
+                    </td>
+                    <td className="p-3 text-right font-mono">-</td>
+                  </tr>
+
+                  {/* Final Payable */}
+                  <tr className="border-t-2 border-slate-300 bg-emerald-50">
+                    <td className="p-3 font-bold text-emerald-800">Final Payable Total</td>
+                    <td className="p-3 text-right font-mono text-slate-400">-</td>
+                    <td className="p-3 text-right font-mono font-bold text-emerald-800">
+                      {formatCurrency(
+                        (selectedPOInvoice?.amount || 0) + 
+                        (selectedPOInvoice?.logistics_cost || 0) * 1.18
+                      )}
+                    </td>
+                    <td className="p-3 text-right font-mono">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Document Previews */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-slate-700">Document Previews</p>
+              <div className="grid grid-cols-3 gap-3">
+                {/* PO PDF Preview */}
+                <div className="border rounded-lg p-3 bg-slate-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium">PO Document</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => window.open(`${process.env.REACT_APP_BACKEND_URL}/api/purchase-orders/${selectedPO?.id}/pdf`, '_blank')}
+                  >
+                    <Eye className="w-3 h-3 mr-1" /> View PO
+                  </Button>
+                </div>
+
+                {/* Invoice Preview */}
+                <div className="border rounded-lg p-3 bg-slate-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Receipt className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium">Invoice</span>
+                  </div>
+                  {selectedPOInvoice?.file_url || selectedPOInvoice?.invoice_url ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => window.open(selectedPOInvoice?.file_url || selectedPOInvoice?.invoice_url, '_blank')}
+                    >
+                      <Eye className="w-3 h-3 mr-1" /> View Invoice
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-slate-400 text-center py-1">Not uploaded</p>
+                  )}
+                </div>
+
+                {/* Logistics Bill Preview */}
+                <div className="border rounded-lg p-3 bg-slate-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Truck className="w-4 h-4 text-orange-600" />
+                    <span className="text-sm font-medium">Logistics Bill</span>
+                  </div>
+                  {selectedPOInvoice?.logistics_bill_url ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => window.open(selectedPOInvoice?.logistics_bill_url, '_blank')}
+                    >
+                      <Eye className="w-3 h-3 mr-1" /> View Bill
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-slate-400 text-center py-1">Not uploaded</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Confirmation Checkbox */}
+            <div className="flex items-start gap-3 p-4 border-2 border-emerald-200 bg-emerald-50 rounded-lg">
+              <input
+                type="checkbox"
+                id="approval-confirm"
+                checked={approvalConfirmed}
+                onChange={(e) => setApprovalConfirmed(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <label htmlFor="approval-confirm" className="text-sm text-emerald-800">
+                <span className="font-medium">I confirm that I have reviewed all documents and financial details.</span>
+                <br />
+                <span className="text-emerald-600">I approve this delivery and acknowledge the final payable amount of {formatCurrency(
+                  (selectedPOInvoice?.amount || 0) + 
+                  (selectedPOInvoice?.logistics_cost || 0) * 1.18
+                )}.</span>
+              </label>
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setApprovalDialogOpen(false)}>Cancel</Button>
             <Button 
               onClick={handleApproveDelivery}
-              disabled={approving}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={approving || !approvalConfirmed}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
             >
               {approving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-              Approve
+              Approve Delivery
             </Button>
           </DialogFooter>
         </DialogContent>
