@@ -189,6 +189,10 @@ const PurchaseOrderForm = () => {
           final_comments: poRes.data.final_comments || "",
           line_items: poRes.data.line_items
         });
+        // Set school search query for editing
+        if (poRes.data.school_name) {
+          setSchoolSearchQuery(poRes.data.school_name);
+        }
       }
     } catch (error) {
       toast.error("Failed to fetch data");
