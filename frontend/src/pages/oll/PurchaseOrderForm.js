@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../../App";
 import { Button } from "../../components/ui/button";
@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table";
-import { ArrowLeft, Save, Loader2, Plus, Trash2, Package, MapPin } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Package, MapPin, Search, Building2 } from "lucide-react";
 import { toast } from "sonner";
 
 const PurchaseOrderForm = () => {
