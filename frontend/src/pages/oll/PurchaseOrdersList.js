@@ -520,6 +520,10 @@ const PurchaseOrdersList = () => {
                   size="sm"
                   onClick={() => {
                     setSelectedPO(order);
+                    // Find the invoice for this PO
+                    const poInvoice = invoices.find(inv => inv.po_id === order.id);
+                    setSelectedPOInvoice(poInvoice || null);
+                    setApprovalConfirmed(false);
                     setApprovalDialogOpen(true);
                   }}
                   className="text-emerald-600 hover:bg-emerald-50"
