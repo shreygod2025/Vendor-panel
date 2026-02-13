@@ -25,6 +25,7 @@ const OLLDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    document.title = "OLL - Dashboard";
     fetchStats();
   }, []);
 
