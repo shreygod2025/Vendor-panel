@@ -2813,6 +2813,243 @@ async def get_school_details(school_id: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=404, detail="School not found")
 
 # ========================
+# EXTERNAL API (for other applications)
+# ========================
+
+# External API Key for third-party access
+EXTERNAL_API_KEY = os.environ.get('EXTERNAL_API_KEY', '')
+
+async def verify_external_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
+    """Verify external API key for third-party applications"""
+    if not EXTERNAL_API_KEY:
+        raise HTTPException(status_code=500, detail="External API not configured")
+    if not x_api_key or x_api_key != EXTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return True
+
+class ExternalPOResponse(BaseModel):
+    """Response model for external PO API"""
+    po_id: str
+    po_number: str
+    status: str
+    created_at: str
+    updated_at: str
+    
+    # School/Delivery Details
+    school_name: Optional[str] = None
+    delivery_address: str
+    contact_person: str
+    contact_number: str
+    delivery_date: Optional[str] = None
+    
+    # Vendor Info
+    vendor_id: str
+    vendor_name: Optional[str] = None
+    
+    # Order Totals
+    subtotal: float
+    total_discount: float
+    total_tax: float
+    grand_total: float
+    
+    # Dispatch Details
+    dispatch_info: Optional[Dict] = None
+    tracking_link: Optional[str] = None
+    
+    # Invoice Details
+    invoice_info: Optional[Dict] = None
+    
+    # Public tracking URL
+    public_tracking_url: Optional[str] = None
+
+@api_router.get("/external/po/{po_number}", response_model=ExternalPOResponse)
+async def get_po_external(po_number: str, _: bool = Depends(verify_external_api_key)):
+    """
+    External API to get PO details by PO number.
+    
+    Use this endpoint from other applications to fetch:
+    - PO status and dates
+    - School/contact details
+    - Tracking link and dispatch info
+    - Invoice amount and status
+    - Logistics cost
+    
+    Authentication: Requires X-API-Key header
+    """
+    # Find PO by po_number
+    po = await db.purchase_orders.find_one({"po_number": po_number.upper()}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail=f"Purchase order '{po_number}' not found")
+    
+    # Get vendor details
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    vendor_name = vendor.get("name") if vendor else None
+    
+    # Get dispatch details
+    dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
+    dispatch_info = None
+    tracking_link = None
+    if dispatch:
+        dispatch_info = {
+            "courier_partner": dispatch.get("courier_partner"),
+            "tracking_id": dispatch.get("tracking_id"),
+            "tracking_url": dispatch.get("tracking_url"),
+            "dispatch_date": dispatch.get("dispatch_date"),
+            "expected_delivery_date": dispatch.get("expected_delivery_date"),
+            "proof_url": dispatch.get("proof_url"),
+            "notes": dispatch.get("notes")
+        }
+        tracking_link = dispatch.get("tracking_url")
+    
+    # Get invoice details
+    invoice = await db.invoices.find_one({"po_id": po["id"]}, {"_id": 0})
+    invoice_info = None
+    if invoice:
+        invoice_info = {
+            "invoice_number": invoice.get("invoice_number"),
+            "invoice_date": invoice.get("invoice_date"),
+            "invoice_amount": invoice.get("amount", 0),
+            "logistics_cost": invoice.get("logistics_cost", 0),
+            "total_amount": (invoice.get("amount", 0) + invoice.get("logistics_cost", 0)),
+            "paid_amount": invoice.get("paid_amount", 0),
+            "payment_status": invoice.get("payment_status", "pending"),
+            "due_date": invoice.get("due_date"),
+            "invoice_url": invoice.get("file_url") or invoice.get("invoice_url"),
+            "logistics_bill_url": invoice.get("logistics_bill_url"),
+            "delivery_proof_url": invoice.get("delivery_proof_url")
+        }
+    
+    # Build public tracking URL
+    app_base_url = os.environ.get('APP_BASE_URL', '')
+    public_tracking_url = f"{app_base_url}/track/{po.get('tracking_token')}" if app_base_url and po.get('tracking_token') else None
+    
+    return ExternalPOResponse(
+        po_id=po["id"],
+        po_number=po["po_number"],
+        status=po["status"],
+        created_at=po["created_at"],
+        updated_at=po["updated_at"],
+        school_name=po.get("school_name"),
+        delivery_address=po["delivery_address"],
+        contact_person=po["contact_person"],
+        contact_number=po["contact_number"],
+        delivery_date=po.get("delivery_date"),
+        vendor_id=po["vendor_id"],
+        vendor_name=vendor_name,
+        subtotal=po.get("subtotal", 0),
+        total_discount=po.get("total_discount", 0),
+        total_tax=po.get("total_tax", 0),
+        grand_total=po.get("grand_total", 0),
+        dispatch_info=dispatch_info,
+        tracking_link=tracking_link,
+        invoice_info=invoice_info,
+        public_tracking_url=public_tracking_url
+    )
+
+@api_router.get("/external/po")
+async def list_pos_external(
+    status: Optional[str] = None,
+    vendor_id: Optional[str] = None,
+    school_name: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    _: bool = Depends(verify_external_api_key)
+):
+    """
+    External API to list POs with filters.
+    
+    Query Parameters:
+    - status: Filter by PO status (sent, confirmed, dispatched, delivered, etc.)
+    - vendor_id: Filter by vendor ID
+    - school_name: Filter by school name (partial match)
+    - from_date: Filter POs created on or after this date (YYYY-MM-DD)
+    - to_date: Filter POs created on or before this date (YYYY-MM-DD)
+    - limit: Maximum number of results (default: 50, max: 100)
+    - offset: Pagination offset
+    
+    Authentication: Requires X-API-Key header
+    """
+    query = {}
+    
+    if status:
+        query["status"] = status
+    if vendor_id:
+        query["vendor_id"] = vendor_id
+    if school_name:
+        query["school_name"] = {"$regex": school_name, "$options": "i"}
+    if from_date:
+        query["created_at"] = {"$gte": from_date}
+    if to_date:
+        if "created_at" in query:
+            query["created_at"]["$lte"] = to_date + "T23:59:59"
+        else:
+            query["created_at"] = {"$lte": to_date + "T23:59:59"}
+    
+    # Enforce max limit
+    limit = min(limit, 100)
+    
+    # Get total count
+    total = await db.purchase_orders.count_documents(query)
+    
+    # Get POs
+    pos = await db.purchase_orders.find(query, {"_id": 0}).sort("created_at", -1).skip(offset).limit(limit).to_list(limit)
+    
+    # Get vendor names
+    vendor_ids = list(set(p["vendor_id"] for p in pos))
+    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
+    vendor_map = {v["id"]: v["name"] for v in vendors}
+    
+    # Build response
+    results = []
+    for po in pos:
+        results.append({
+            "po_id": po["id"],
+            "po_number": po["po_number"],
+            "status": po["status"],
+            "school_name": po.get("school_name"),
+            "vendor_name": vendor_map.get(po["vendor_id"]),
+            "grand_total": po.get("grand_total", 0),
+            "delivery_date": po.get("delivery_date"),
+            "created_at": po["created_at"],
+            "contact_person": po["contact_person"],
+            "contact_number": po["contact_number"]
+        })
+    
+    return {
+        "data": results,
+        "pagination": {
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total
+        }
+    }
+
+@api_router.get("/external/po/{po_number}/line-items")
+async def get_po_line_items_external(po_number: str, _: bool = Depends(verify_external_api_key)):
+    """
+    External API to get PO line items (products ordered).
+    
+    Returns detailed list of products with quantities and prices.
+    
+    Authentication: Requires X-API-Key header
+    """
+    po = await db.purchase_orders.find_one({"po_number": po_number.upper()}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail=f"Purchase order '{po_number}' not found")
+    
+    return {
+        "po_number": po["po_number"],
+        "line_items": po.get("line_items", []),
+        "subtotal": po.get("subtotal", 0),
+        "total_discount": po.get("total_discount", 0),
+        "total_tax": po.get("total_tax", 0),
+        "grand_total": po.get("grand_total", 0)
+    }
+
+# ========================
 # SEED DATA
 # ========================
 
