@@ -25,7 +25,7 @@ import axios from "axios";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
-const OLL_LOGO = "https://customer-assets.emergentagent.com/job_vendormate-20/artifacts/ze7saivu_OLL-horizontal-logo-1.png";
+const OLL_LOGO = "https://customer-assets.emergentagent.com/job_1abb6756-ee51-414a-aff6-9c61f26a1a75/artifacts/23infxd1_Logo.png";
 
 const PublicTracking = () => {
   const { trackingToken } = useParams();
@@ -34,6 +34,7 @@ const PublicTracking = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    document.title = "OLL - Order Tracking";
     fetchTrackingData();
   }, [trackingToken]);
 
@@ -41,6 +42,10 @@ const PublicTracking = () => {
     try {
       const response = await axios.get(`${API}/track/${trackingToken}`);
       setData(response.data);
+      // Update title with PO number when loaded
+      if (response.data?.po_number) {
+        document.title = `OLL - Track ${response.data.po_number}`;
+      }
     } catch (err) {
       setError("Order not found or tracking link is invalid");
     } finally {
