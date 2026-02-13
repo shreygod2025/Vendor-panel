@@ -386,8 +386,12 @@ class InvoiceResponse(BaseModel):
     amount: float
     paid_amount: float = 0
     payment_status: str = "pending"
-    file_url: Optional[str]
-    notes: Optional[str]
+    file_url: Optional[str] = None
+    invoice_url: Optional[str] = None
+    logistics_cost: Optional[float] = 0
+    logistics_bill_url: Optional[str] = None
+    delivery_proof_url: Optional[str] = None
+    notes: Optional[str] = None
     created_at: str
     created_by: str
 
