@@ -665,6 +665,13 @@ const PurchaseOrdersList = () => {
                           Create Return
                         </Link>
                       </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleForceDeletePO(order)}
+                        className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete PO & Data
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
