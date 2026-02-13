@@ -26,6 +26,7 @@ const VendorDashboard = () => {
   const [earnings, setEarnings] = useState({ total: 0, paid: 0, pending: 0 });
 
   useEffect(() => {
+    document.title = "OLL - Vendor Dashboard";
     fetchData();
   }, []);
 
