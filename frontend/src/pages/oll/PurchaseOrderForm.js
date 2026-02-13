@@ -88,7 +88,7 @@ const PurchaseOrderForm = () => {
     
     setLoadingSchools(true);
     try {
-      const response = await apiClient.get(`/schools/search?q=${encodeURIComponent(query)}&limit=10`);
+      const response = await apiClient.get(`/schools/search?q=${encodeURIComponent(query)}&limit=20`);
       setSchoolSuggestions(response.data.schools || []);
     } catch (error) {
       console.error("Failed to search schools:", error);
