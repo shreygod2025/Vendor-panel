@@ -2897,19 +2897,125 @@ async def cron_trigger_po_sync(secret: str = ""):
     return {"triggered": success, "timestamp": datetime.now(timezone.utc).isoformat()}
 
 # ========================
+# API KEY MANAGEMENT
+# ========================
+
+import secrets
+
+class APIKeyCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class APIKeyResponse(BaseModel):
+    id: str
+    name: str
+    key_prefix: str
+    description: Optional[str] = None
+    is_active: bool
+    created_at: str
+    created_by: str
+    last_used_at: Optional[str] = None
+
+@api_router.post("/api-keys")
+async def create_api_key(key_data: APIKeyCreate, current_user: dict = Depends(get_current_user)):
+    """Generate a new API key (Admin only)"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL admin can manage API keys")
+    
+    # Generate a secure API key
+    raw_key = f"oll_ext_{secrets.token_urlsafe(32)}"
+    key_prefix = raw_key[:16] + "..."
+    
+    api_key_doc = {
+        "id": str(uuid.uuid4()),
+        "name": key_data.name,
+        "description": key_data.description,
+        "key": raw_key,  # Store the full key (in production, you might hash this)
+        "key_prefix": key_prefix,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_user["user_id"],
+        "created_by_name": current_user.get("username", "Unknown"),
+        "last_used_at": None
+    }
+    
+    await db.api_keys.insert_one(api_key_doc)
+    
+    # Return the full key only once during creation
+    return {
+        "id": api_key_doc["id"],
+        "name": api_key_doc["name"],
+        "key": raw_key,  # Full key shown only on creation
+        "key_prefix": key_prefix,
+        "description": api_key_doc["description"],
+        "is_active": True,
+        "created_at": api_key_doc["created_at"],
+        "message": "Save this key securely - it won't be shown again!"
+    }
+
+@api_router.get("/api-keys")
+async def list_api_keys(current_user: dict = Depends(get_current_user)):
+    """List all API keys (Admin only)"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL admin can view API keys")
+    
+    keys = await db.api_keys.find({}, {"_id": 0, "key": 0}).sort("created_at", -1).to_list(100)
+    return keys
+
+@api_router.patch("/api-keys/{key_id}/toggle")
+async def toggle_api_key(key_id: str, current_user: dict = Depends(get_current_user)):
+    """Enable or disable an API key (Admin only)"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL admin can manage API keys")
+    
+    key = await db.api_keys.find_one({"id": key_id})
+    if not key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    
+    new_status = not key.get("is_active", True)
+    await db.api_keys.update_one({"id": key_id}, {"$set": {"is_active": new_status}})
+    
+    return {"id": key_id, "is_active": new_status, "message": f"API key {'enabled' if new_status else 'disabled'}"}
+
+@api_router.delete("/api-keys/{key_id}")
+async def delete_api_key(key_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an API key (Admin only)"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL admin can manage API keys")
+    
+    result = await db.api_keys.delete_one({"id": key_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="API key not found")
+    
+    return {"message": "API key deleted successfully"}
+
+# ========================
 # EXTERNAL API (for other applications)
 # ========================
 
-# External API Key for third-party access
+# External API Key for third-party access (fallback to env var)
 EXTERNAL_API_KEY = os.environ.get('EXTERNAL_API_KEY', '')
 
 async def verify_external_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
     """Verify external API key for third-party applications"""
-    if not EXTERNAL_API_KEY:
-        raise HTTPException(status_code=500, detail="External API not configured")
-    if not x_api_key or x_api_key != EXTERNAL_API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-    return True
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API key required. Use X-API-Key header.")
+    
+    # First check database for active keys
+    db_key = await db.api_keys.find_one({"key": x_api_key, "is_active": True})
+    if db_key:
+        # Update last used timestamp
+        await db.api_keys.update_one(
+            {"id": db_key["id"]}, 
+            {"$set": {"last_used_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return True
+    
+    # Fallback to environment variable key
+    if EXTERNAL_API_KEY and x_api_key == EXTERNAL_API_KEY:
+        return True
+    
+    raise HTTPException(status_code=401, detail="Invalid or inactive API key")
 
 class ExternalPOResponse(BaseModel):
     """Response model for external PO API"""
