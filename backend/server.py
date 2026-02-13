@@ -2933,6 +2933,12 @@ class ExternalPOResponse(BaseModel):
     
     # Public tracking URL
     public_tracking_url: Optional[str] = None
+    
+    # File URLs
+    po_pdf_url: Optional[str] = None
+    invoice_file_url: Optional[str] = None
+    logistics_bill_url: Optional[str] = None
+    delivery_proof_url: Optional[str] = None
 
 @api_router.get("/external/po/{po_number}", response_model=ExternalPOResponse)
 async def get_po_external(po_number: str, _: bool = Depends(verify_external_api_key)):
