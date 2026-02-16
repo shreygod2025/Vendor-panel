@@ -4024,7 +4024,7 @@ async def integration_raise_po(
     })
     
     # Build tracking URL (base URL from environment or default)
-    base_url = os.environ.get('APP_BASE_URL', 'https://procureway.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://oll-returns-hub.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{tracking_token}"
     
     return IntegrationPOResponse(
@@ -4075,7 +4075,7 @@ async def integration_get_tracking(
     # Get dispatch info if available
     dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://procureway.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://oll-returns-hub.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{po['tracking_token']}"
     
     return TrackingLinkResponse(
@@ -4113,7 +4113,7 @@ async def integration_get_bulk_tracking(
     results = []
     errors = []
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://procureway.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://oll-returns-hub.preview.emergentagent.com')
     
     # Search by PO IDs
     if request.po_ids:
