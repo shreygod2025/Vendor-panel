@@ -369,6 +369,8 @@ const InvoicesList = () => {
                   <TableHead>Vendor</TableHead>
                   <TableHead>Invoice Date</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>Logistics</TableHead>
+                  <TableHead>Total</TableHead>
                   <TableHead>Paid</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Timeline</TableHead>
@@ -380,14 +382,22 @@ const InvoicesList = () => {
                   const statusInfo = getInvoiceStatus(invoice);
                   const daysRemaining = getDaysRemaining(invoice);
                   const paidAmount = invoice.paid_amount || 0;
+                  const logisticsCost = invoice.logistics_cost || 0;
+                  const totalAmount = invoice.amount + logisticsCost;
                   
                   return (
                     <TableRow key={invoice.id}>
                       <TableCell className="font-mono font-medium">{invoice.invoice_number}</TableCell>
-                      <TableCell className="font-mono text-sm">{invoice.po_number || invoice.po_id?.slice(0, 8) + "..."}</TableCell>
+                      <TableCell>
+                        <Link to={`/oll/purchase-orders/${invoice.po_id}`} className="font-mono text-sm text-blue-600 hover:underline">
+                          {invoice.po_number || invoice.po_id?.slice(0, 8) + "..."}
+                        </Link>
+                      </TableCell>
                       <TableCell>{invoice.vendor_name || "-"}</TableCell>
                       <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
-                      <TableCell className="font-mono font-medium">{formatCurrency(invoice.amount)}</TableCell>
+                      <TableCell className="font-mono">{formatCurrency(invoice.amount)}</TableCell>
+                      <TableCell className="font-mono text-orange-600">{logisticsCost > 0 ? formatCurrency(logisticsCost) : "-"}</TableCell>
+                      <TableCell className="font-mono font-medium">{formatCurrency(totalAmount)}</TableCell>
                       <TableCell className="font-mono">{formatCurrency(paidAmount)}</TableCell>
                       <TableCell>
                         <span className={`badge ${statusInfo.color}`}>
