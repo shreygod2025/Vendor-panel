@@ -116,11 +116,25 @@ Build a Vendor Management System for OLL organization with the following capabil
 - `GET /api/issues?po_id={id}` - Get issues for a PO
 - `POST /api/issues/{id}/reply` - Add reply to issue
 - `GET /api/track/{token}` - Public tracking
+- **Returns API**:
+  - `GET /api/returns` - List all returns (filtered by role)
+  - `POST /api/returns` - Create return (OLL only, requires return_proof_url)
+  - `POST /api/returns/{id}/confirm` - Vendor confirms with credit note
+  - `POST /api/returns/{id}/reject` - Vendor rejects with reason
+  - `DELETE /api/returns/{id}` - Delete return (OLL only)
 
 ## Database Schema Updates
 - **PurchaseOrder**: Added `custom_po_number`, `school_name` fields
 - **Issue**: Added `attachment_url`, `replies[]`, `created_by_name`, `created_by_role`
 - **IssueReply**: `id`, `message`, `attachment_url`, `created_by`, `created_by_name`, `created_by_role`, `created_at`
+- **Return** (Enhanced):
+  - `return_number`, `po_id`, `vendor_id`
+  - `items[]` - with `product_id`, `product_name`, `quantity`, `original_price`, `deduction_amount`, `deduction_reason`, `reason`
+  - `total_value`, `total_deductions`, `credit_amount`
+  - `status` - "sent", "confirmed", "rejected"
+  - `return_proof_url` (mandatory)
+  - `credit_note_number`, `credit_note_url`, `credit_note_date`
+  - `rejection_reason`
 
 ## Environment Variables
 - `MONGO_URL` - MongoDB connection string
@@ -135,9 +149,8 @@ Build a Vendor Management System for OLL organization with the following capabil
 
 ## Pending Tasks
 
-### P0 - Critical (From Previous Session)
-1. ~~Product Import Feature~~ - **FIXED** ✅
-2. ~~Distributor Role Bugs~~ - Needs security audit
+### P0 - Critical
+1. ~~Distributor Role Security Bugs~~ - Needs security audit (Role-based access control for distributor)
 
 ### P1 - High Priority
 1. Verify PO PDF company details are correct
@@ -154,6 +167,7 @@ Build a Vendor Management System for OLL organization with the following capabil
 - External Schools API may return empty address fields for some schools
 
 ## Changelog
+- Feb 16, 2025: **Enhanced Returns Feature** - Complete overhaul with mandatory return proof upload, item-level costing from PO, deduction amounts with reasons, status tracking (sent/confirmed/rejected), vendor confirm/reject flow with credit note integration
 - Feb 13, 2025: **School Search Integration** - Added external Schools API integration with search suggestions and auto-fill for PO form (school_name, contact_person, contact_number, delivery_address)
 - Feb 12, 2025: Issues system with replies, Custom PO Number, Vendor UI improvements
 - Feb 12, 2025: **Product Import feature fixed** - Bulk import via CSV/XLSX with vendor name mapping, SKU duplicate check, error handling
