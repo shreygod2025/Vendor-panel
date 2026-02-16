@@ -423,6 +423,9 @@ class ReturnItemCreate(BaseModel):
     product_name: str
     quantity: int
     unit_price: float
+    original_price: float = 0  # Original price from PO
+    deduction_amount: float = 0  # Deduction from original
+    deduction_reason: Optional[str] = None
     reason: str
 
 class ReturnCreate(BaseModel):
@@ -430,6 +433,7 @@ class ReturnCreate(BaseModel):
     vendor_id: str
     items: List[ReturnItemCreate]
     notes: Optional[str] = None
+    return_proof_url: str  # Compulsory proof upload
 
 class ReturnResponse(BaseModel):
     id: str
@@ -440,13 +444,25 @@ class ReturnResponse(BaseModel):
     vendor_name: Optional[str] = None
     items: List[Dict]
     total_value: float
-    status: str
-    credit_note_number: Optional[str]
-    credit_note_date: Optional[str]
-    notes: Optional[str]
+    total_deductions: float = 0
+    credit_amount: float = 0  # Final credit amount after deductions
+    status: str  # sent, confirmed, rejected
+    return_proof_url: Optional[str] = None
+    credit_note_number: Optional[str] = None
+    credit_note_url: Optional[str] = None
+    credit_note_date: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    notes: Optional[str] = None
     created_at: str
     updated_at: str
     created_by: str
+
+class ReturnConfirm(BaseModel):
+    credit_note_number: str
+    credit_note_url: str  # Upload credit note
+
+class ReturnReject(BaseModel):
+    rejection_reason: str
 
 # Audit Log
 class AuditLogResponse(BaseModel):
