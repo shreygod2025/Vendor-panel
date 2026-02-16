@@ -2469,11 +2469,10 @@ async def create_return(return_req: ReturnCreate, current_user: dict = Depends(g
     
     vendor = await db.vendors.find_one({"id": return_req.vendor_id}, {"_id": 0})
     
-    # Calculate total value
-    total_value = sum(item.quantity * item.unit_price for item in return_req.items)
-    
-    # Auto-generate credit note
-    credit_note_number = generate_credit_note_number()
+    # Calculate totals
+    total_value = sum(item.quantity * item.original_price for item in return_req.items)
+    total_deductions = sum(item.deduction_amount for item in return_req.items)
+    credit_amount = total_value - total_deductions
     
     return_doc = {
         "id": str(uuid.uuid4()),
@@ -2482,9 +2481,14 @@ async def create_return(return_req: ReturnCreate, current_user: dict = Depends(g
         "vendor_id": return_req.vendor_id,
         "items": [item.model_dump() for item in return_req.items],
         "total_value": total_value,
-        "status": "credit_issued",
-        "credit_note_number": credit_note_number,
-        "credit_note_date": datetime.now(timezone.utc).isoformat(),
+        "total_deductions": total_deductions,
+        "credit_amount": credit_amount,
+        "status": "sent",  # Initial status
+        "return_proof_url": return_req.return_proof_url,
+        "credit_note_number": None,
+        "credit_note_url": None,
+        "credit_note_date": None,
+        "rejection_reason": None,
         "notes": return_req.notes,
         "created_by": current_user["user_id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -2494,10 +2498,130 @@ async def create_return(return_req: ReturnCreate, current_user: dict = Depends(g
     await db.returns.insert_one(return_doc)
     await create_audit_log("CREATE_RETURN", "return", return_doc["id"], current_user, {"po_id": return_req.po_id})
     
+    # Trigger PO sync
+    asyncio.create_task(trigger_po_sync_webhook())
+    
     return_doc["vendor_name"] = vendor.get("name") if vendor else None
     return_doc["po_number"] = po["po_number"]
     
     return ReturnResponse(**return_doc)
+
+@api_router.post("/returns/{return_id}/confirm")
+async def confirm_return(return_id: str, confirm_data: ReturnConfirm, current_user: dict = Depends(get_current_user)):
+    """Vendor confirms the return and uploads credit note"""
+    if current_user.get("role") != "vendor":
+        raise HTTPException(status_code=403, detail="Only vendors can confirm returns")
+    
+    return_doc = await db.returns.find_one({"id": return_id}, {"_id": 0})
+    if not return_doc:
+        raise HTTPException(status_code=404, detail="Return not found")
+    
+    if current_user.get("vendor_id") != return_doc["vendor_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if return_doc["status"] != "sent":
+        raise HTTPException(status_code=400, detail="Return is not in sent status")
+    
+    # Update return with credit note
+    update_data = {
+        "status": "confirmed",
+        "credit_note_number": confirm_data.credit_note_number,
+        "credit_note_url": confirm_data.credit_note_url,
+        "credit_note_date": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.returns.update_one({"id": return_id}, {"$set": update_data})
+    
+    # Create a credit payment entry
+    payment_doc = {
+        "id": str(uuid.uuid4()),
+        "invoice_id": None,  # Credit note, not tied to specific invoice
+        "return_id": return_id,
+        "vendor_id": return_doc["vendor_id"],
+        "po_id": return_doc["po_id"],
+        "amount": -return_doc["credit_amount"],  # Negative for credit
+        "payment_type": "credit",
+        "payment_mode": "credit_note",
+        "reference_id": confirm_data.credit_note_number,
+        "payment_date": datetime.now(timezone.utc).isoformat()[:10],
+        "notes": f"Credit note for return {return_doc['return_number']}",
+        "created_by": current_user["user_id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.payments.insert_one(payment_doc)
+    await create_audit_log("CONFIRM_RETURN", "return", return_id, current_user, {"credit_note": confirm_data.credit_note_number})
+    
+    # Trigger PO sync
+    asyncio.create_task(trigger_po_sync_webhook())
+    
+    return {"message": "Return confirmed and credit note issued", "credit_note_number": confirm_data.credit_note_number}
+
+@api_router.post("/returns/{return_id}/reject")
+async def reject_return(return_id: str, reject_data: ReturnReject, current_user: dict = Depends(get_current_user)):
+    """Vendor rejects the return with reason"""
+    if current_user.get("role") != "vendor":
+        raise HTTPException(status_code=403, detail="Only vendors can reject returns")
+    
+    return_doc = await db.returns.find_one({"id": return_id}, {"_id": 0})
+    if not return_doc:
+        raise HTTPException(status_code=404, detail="Return not found")
+    
+    if current_user.get("vendor_id") != return_doc["vendor_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if return_doc["status"] != "sent":
+        raise HTTPException(status_code=400, detail="Return is not in sent status")
+    
+    await db.returns.update_one(
+        {"id": return_id},
+        {"$set": {
+            "status": "rejected",
+            "rejection_reason": reject_data.rejection_reason,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await create_audit_log("REJECT_RETURN", "return", return_id, current_user, {"reason": reject_data.rejection_reason})
+    
+    return {"message": "Return rejected", "reason": reject_data.rejection_reason}
+
+@api_router.get("/credit-notes")
+async def get_credit_notes(current_user: dict = Depends(get_current_user)):
+    """Get all confirmed returns as credit notes"""
+    query = {"status": "confirmed"}
+    
+    if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
+        query["vendor_id"] = current_user["vendor_id"]
+    
+    returns = await db.returns.find(query, {"_id": 0}).sort("credit_note_date", -1).to_list(1000)
+    
+    # Get vendor and PO info
+    vendor_ids = list(set(r["vendor_id"] for r in returns))
+    po_ids = list(set(r["po_id"] for r in returns))
+    
+    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
+    pos = await db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0}).to_list(1000)
+    
+    vendor_map = {v["id"]: v["name"] for v in vendors}
+    po_map = {p["id"]: p["po_number"] for p in pos}
+    
+    result = []
+    for r in returns:
+        result.append({
+            "id": r["id"],
+            "credit_note_number": r.get("credit_note_number"),
+            "credit_note_date": r.get("credit_note_date"),
+            "credit_note_url": r.get("credit_note_url"),
+            "return_number": r["return_number"],
+            "po_number": po_map.get(r["po_id"]),
+            "vendor_name": vendor_map.get(r["vendor_id"]),
+            "credit_amount": r.get("credit_amount", r.get("total_value", 0)),
+            "items_count": len(r.get("items", []))
+        })
+    
+    return result
 
 @api_router.get("/returns", response_model=List[ReturnResponse])
 async def get_returns(vendor_id: Optional[str] = None, status: Optional[str] = None, current_user: dict = Depends(get_current_user)):
