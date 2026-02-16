@@ -72,6 +72,29 @@ Build a Vendor Management System for OLL organization with the following capabil
   - Toast notification on successful selection
   - Manual entry still supported for custom school names
 
+### Phase 2.7 - Enhanced Returns Feature (Completed - Feb 16, 2025) ✅
+- **OLL Admin - Create Return Form**:
+  - Select delivered POs with PO value display
+  - **Mandatory return proof upload** (photo/document of returned items)
+  - Item-level costing with original price from PO
+  - Deduction amounts with reason fields
+  - Real-time credit amount calculation (Total - Deductions)
+  - Summary card showing total return value, deductions, and final credit amount
+- **Returns Status Tracking**:
+  - Status flow: `sent` → `confirmed` or `rejected`
+  - OLL admin creates return (status: sent)
+  - Vendor can confirm (with credit note upload) or reject (with reason)
+- **Vendor Returns Management**:
+  - View all return requests from OLL
+  - Summary cards: Pending Review, Credit Notes Issued, Rejected
+  - View return details with proof, items, deductions
+  - **Confirm flow**: Upload credit note document, enter credit note number
+  - **Reject flow**: Provide rejection reason
+- **Credit Note Integration**:
+  - Confirmed returns create negative payment entries (credits)
+  - Credit notes appear in Credit Notes tab
+  - Integration with Payments system
+
 ## Technical Architecture
 
 ### Backend (FastAPI)
