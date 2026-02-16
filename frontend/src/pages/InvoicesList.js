@@ -251,8 +251,8 @@ const InvoicesList = () => {
     pending: invoices.filter(i => getInvoiceStatus(i).status === "pending").length,
     overdue: invoices.filter(i => getInvoiceStatus(i).status === "overdue").length,
     cleared: invoices.filter(i => getInvoiceStatus(i).status === "cleared").length,
-    totalAmount: invoices.reduce((sum, i) => sum + i.amount, 0),
-    pendingAmount: invoices.reduce((sum, i) => sum + i.amount - (i.paid_amount || 0), 0)
+    totalAmount: invoices.reduce((sum, i) => sum + i.amount + (i.logistics_cost || 0), 0),
+    pendingAmount: invoices.reduce((sum, i) => sum + i.amount + (i.logistics_cost || 0) - (i.paid_amount || 0), 0)
   };
 
   return (
