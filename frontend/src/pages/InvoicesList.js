@@ -658,7 +658,11 @@ const InvoicesList = () => {
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="text-slate-600">Logistics Cost</span>
-                  <span className="font-mono">{formatCurrency(viewingInvoice.logistics_cost || 0)}</span>
+                  <span className="font-mono text-orange-600">{formatCurrency(viewingInvoice.logistics_cost || 0)}</span>
+                </div>
+                <div className="flex justify-between mb-2 pt-2 border-t">
+                  <span className="text-slate-700 font-medium">Total Payable</span>
+                  <span className="font-mono font-medium">{formatCurrency(viewingInvoice.amount + (viewingInvoice.logistics_cost || 0))}</span>
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="text-slate-600">Paid Amount</span>
@@ -666,7 +670,7 @@ const InvoicesList = () => {
                 </div>
                 <div className="flex justify-between pt-2 border-t font-medium">
                   <span>Outstanding</span>
-                  <span className="font-mono text-amber-600">{formatCurrency(viewingInvoice.amount - (viewingInvoice.paid_amount || 0))}</span>
+                  <span className="font-mono text-amber-600">{formatCurrency(viewingInvoice.amount + (viewingInvoice.logistics_cost || 0) - (viewingInvoice.paid_amount || 0))}</span>
                 </div>
               </div>
 
