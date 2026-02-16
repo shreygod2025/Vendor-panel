@@ -701,6 +701,31 @@ const InvoicesList = () => {
                 </div>
               )}
 
+              {/* Logistics Bill */}
+              {viewingInvoice.logistics_bill_url && (
+                <div className="p-4 border-2 border-dashed border-orange-200 bg-orange-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <Receipt className="w-5 h-5 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-orange-800">Logistics Bill</p>
+                        <p className="text-xs text-orange-600">Uploaded by vendor</p>
+                      </div>
+                    </div>
+                    <a 
+                      href={viewingInvoice.logistics_bill_url} 
+                      download={`Logistics-${viewingInvoice.invoice_number}.pdf`}
+                      className="flex items-center gap-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {viewingInvoice.notes && (
                 <div className="p-3 bg-amber-50 rounded-lg">
                   <p className="text-xs text-amber-600 mb-1">Notes</p>
