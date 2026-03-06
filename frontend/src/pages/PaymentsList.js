@@ -39,10 +39,9 @@ const PaymentsList = () => {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [selectedInvoices, setSelectedInvoices] = useState([]);
   
   const [formData, setFormData] = useState({
-    invoice_id: "",
     amount: "",
     payment_date: "",
     payment_mode: "",
@@ -92,37 +91,54 @@ const PaymentsList = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (selectedInvoices.length === 0) {
+      toast.error("Please select at least one invoice");
+      return;
+    }
+    
     setSaving(true);
     
     try {
-      // If using credit, first record the credit payment
-      if (formData.use_credit && parseFloat(formData.credit_amount) > 0) {
-        await apiClient.post("/payments", {
-          invoice_id: formData.invoice_id,
-          amount: parseFloat(formData.credit_amount),
-          payment_date: formData.payment_date,
-          payment_mode: "credit",
-          reference_id: `CREDIT-${Date.now()}`,
-          notes: "Payment via vendor credit"
-        });
+      // Record payment for each selected invoice
+      for (const invoice of selectedInvoices) {
+        const invoicePendingAmount = (invoice.amount + (invoice.logistics_cost || 0)) - (invoice.paid_amount || 0);
+        
+        // If using credit, first record the credit payment
+        if (formData.use_credit && parseFloat(formData.credit_amount) > 0) {
+          const creditForThisInvoice = Math.min(parseFloat(formData.credit_amount) / selectedInvoices.length, invoicePendingAmount);
+          if (creditForThisInvoice > 0) {
+            await apiClient.post("/payments", {
+              invoice_id: invoice.id,
+              amount: creditForThisInvoice,
+              payment_date: formData.payment_date,
+              payment_mode: "credit",
+              reference_id: formData.reference_id || `CREDIT-${Date.now()}`,
+              notes: "Payment via vendor credit"
+            });
+          }
+        }
+        
+        // Calculate remaining amount for this invoice after credit
+        const creditUsed = formData.use_credit ? Math.min(parseFloat(formData.credit_amount) / selectedInvoices.length, invoicePendingAmount) : 0;
+        const remainingForInvoice = invoicePendingAmount - creditUsed;
+        
+        // If there's also a cash/bank payment
+        if (remainingForInvoice > 0 && parseFloat(formData.amount) > 0 && formData.payment_mode && formData.payment_mode !== "credit") {
+          await apiClient.post("/payments", {
+            invoice_id: invoice.id,
+            amount: remainingForInvoice,
+            payment_date: formData.payment_date,
+            payment_mode: formData.payment_mode,
+            reference_id: formData.reference_id,
+            notes: formData.notes
+          });
+        }
       }
       
-      // If there's also a cash/bank payment
-      if (parseFloat(formData.amount) > 0 && formData.payment_mode !== "credit") {
-        await apiClient.post("/payments", {
-          invoice_id: formData.invoice_id,
-          amount: parseFloat(formData.amount),
-          payment_date: formData.payment_date,
-          payment_mode: formData.payment_mode,
-          reference_id: formData.reference_id,
-          notes: formData.notes
-        });
-      }
-      
-      toast.success("Payment recorded successfully");
+      toast.success(`Payment recorded for ${selectedInvoices.length} invoice(s)`);
       setShowDialog(false);
       setFormData({
-        invoice_id: "",
         amount: "",
         payment_date: "",
         payment_mode: "",
@@ -131,7 +147,7 @@ const PaymentsList = () => {
         use_credit: false,
         credit_amount: ""
       });
-      setSelectedInvoice(null);
+      setSelectedInvoices([]);
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to record payment");
@@ -140,26 +156,30 @@ const PaymentsList = () => {
     }
   };
 
-  const handleInvoiceSelect = (invoiceId) => {
-    const invoice = invoices.find(inv => inv.id === invoiceId);
-    setSelectedInvoice(invoice);
-    setFormData(prev => ({ 
-      ...prev, 
-      invoice_id: invoiceId,
-      use_credit: false,
-      credit_amount: ""
-    }));
+  const toggleInvoiceSelection = (invoice) => {
+    setSelectedInvoices(prev => {
+      const isSelected = prev.some(inv => inv.id === invoice.id);
+      if (isSelected) {
+        return prev.filter(inv => inv.id !== invoice.id);
+      } else {
+        return [...prev, invoice];
+      }
+    });
+  };
+
+  const getTotalPendingAmount = () => {
+    return selectedInvoices.reduce((sum, inv) => {
+      const total = inv.amount + (inv.logistics_cost || 0);
+      const paid = inv.paid_amount || 0;
+      return sum + (total - paid);
+    }, 0);
   };
 
   const getVendorCredit = () => {
-    if (!selectedInvoice) return null;
-    return vendorCredits[selectedInvoice.vendor_id];
-  };
-
-  const getPendingAmount = () => {
-    if (!selectedInvoice) return 0;
-    const totalAmount = selectedInvoice.amount + (selectedInvoice.logistics_cost || 0);
-    return totalAmount - (selectedInvoice.paid_amount || 0);
+    if (selectedInvoices.length === 0) return null;
+    // Get credit for the first selected invoice's vendor
+    const vendorId = selectedInvoices[0].vendor_id;
+    return vendorCredits[vendorId];
   };
 
   const openViewPayment = (payment) => {
@@ -305,9 +325,8 @@ const PaymentsList = () => {
       <Dialog open={showDialog} onOpenChange={(open) => {
         setShowDialog(open);
         if (!open) {
-          setSelectedInvoice(null);
+          setSelectedInvoices([]);
           setFormData({
-            invoice_id: "",
             amount: "",
             payment_date: "",
             payment_mode: "",
@@ -318,29 +337,72 @@ const PaymentsList = () => {
           });
         }
       }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Invoice Selection - Multi Select */}
             <div>
-              <Label>Invoice</Label>
-              <Select value={formData.invoice_id} onValueChange={handleInvoiceSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Invoice" />
-                </SelectTrigger>
-                <SelectContent>
-                  {invoices.filter(inv => (inv.amount - (inv.paid_amount || 0)) > 0).map((inv) => (
-                    <SelectItem key={inv.id} value={inv.id}>
-                      {inv.invoice_number} - {formatCurrency(inv.amount)} (Pending: {formatCurrency(inv.amount - (inv.paid_amount || 0))})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="mb-2 block">Select Invoices to Pay</Label>
+              <div className="border rounded-lg max-h-48 overflow-y-auto">
+                {invoices.filter(inv => {
+                  const total = inv.amount + (inv.logistics_cost || 0);
+                  const pending = total - (inv.paid_amount || 0);
+                  return pending > 0;
+                }).length === 0 ? (
+                  <div className="p-4 text-center text-slate-500">
+                    No pending invoices found
+                  </div>
+                ) : (
+                  invoices.filter(inv => {
+                    const total = inv.amount + (inv.logistics_cost || 0);
+                    const pending = total - (inv.paid_amount || 0);
+                    return pending > 0;
+                  }).map((inv) => {
+                    const total = inv.amount + (inv.logistics_cost || 0);
+                    const pending = total - (inv.paid_amount || 0);
+                    const isSelected = selectedInvoices.some(s => s.id === inv.id);
+                    
+                    return (
+                      <div 
+                        key={inv.id}
+                        className={`flex items-center gap-3 p-3 border-b last:border-b-0 cursor-pointer hover:bg-slate-50 ${isSelected ? 'bg-blue-50' : ''}`}
+                        onClick={() => toggleInvoiceSelection(inv)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-medium">{inv.invoice_number}</span>
+                            <span className="text-sm text-slate-500">{inv.vendor_name}</span>
+                          </div>
+                          <div className="flex items-center justify-between mt-1 text-sm">
+                            <span className="text-slate-500">
+                              Total: {formatCurrency(total)}
+                              {inv.logistics_cost > 0 && <span className="text-orange-500 ml-1">(+{formatCurrency(inv.logistics_cost)} logistics)</span>}
+                            </span>
+                            <span className="font-medium text-amber-600">Pending: {formatCurrency(pending)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {selectedInvoices.length > 0 && (
+                <p className="text-sm text-blue-600 mt-2">
+                  {selectedInvoices.length} invoice(s) selected
+                </p>
+              )}
             </div>
 
             {/* Show vendor credit if available */}
-            {selectedInvoice && getVendorCredit()?.available_credit > 0 && (
+            {selectedInvoices.length > 0 && getVendorCredit()?.available_credit > 0 && (
               <Card className="bg-purple-50 border-purple-200">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
@@ -364,7 +426,7 @@ const PaymentsList = () => {
                           onChange={(e) => {
                             const useCredit = e.target.checked;
                             const availableCredit = getVendorCredit()?.available_credit || 0;
-                            const pendingAmount = getPendingAmount();
+                            const pendingAmount = getTotalPendingAmount();
                             const creditToUse = Math.min(availableCredit, pendingAmount);
                             
                             setFormData(prev => ({
@@ -387,11 +449,11 @@ const PaymentsList = () => {
                           <Input
                             type="number"
                             step="0.01"
-                            max={Math.min(getVendorCredit()?.available_credit || 0, getPendingAmount())}
+                            max={Math.min(getVendorCredit()?.available_credit || 0, getTotalPendingAmount())}
                             value={formData.credit_amount}
                             onChange={(e) => {
                               const creditAmt = parseFloat(e.target.value) || 0;
-                              const pendingAmount = getPendingAmount();
+                              const pendingAmount = getTotalPendingAmount();
                               setFormData(prev => ({
                                 ...prev,
                                 credit_amount: e.target.value,
@@ -409,47 +471,42 @@ const PaymentsList = () => {
             )}
 
             {/* Payment Summary */}
-            {selectedInvoice && (
-              <div className="p-3 bg-slate-50 rounded-lg text-sm">
-                <div className="flex justify-between mb-1">
-                  <span className="text-slate-600">Invoice Amount:</span>
-                  <span className="font-mono">{formatCurrency(selectedInvoice.amount)}</span>
-                </div>
-                {(selectedInvoice.logistics_cost || 0) > 0 && (
-                  <div className="flex justify-between mb-1">
-                    <span className="text-slate-600">Logistics Cost:</span>
-                    <span className="font-mono text-orange-600">{formatCurrency(selectedInvoice.logistics_cost)}</span>
+            {selectedInvoices.length > 0 && (
+              <div className="p-4 bg-slate-50 rounded-lg">
+                <h4 className="font-medium text-slate-700 mb-3">Payment Summary</h4>
+                <div className="space-y-2 text-sm">
+                  {selectedInvoices.map(inv => {
+                    const total = inv.amount + (inv.logistics_cost || 0);
+                    const pending = total - (inv.paid_amount || 0);
+                    return (
+                      <div key={inv.id} className="flex justify-between">
+                        <span className="text-slate-600">{inv.invoice_number}:</span>
+                        <span className="font-mono">{formatCurrency(pending)}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-between font-bold pt-2 border-t border-slate-300">
+                    <span>Total Pending:</span>
+                    <span className="font-mono text-amber-600">{formatCurrency(getTotalPendingAmount())}</span>
                   </div>
-                )}
-                <div className="flex justify-between mb-1 border-t pt-1">
-                  <span className="text-slate-600 font-medium">Total Amount:</span>
-                  <span className="font-mono font-medium">{formatCurrency(selectedInvoice.amount + (selectedInvoice.logistics_cost || 0))}</span>
+                  {formData.use_credit && parseFloat(formData.credit_amount) > 0 && (
+                    <>
+                      <div className="flex justify-between text-purple-600">
+                        <span>Credit Applied:</span>
+                        <span className="font-mono">-{formatCurrency(parseFloat(formData.credit_amount))}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-emerald-600">
+                        <span>Amount to Pay:</span>
+                        <span className="font-mono">{formatCurrency(Math.max(0, getTotalPendingAmount() - parseFloat(formData.credit_amount)))}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-slate-600">Already Paid:</span>
-                  <span className="font-mono">{formatCurrency(selectedInvoice.paid_amount || 0)}</span>
-                </div>
-                <div className="flex justify-between font-medium border-t pt-1 mt-1">
-                  <span>Pending Amount:</span>
-                  <span className="font-mono text-amber-600">{formatCurrency(getPendingAmount())}</span>
-                </div>
-                {formData.use_credit && parseFloat(formData.credit_amount) > 0 && (
-                  <>
-                    <div className="flex justify-between text-purple-600 mt-1">
-                      <span>Credit Applied:</span>
-                      <span className="font-mono">-{formatCurrency(parseFloat(formData.credit_amount))}</span>
-                    </div>
-                    <div className="flex justify-between font-medium text-emerald-600">
-                      <span>Remaining to Pay:</span>
-                      <span className="font-mono">{formatCurrency(Math.max(0, getPendingAmount() - parseFloat(formData.credit_amount)))}</span>
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
             {/* Only show payment fields if there's remaining amount after credit */}
-            {(!formData.use_credit || (formData.use_credit && parseFloat(formData.amount) > 0)) && (
+            {selectedInvoices.length > 0 && (!formData.use_credit || (formData.use_credit && parseFloat(formData.amount) > 0)) && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -457,9 +514,9 @@ const PaymentsList = () => {
                     <Input
                       type="number"
                       step="0.01"
-                      value={formData.amount}
+                      value={formData.amount || getTotalPendingAmount()}
                       onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
-                      required={!formData.use_credit || parseFloat(formData.credit_amount) < getPendingAmount()}
+                      required={!formData.use_credit || parseFloat(formData.credit_amount) < getTotalPendingAmount()}
                     />
                   </div>
                   <div>
@@ -490,12 +547,12 @@ const PaymentsList = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label>Reference ID</Label>
+                    <Label>Reference ID *</Label>
                     <Input
                       value={formData.reference_id}
                       onChange={(e) => setFormData(prev => ({ ...prev, reference_id: e.target.value }))}
-                      required={!formData.use_credit || parseFloat(formData.credit_amount) < getPendingAmount()}
-                      placeholder="Transaction ID"
+                      required
+                      placeholder="Transaction / UTR Number"
                     />
                   </div>
                 </div>
@@ -514,10 +571,10 @@ const PaymentsList = () => {
               <Button 
                 type="submit" 
                 className="bg-[#1e3a8a] hover:bg-[#1e40af]" 
-                disabled={saving || (!formData.use_credit && !formData.amount)}
+                disabled={saving || selectedInvoices.length === 0 || (!formData.use_credit && !formData.payment_mode)}
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Record Payment
+                Record Payment {selectedInvoices.length > 1 ? `(${selectedInvoices.length} invoices)` : ''}
               </Button>
             </DialogFooter>
           </form>
