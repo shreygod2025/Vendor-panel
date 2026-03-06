@@ -167,6 +167,9 @@ Build a Vendor Management System for OLL organization with the following capabil
 - External Schools API may return empty address fields for some schools
 
 ## Changelog
+- Feb 17, 2025: **Office Inventory Feature** - Added new inventory management section under Management for tracking office products with quantity, unit price, total value, categories, and locations
+- Feb 17, 2025: **Fixed Payments Issues** - Fixed payments page error, added logistics cost display in record payment dialog, fixed invoice status update after payment
+- Feb 17, 2025: **Fixed Returns Issues** - Added file upload endpoint, fixed GST calculation in credit amounts
 - Feb 16, 2025: **Enhanced Returns Feature** - Complete overhaul with mandatory return proof upload, item-level costing from PO, deduction amounts with reasons, status tracking (sent/confirmed/rejected), vendor confirm/reject flow with credit note integration
 - Feb 13, 2025: **School Search Integration** - Added external Schools API integration with search suggestions and auto-fill for PO form (school_name, contact_person, contact_number, delivery_address)
 - Feb 12, 2025: Issues system with replies, Custom PO Number, Vendor UI improvements

@@ -478,6 +478,39 @@ class AuditLogResponse(BaseModel):
     details: Dict
     timestamp: str
 
+# Inventory Models
+class InventoryItemCreate(BaseModel):
+    product_name: str
+    sku: Optional[str] = None
+    category: Optional[str] = None
+    quantity: int
+    unit_price: float
+    location: Optional[str] = None
+    notes: Optional[str] = None
+
+class InventoryItemUpdate(BaseModel):
+    product_name: Optional[str] = None
+    sku: Optional[str] = None
+    category: Optional[str] = None
+    quantity: Optional[int] = None
+    unit_price: Optional[float] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+
+class InventoryItemResponse(BaseModel):
+    id: str
+    product_name: str
+    sku: Optional[str] = None
+    category: Optional[str] = None
+    quantity: int
+    unit_price: float
+    total_value: float
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: str
+    updated_at: str
+    created_by: str
+
 # ========================
 # HELPER FUNCTIONS
 # ========================
@@ -2792,6 +2825,129 @@ async def get_audit_logs(entity_type: Optional[str] = None, entity_id: Optional[
     
     logs = await db.audit_logs.find(query, {"_id": 0}).sort("timestamp", -1).to_list(limit)
     return [AuditLogResponse(**log) for log in logs]
+
+# ========================
+# INVENTORY ENDPOINTS
+# ========================
+
+@api_router.get("/inventory", response_model=List[InventoryItemResponse])
+async def get_inventory(category: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get all inventory items - OLL only"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can access inventory")
+    
+    query = {}
+    if category:
+        query["category"] = category
+    
+    items = await db.inventory.find(query, {"_id": 0}).sort("product_name", 1).to_list(1000)
+    return [InventoryItemResponse(**item) for item in items]
+
+@api_router.post("/inventory", response_model=InventoryItemResponse)
+async def create_inventory_item(item: InventoryItemCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new inventory item - OLL only"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can manage inventory")
+    
+    item_doc = {
+        "id": str(uuid.uuid4()),
+        "product_name": item.product_name,
+        "sku": item.sku,
+        "category": item.category,
+        "quantity": item.quantity,
+        "unit_price": item.unit_price,
+        "total_value": round(item.quantity * item.unit_price, 2),
+        "location": item.location,
+        "notes": item.notes,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_user["user_id"]
+    }
+    
+    await db.inventory.insert_one(item_doc)
+    await create_audit_log("CREATE_INVENTORY", "inventory", item_doc["id"], current_user, {"product_name": item.product_name})
+    
+    return InventoryItemResponse(**item_doc)
+
+@api_router.get("/inventory/{item_id}", response_model=InventoryItemResponse)
+async def get_inventory_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a single inventory item - OLL only"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can access inventory")
+    
+    item = await db.inventory.find_one({"id": item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    return InventoryItemResponse(**item)
+
+@api_router.put("/inventory/{item_id}", response_model=InventoryItemResponse)
+async def update_inventory_item(item_id: str, update: InventoryItemUpdate, current_user: dict = Depends(get_current_user)):
+    """Update an inventory item - OLL only"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can manage inventory")
+    
+    item = await db.inventory.find_one({"id": item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Recalculate total_value if quantity or unit_price changed
+    new_quantity = update_data.get("quantity", item["quantity"])
+    new_unit_price = update_data.get("unit_price", item["unit_price"])
+    update_data["total_value"] = round(new_quantity * new_unit_price, 2)
+    
+    await db.inventory.update_one({"id": item_id}, {"$set": update_data})
+    await create_audit_log("UPDATE_INVENTORY", "inventory", item_id, current_user, update_data)
+    
+    updated_item = await db.inventory.find_one({"id": item_id}, {"_id": 0})
+    return InventoryItemResponse(**updated_item)
+
+@api_router.delete("/inventory/{item_id}")
+async def delete_inventory_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an inventory item - OLL only"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can manage inventory")
+    
+    item = await db.inventory.find_one({"id": item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    await db.inventory.delete_one({"id": item_id})
+    await create_audit_log("DELETE_INVENTORY", "inventory", item_id, current_user, {"product_name": item["product_name"]})
+    
+    return {"message": "Inventory item deleted successfully"}
+
+@api_router.get("/inventory/summary/stats")
+async def get_inventory_stats(current_user: dict = Depends(get_current_user)):
+    """Get inventory summary statistics - OLL only"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can access inventory")
+    
+    items = await db.inventory.find({}, {"_id": 0}).to_list(1000)
+    
+    total_items = len(items)
+    total_quantity = sum(item["quantity"] for item in items)
+    total_value = sum(item["total_value"] for item in items)
+    
+    # Group by category
+    by_category = {}
+    for item in items:
+        cat = item.get("category") or "Uncategorized"
+        if cat not in by_category:
+            by_category[cat] = {"count": 0, "quantity": 0, "value": 0}
+        by_category[cat]["count"] += 1
+        by_category[cat]["quantity"] += item["quantity"]
+        by_category[cat]["value"] += item["total_value"]
+    
+    return {
+        "total_items": total_items,
+        "total_quantity": total_quantity,
+        "total_value": round(total_value, 2),
+        "by_category": by_category
+    }
 
 # ========================
 # DASHBOARD / ANALYTICS

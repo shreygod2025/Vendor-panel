@@ -18,7 +18,8 @@ import {
   CalendarClock,
   Upload,
   BarChart3,
-  Key
+  Key,
+  Warehouse
 } from "lucide-react";
 
 const OLL_LOGO = "https://customer-assets.emergentagent.com/job_1abb6756-ee51-414a-aff6-9c61f26a1a75/artifacts/23infxd1_Logo.png";
@@ -60,6 +61,7 @@ const Sidebar = ({ role, isOpen, onClose }) => {
       items: [
         { path: "/oll/vendors", icon: Building2, label: "Vendors" },
         { path: "/oll/products", icon: Package, label: "Products" },
+        { path: "/oll/inventory", icon: Warehouse, label: "Office Inventory" },
         { path: "/oll/users", icon: UserCog, label: "Users" }
       ]
     },

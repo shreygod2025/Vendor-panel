@@ -28,6 +28,7 @@ import IssuesPage from "./pages/oll/IssuesPage";
 import BulkImport from "./pages/oll/BulkImport";
 import Analytics from "./pages/oll/Analytics";
 import APIKeysPage from "./pages/oll/APIKeysPage";
+import InventoryPage from "./pages/oll/InventoryPage";
 
 // Vendor Pages
 import VendorPurchaseOrders from "./pages/vendor/PurchaseOrders";
@@ -302,6 +303,11 @@ function AppRoutes() {
       <Route path="/oll/api-keys" element={
         <ProtectedRoute allowedRoles={["oll"]}>
           <DashboardLayout><APIKeysPage /></DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/oll/inventory" element={
+        <ProtectedRoute allowedRoles={["oll"]}>
+          <DashboardLayout><InventoryPage /></DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path="/oll/users" element={
