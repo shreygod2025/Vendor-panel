@@ -158,11 +158,12 @@ const PaymentsList = () => {
 
   const getPendingAmount = () => {
     if (!selectedInvoice) return 0;
-    return selectedInvoice.amount - (selectedInvoice.paid_amount || 0);
+    const totalAmount = selectedInvoice.amount + (selectedInvoice.logistics_cost || 0);
+    return totalAmount - (selectedInvoice.paid_amount || 0);
   };
 
   const openViewPayment = (payment) => {
-    const invoice = invoices.find(inv => inv.id === payment.invoice_id);
+    const invoice = payment.invoice_id ? invoices.find(inv => inv.id === payment.invoice_id) : null;
     setViewingPayment(payment);
     setViewingInvoice(invoice);
     setViewDialog(true);
@@ -242,19 +243,26 @@ const PaymentsList = () => {
               </TableHeader>
               <TableBody>
                 {payments.map((payment) => {
-                  const invoice = invoices.find(inv => inv.id === payment.invoice_id);
+                  const invoice = payment.invoice_id ? invoices.find(inv => inv.id === payment.invoice_id) : null;
+                  const isCredit = payment.payment_type === "credit";
                   return (
                     <TableRow key={payment.id}>
-                      <TableCell className="font-mono text-sm">{invoice?.invoice_number || payment.invoice_id.slice(0, 8) + "..."}</TableCell>
-                      <TableCell className="font-mono font-medium text-emerald-600">
+                      <TableCell className="font-mono text-sm">
+                        {isCredit ? (
+                          <span className="text-purple-600">Credit Note</span>
+                        ) : (
+                          invoice?.invoice_number || (payment.invoice_id ? payment.invoice_id.slice(0, 8) + "..." : "-")
+                        )}
+                      </TableCell>
+                      <TableCell className={`font-mono font-medium ${isCredit ? 'text-purple-600' : 'text-emerald-600'}`}>
                         {formatCurrency(payment.amount)}
                       </TableCell>
                       <TableCell>{formatDate(payment.payment_date)}</TableCell>
                       <TableCell className="capitalize">{payment.payment_mode}</TableCell>
-                      <TableCell className="font-mono text-sm">{payment.reference_id}</TableCell>
+                      <TableCell className="font-mono text-sm">{payment.reference_id || "-"}</TableCell>
                       <TableCell>
                         <span className={`badge ${getStatusColor(payment.payment_status)}`}>
-                          {payment.payment_status.replace('_', ' ')}
+                          {payment.payment_status?.replace('_', ' ') || 'completed'}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -406,6 +414,16 @@ const PaymentsList = () => {
                 <div className="flex justify-between mb-1">
                   <span className="text-slate-600">Invoice Amount:</span>
                   <span className="font-mono">{formatCurrency(selectedInvoice.amount)}</span>
+                </div>
+                {(selectedInvoice.logistics_cost || 0) > 0 && (
+                  <div className="flex justify-between mb-1">
+                    <span className="text-slate-600">Logistics Cost:</span>
+                    <span className="font-mono text-orange-600">{formatCurrency(selectedInvoice.logistics_cost)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between mb-1 border-t pt-1">
+                  <span className="text-slate-600 font-medium">Total Amount:</span>
+                  <span className="font-mono font-medium">{formatCurrency(selectedInvoice.amount + (selectedInvoice.logistics_cost || 0))}</span>
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-slate-600">Already Paid:</span>

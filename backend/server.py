@@ -406,14 +406,17 @@ class PaymentCreate(BaseModel):
 
 class PaymentResponse(BaseModel):
     id: str
-    invoice_id: str
-    po_id: str
+    invoice_id: Optional[str] = None  # Can be None for credit payments
+    po_id: Optional[str] = None
+    vendor_id: Optional[str] = None
+    return_id: Optional[str] = None  # For credit payments from returns
     amount: float
+    payment_type: Optional[str] = "payment"  # "payment" or "credit"
     payment_date: str
     payment_mode: str
-    reference_id: str
-    payment_status: str
-    notes: Optional[str]
+    reference_id: Optional[str] = None
+    payment_status: Optional[str] = "completed"
+    notes: Optional[str] = None
     created_at: str
     created_by: str
 
@@ -2347,7 +2350,10 @@ async def create_payment(payment: PaymentCreate, current_user: dict = Depends(ge
     existing_payments = await db.payments.find({"invoice_id": payment.invoice_id}, {"_id": 0}).to_list(1000)
     total_paid = sum(p["amount"] for p in existing_payments) + payment.amount
     
-    if total_paid >= invoice["amount"]:
+    # Total amount includes invoice amount + logistics cost
+    total_invoice_amount = invoice["amount"] + invoice.get("logistics_cost", 0)
+    
+    if total_paid >= total_invoice_amount:
         payment_status = "fully_paid"
     else:
         payment_status = "partially_paid"
