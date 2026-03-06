@@ -96,42 +96,38 @@ const PaymentsList = () => {
       toast.error("Please select at least one invoice");
       return;
     }
+
+    if (!formData.payment_date) {
+      toast.error("Please select a payment date");
+      return;
+    }
+
+    if (!formData.payment_mode) {
+      toast.error("Please select a payment mode");
+      return;
+    }
+
+    if (!formData.reference_id) {
+      toast.error("Please enter a reference ID");
+      return;
+    }
     
     setSaving(true);
     
     try {
       // Record payment for each selected invoice
       for (const invoice of selectedInvoices) {
-        const invoicePendingAmount = (invoice.amount + (invoice.logistics_cost || 0)) - (invoice.paid_amount || 0);
+        const invoiceTotal = invoice.amount + (invoice.logistics_cost || 0);
+        const invoicePending = invoiceTotal - (invoice.paid_amount || 0);
         
-        // If using credit, first record the credit payment
-        if (formData.use_credit && parseFloat(formData.credit_amount) > 0) {
-          const creditForThisInvoice = Math.min(parseFloat(formData.credit_amount) / selectedInvoices.length, invoicePendingAmount);
-          if (creditForThisInvoice > 0) {
-            await apiClient.post("/payments", {
-              invoice_id: invoice.id,
-              amount: creditForThisInvoice,
-              payment_date: formData.payment_date,
-              payment_mode: "credit",
-              reference_id: formData.reference_id || `CREDIT-${Date.now()}`,
-              notes: "Payment via vendor credit"
-            });
-          }
-        }
-        
-        // Calculate remaining amount for this invoice after credit
-        const creditUsed = formData.use_credit ? Math.min(parseFloat(formData.credit_amount) / selectedInvoices.length, invoicePendingAmount) : 0;
-        const remainingForInvoice = invoicePendingAmount - creditUsed;
-        
-        // If there's also a cash/bank payment
-        if (remainingForInvoice > 0 && parseFloat(formData.amount) > 0 && formData.payment_mode && formData.payment_mode !== "credit") {
+        if (invoicePending > 0) {
           await apiClient.post("/payments", {
             invoice_id: invoice.id,
-            amount: remainingForInvoice,
+            amount: invoicePending,
             payment_date: formData.payment_date,
             payment_mode: formData.payment_mode,
             reference_id: formData.reference_id,
-            notes: formData.notes
+            notes: formData.notes || `Payment for ${selectedInvoices.length} invoices`
           });
         }
       }
