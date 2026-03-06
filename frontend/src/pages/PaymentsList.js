@@ -609,6 +609,12 @@ const PaymentsList = () => {
                     <p className="font-mono text-sm">{viewingPayment.reference_id || "-"}</p>
                   </div>
                 </div>
+                {viewingPayment.notes && (
+                  <div className="mt-3 pt-3 border-t border-emerald-200">
+                    <p className="text-emerald-600 text-sm">Notes</p>
+                    <p className="text-sm text-emerald-800 mt-1">{viewingPayment.notes}</p>
+                  </div>
+                )}
               </div>
 
               {/* Invoice Details */}
