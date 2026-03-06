@@ -43,6 +43,7 @@ const CATEGORIES = [
 
 const InventoryPage = () => {
   const [inventory, setInventory] = useState([]);
+  const [products, setProducts] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -52,8 +53,10 @@ const InventoryPage = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState("");
   
   const [formData, setFormData] = useState({
+    product_id: "",
     product_name: "",
     sku: "",
     category: "",
@@ -69,12 +72,14 @@ const InventoryPage = () => {
 
   const fetchData = async () => {
     try {
-      const [inventoryRes, statsRes] = await Promise.all([
+      const [inventoryRes, statsRes, productsRes] = await Promise.all([
         apiClient.get("/inventory"),
-        apiClient.get("/inventory/summary/stats")
+        apiClient.get("/inventory/summary/stats"),
+        apiClient.get("/products")
       ]);
       setInventory(inventoryRes.data);
       setStats(statsRes.data);
+      setProducts(productsRes.data);
     } catch (error) {
       toast.error("Failed to fetch inventory");
     } finally {
@@ -84,7 +89,9 @@ const InventoryPage = () => {
 
   const openAddDialog = () => {
     setEditingItem(null);
+    setSelectedProductId("");
     setFormData({
+      product_id: "",
       product_name: "",
       sku: "",
       category: "",
@@ -98,7 +105,9 @@ const InventoryPage = () => {
 
   const openEditDialog = (item) => {
     setEditingItem(item);
+    setSelectedProductId(item.product_id || "");
     setFormData({
+      product_id: item.product_id || "",
       product_name: item.product_name,
       sku: item.sku || "",
       category: item.category || "",
@@ -110,11 +119,26 @@ const InventoryPage = () => {
     setShowDialog(true);
   };
 
+  const handleProductSelect = (productId) => {
+    setSelectedProductId(productId);
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      setFormData(prev => ({
+        ...prev,
+        product_id: product.id,
+        product_name: product.name,
+        sku: product.sku || "",
+        category: product.category || "",
+        unit_price: product.unit_price?.toString() || ""
+      }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.product_name.trim()) {
-      toast.error("Product name is required");
+      toast.error("Please select a product");
       return;
     }
     if (!formData.quantity || parseInt(formData.quantity) < 0) {
@@ -129,6 +153,7 @@ const InventoryPage = () => {
     setSaving(true);
     try {
       const payload = {
+        product_id: formData.product_id || null,
         product_name: formData.product_name.trim(),
         sku: formData.sku.trim() || null,
         category: formData.category || null,
@@ -411,44 +436,59 @@ const InventoryPage = () => {
           </DialogHeader>
           
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Product Selection */}
             <div>
-              <Label htmlFor="product_name">Product Name *</Label>
-              <Input
-                id="product_name"
-                value={formData.product_name}
-                onChange={(e) => setFormData(prev => ({ ...prev, product_name: e.target.value }))}
-                placeholder="e.g., Arduino Uno Board"
-                data-testid="product-name-input"
-              />
+              <Label htmlFor="product">Select Product *</Label>
+              <Select 
+                value={selectedProductId} 
+                onValueChange={handleProductSelect}
+                disabled={editingItem !== null}
+              >
+                <SelectTrigger data-testid="product-select">
+                  <SelectValue placeholder="Choose a product from the list" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name} {product.sku ? `(${product.sku})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editingItem && (
+                <p className="text-xs text-slate-500 mt-1">Product cannot be changed while editing</p>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="sku">SKU / Item Code</Label>
-                <Input
-                  id="sku"
-                  value={formData.sku}
-                  onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
-                  placeholder="e.g., ARD-UNO-001"
-                />
+            {/* Show selected product info */}
+            {formData.product_name && (
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-blue-600">Product:</span>
+                    <span className="ml-2 font-medium">{formData.product_name}</span>
+                  </div>
+                  {formData.sku && (
+                    <div>
+                      <span className="text-blue-600">SKU:</span>
+                      <span className="ml-2 font-mono">{formData.sku}</span>
+                    </div>
+                  )}
+                  {formData.category && (
+                    <div>
+                      <span className="text-blue-600">Category:</span>
+                      <span className="ml-2">{formData.category}</span>
+                    </div>
+                  )}
+                  {formData.unit_price && (
+                    <div>
+                      <span className="text-blue-600">Unit Price:</span>
+                      <span className="ml-2 font-mono">{formatCurrency(parseFloat(formData.unit_price))}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Select 
-                  value={formData.category} 
-                  onValueChange={(v) => setFormData(prev => ({ ...prev, category: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

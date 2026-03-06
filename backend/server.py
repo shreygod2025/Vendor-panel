@@ -480,6 +480,7 @@ class AuditLogResponse(BaseModel):
 
 # Inventory Models
 class InventoryItemCreate(BaseModel):
+    product_id: Optional[str] = None  # Reference to products collection
     product_name: str
     sku: Optional[str] = None
     category: Optional[str] = None
@@ -489,6 +490,7 @@ class InventoryItemCreate(BaseModel):
     notes: Optional[str] = None
 
 class InventoryItemUpdate(BaseModel):
+    product_id: Optional[str] = None
     product_name: Optional[str] = None
     sku: Optional[str] = None
     category: Optional[str] = None
@@ -499,6 +501,7 @@ class InventoryItemUpdate(BaseModel):
 
 class InventoryItemResponse(BaseModel):
     id: str
+    product_id: Optional[str] = None
     product_name: str
     sku: Optional[str] = None
     category: Optional[str] = None
@@ -2841,6 +2844,10 @@ async def get_inventory(category: Optional[str] = None, current_user: dict = Dep
         query["category"] = category
     
     items = await db.inventory.find(query, {"_id": 0}).sort("product_name", 1).to_list(1000)
+    # Add default product_id for older items
+    for item in items:
+        if "product_id" not in item:
+            item["product_id"] = None
     return [InventoryItemResponse(**item) for item in items]
 
 @api_router.post("/inventory", response_model=InventoryItemResponse)
@@ -2851,6 +2858,7 @@ async def create_inventory_item(item: InventoryItemCreate, current_user: dict = 
     
     item_doc = {
         "id": str(uuid.uuid4()),
+        "product_id": item.product_id,
         "product_name": item.product_name,
         "sku": item.sku,
         "category": item.category,
@@ -2878,6 +2886,9 @@ async def get_inventory_item(item_id: str, current_user: dict = Depends(get_curr
     item = await db.inventory.find_one({"id": item_id}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    if "product_id" not in item:
+        item["product_id"] = None
     
     return InventoryItemResponse(**item)
 
