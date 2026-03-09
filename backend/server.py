@@ -268,6 +268,7 @@ class POResponse(BaseModel):
     # External request fields
     requester_name: Optional[str] = None
     is_external_request: Optional[bool] = False
+    source_system: Optional[str] = None  # Identifies the external system that created the request
 
 # Public PO Request Model (no auth required)
 class PublicPORequestItem(BaseModel):
@@ -284,6 +285,17 @@ class PublicPORequest(BaseModel):
     notes: Optional[str] = None
     products: List[PublicPORequestItem]
     requester_name: str
+    source_system: Optional[str] = None  # Optional: identify the external system making the request
+
+class PublicPORequestResponse(BaseModel):
+    success: bool
+    po_number: str
+    po_id: str
+    tracking_token: str
+    tracking_url: str
+    status: str
+    message: str
+    created_at: str
 
 # Dispatch Models
 class DispatchCreate(BaseModel):
@@ -1204,6 +1216,8 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
             p["requester_name"] = None
         if "is_external_request" not in p:
             p["is_external_request"] = False
+        if "source_system" not in p:
+            p["source_system"] = None
         result.append(POResponse(**p))
     
     return result
@@ -1246,6 +1260,8 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
         po["requester_name"] = None
     if "is_external_request" not in po:
         po["is_external_request"] = False
+    if "source_system" not in po:
+        po["source_system"] = None
     
     return POResponse(**po)
 
@@ -2375,9 +2391,40 @@ async def get_public_products():
     
     return result
 
-@api_router.post("/public/po-request")
+@api_router.post("/public/po-request", response_model=PublicPORequestResponse)
 async def create_public_po_request(request: PublicPORequest):
-    """Create a PO request from external users (no authentication required)"""
+    """
+    Create a PO request from external users/systems (no authentication required).
+    
+    This endpoint allows external systems to programmatically raise PO requests.
+    The request will appear in the admin's "Requests" section for review and approval.
+    
+    **Usage:**
+    - External integrations can call this API to submit PO requests
+    - Returns tracking URL and token for status monitoring
+    - Admin must assign vendor and approve before PO is sent
+    
+    **Request Body:**
+    - requester_name: Name of person/system raising the request (required)
+    - delivery_address: Complete delivery address (required)
+    - contact_person: Name of contact person (required)
+    - contact_number: Phone number (required)
+    - delivery_date: Expected delivery date in YYYY-MM-DD format (required)
+    - products: List of products with product_id/product_name and quantity (required)
+    - school_name: Name of school/institution (optional)
+    - notes: Additional notes (optional)
+    - source_system: Identifier for the external system making the request (optional)
+    
+    **Response:**
+    - success: Boolean indicating success
+    - po_number: Generated PO number (e.g., PO-001)
+    - po_id: Unique ID for API operations
+    - tracking_token: Short token for tracking URL
+    - tracking_url: Full URL for public tracking page
+    - status: Current status (will be "request")
+    - message: Success message
+    - created_at: ISO timestamp of creation
+    """
     
     if len(request.products) == 0:
         raise HTTPException(status_code=400, detail="At least one product is required")
@@ -2434,6 +2481,7 @@ async def create_public_po_request(request: PublicPORequest):
         "tracking_token": tracking_token,
         "requester_name": request.requester_name.strip(),
         "is_external_request": True,
+        "source_system": request.source_system,  # Track which external system made the request
         "created_by": "external",
         "created_by_name": request.requester_name.strip(),
         "created_by_role": "external",
@@ -2443,13 +2491,88 @@ async def create_public_po_request(request: PublicPORequest):
     
     await db.purchase_orders.insert_one(po_doc)
     
-    logger.info(f"External PO request created: {po_number} by {request.requester_name}")
+    logger.info(f"External PO request created: {po_number} by {request.requester_name} from {request.source_system or 'unknown'}")
+    
+    # Build tracking URL - use environment variable or default
+    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://public-po-request.preview.emergentagent.com')
+    tracking_url = f"{base_url}/track/{tracking_token}"
+    
+    return PublicPORequestResponse(
+        success=True,
+        po_number=po_number,
+        po_id=po_doc["id"],
+        tracking_token=tracking_token,
+        tracking_url=tracking_url,
+        status="request",
+        message="Your PO request has been submitted successfully. Admin will review and approve it.",
+        created_at=po_doc["created_at"]
+    )
+
+@api_router.get("/public/po-status/{identifier}")
+async def get_public_po_status(identifier: str):
+    """
+    Get the status of a PO request by po_id or tracking_token (no authentication required).
+    
+    This endpoint allows external systems to check the status of their PO requests.
+    
+    **Parameters:**
+    - identifier: Either the po_id (UUID) or tracking_token (8-char code)
+    
+    **Response:**
+    - po_number: The PO number
+    - po_id: Unique ID
+    - tracking_token: Short tracking token
+    - tracking_url: Full tracking page URL
+    - status: Current status (request, sent, confirmed, dispatched, delivered, closed)
+    - status_description: Human-readable status description
+    - vendor_name: Assigned vendor (if any)
+    - created_at: When the request was created
+    - updated_at: Last update time
+    """
+    # Try to find by po_id first, then by tracking_token
+    po = await db.purchase_orders.find_one({"id": identifier}, {"_id": 0})
+    if not po:
+        po = await db.purchase_orders.find_one({"tracking_token": identifier.upper()}, {"_id": 0})
+    
+    if not po:
+        raise HTTPException(status_code=404, detail="PO request not found")
+    
+    # Get vendor name if assigned
+    vendor_name = None
+    if po.get("vendor_id"):
+        vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+        vendor_name = vendor.get("name") if vendor else None
+    
+    # Build tracking URL
+    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://public-po-request.preview.emergentagent.com')
+    tracking_url = f"{base_url}/track/{po.get('tracking_token', '')}"
+    
+    # Status descriptions
+    status_descriptions = {
+        "request": "Pending admin review",
+        "draft": "Draft - not yet sent",
+        "sent": "Sent to vendor - awaiting confirmation",
+        "confirmed": "Confirmed by vendor",
+        "dispatched": "Order dispatched",
+        "delivered": "Order delivered",
+        "closed": "Order completed",
+        "rejected": "Order rejected"
+    }
     
     return {
-        "success": True,
-        "po_number": po_number,
-        "tracking_token": tracking_token,
-        "message": "Your PO request has been submitted successfully. Admin will review and approve it."
+        "po_number": po["po_number"],
+        "po_id": po["id"],
+        "tracking_token": po.get("tracking_token"),
+        "tracking_url": tracking_url,
+        "status": po["status"],
+        "status_description": status_descriptions.get(po["status"], po["status"]),
+        "vendor_name": vendor_name,
+        "school_name": po.get("school_name"),
+        "delivery_date": po.get("delivery_date"),
+        "requester_name": po.get("requester_name"),
+        "source_system": po.get("source_system"),
+        "created_at": po.get("created_at"),
+        "updated_at": po.get("updated_at")
     }
 
 @api_router.post("/purchase-orders/{po_id}/approve-request")
