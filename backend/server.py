@@ -793,6 +793,18 @@ async def get_vendors(is_active: Optional[bool] = None, current_user: dict = Dep
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["id"] = current_user["vendor_id"]
     
+    # Security: Distributors can only see vendors they have POs with
+    if current_user.get("role") == "distributor":
+        distributor_pos = await db.purchase_orders.find(
+            {"distributor_id": current_user["user_id"]},
+            {"vendor_id": 1, "_id": 0}
+        ).to_list(1000)
+        distributor_vendor_ids = list(set(p["vendor_id"] for p in distributor_pos if p.get("vendor_id")))
+        if distributor_vendor_ids:
+            query["id"] = {"$in": distributor_vendor_ids}
+        else:
+            return []  # No vendors if no POs
+    
     vendors = await db.vendors.find(query, {"_id": 0}).to_list(1000)
     return [VendorResponse(**v) for v in vendors]
 
@@ -800,6 +812,15 @@ async def get_vendors(is_active: Optional[bool] = None, current_user: dict = Dep
 async def get_vendor(vendor_id: str, current_user: dict = Depends(get_current_user)):
     if current_user.get("role") == "vendor" and current_user.get("vendor_id") != vendor_id:
         raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Security: Distributors can only see vendors they have POs with
+    if current_user.get("role") == "distributor":
+        has_po_with_vendor = await db.purchase_orders.find_one({
+            "distributor_id": current_user["user_id"],
+            "vendor_id": vendor_id
+        })
+        if not has_po_with_vendor:
+            raise HTTPException(status_code=403, detail="Access denied")
     
     vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
     if not vendor:
@@ -978,6 +999,18 @@ async def get_products(vendor_id: Optional[str] = None, is_active: Optional[bool
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
+    
+    # Security: Distributors can only see products from vendors they have POs with
+    if current_user.get("role") == "distributor":
+        distributor_pos = await db.purchase_orders.find(
+            {"distributor_id": current_user["user_id"]},
+            {"vendor_id": 1, "_id": 0}
+        ).to_list(1000)
+        distributor_vendor_ids = list(set(p["vendor_id"] for p in distributor_pos if p.get("vendor_id")))
+        if distributor_vendor_ids:
+            query["vendor_id"] = {"$in": distributor_vendor_ids}
+        else:
+            return []  # No products if no POs
     
     products = await db.products.find(query, {"_id": 0}).to_list(1000)
     
@@ -1458,6 +1491,11 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
     existing = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Security: Distributors can only update their own POs
+    if current_user.get("role") == "distributor":
+        if existing.get("distributor_id") != current_user["user_id"]:
+            raise HTTPException(status_code=403, detail="Access denied")
     
     if current_user.get("role") == "vendor":
         if current_user.get("vendor_id") != existing["vendor_id"]:
@@ -2492,6 +2530,15 @@ async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
     
+    # Security: Distributors can only see invoices for their POs
+    if current_user.get("role") == "distributor":
+        distributor_pos = await db.purchase_orders.find(
+            {"distributor_id": current_user["user_id"]},
+            {"id": 1, "_id": 0}
+        ).to_list(1000)
+        distributor_po_ids = [p["id"] for p in distributor_pos]
+        query["po_id"] = {"$in": distributor_po_ids}
+    
     invoices = await db.invoices.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
     # Get PO and vendor info
@@ -2644,6 +2691,20 @@ async def get_payments(invoice_id: Optional[str] = None, po_id: Optional[str] = 
         invoice_ids = [i["id"] for i in vendor_invoices]
         query["invoice_id"] = {"$in": invoice_ids}
     
+    # Security: Distributors can only see payments for their POs
+    if current_user.get("role") == "distributor":
+        distributor_pos = await db.purchase_orders.find(
+            {"distributor_id": current_user["user_id"]},
+            {"id": 1, "_id": 0}
+        ).to_list(1000)
+        distributor_po_ids = [p["id"] for p in distributor_pos]
+        distributor_invoices = await db.invoices.find(
+            {"po_id": {"$in": distributor_po_ids}},
+            {"id": 1, "_id": 0}
+        ).to_list(1000)
+        invoice_ids = [i["id"] for i in distributor_invoices]
+        query["invoice_id"] = {"$in": invoice_ids}
+    
     payments = await db.payments.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     return [PaymentResponse(**p) for p in payments]
 
@@ -2653,6 +2714,15 @@ async def get_pending_payments(current_user: dict = Depends(get_current_user)):
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
+    
+    # Security: Distributors can only see pending payments for their POs
+    if current_user.get("role") == "distributor":
+        distributor_pos = await db.purchase_orders.find(
+            {"distributor_id": current_user["user_id"]},
+            {"id": 1, "_id": 0}
+        ).to_list(1000)
+        distributor_po_ids = [p["id"] for p in distributor_pos]
+        query["po_id"] = {"$in": distributor_po_ids}
     
     invoices = await db.invoices.find(query, {"_id": 0}).sort("due_date", 1).to_list(100)
     
@@ -2885,6 +2955,15 @@ async def get_returns(vendor_id: Optional[str] = None, status: Optional[str] = N
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
+    
+    # Security: Distributors can only see returns for their POs
+    if current_user.get("role") == "distributor":
+        distributor_pos = await db.purchase_orders.find(
+            {"distributor_id": current_user["user_id"]},
+            {"id": 1, "_id": 0}
+        ).to_list(1000)
+        distributor_po_ids = [p["id"] for p in distributor_pos]
+        query["po_id"] = {"$in": distributor_po_ids}
     
     returns = await db.returns.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
