@@ -95,6 +95,30 @@ Build a Vendor Management System for OLL organization with the following capabil
   - Credit notes appear in Credit Notes tab
   - Integration with Payments system
 
+### Phase 2.8 - Public PO Request Feature (Completed - Mar 9, 2025) ✅
+- **Public PO Request Form** (`/add`):
+  - No login required for external users
+  - Form fields: requester_name, school_name (with auto-search), delivery_address, contact_person, contact_number, delivery_date, products list, notes
+  - School search integration with auto-fill
+  - Product list with add/remove functionality
+  - Upon submission, returns tracking_token for status tracking
+- **Public Tracking Page** (`/track/:token`):
+  - View order status timeline (Created → Sent → Confirmed → Dispatched → Delivered → Completed)
+  - Shows order details: PO number, vendor (if assigned), delivery address, products
+  - No authentication required
+- **Admin Requests Tab** (Purchase Orders page):
+  - New "Requests" tab shows pending external PO requests
+  - Table columns: Request #, Requester, School, Products, Delivery Date, Vendor status
+  - "Not Assigned" badge for requests without vendor
+  - "Edit & Assign" button to open edit form
+- **Admin Workflow**:
+  - View incoming requests in Requests tab
+  - Edit request: assign vendor, add product pricing/SKUs, update details
+  - Approve request: changes status from "request" to "sent", notifies vendor
+- **Backend Endpoints**:
+  - `POST /api/public/po-request` - Create request without auth
+  - `POST /api/purchase-orders/{id}/approve-request` - Approve and send to vendor
+
 ## Technical Architecture
 
 ### Backend (FastAPI)
@@ -111,6 +135,8 @@ Build a Vendor Management System for OLL organization with the following capabil
 
 ### Key API Endpoints
 - `POST /api/purchase-orders` - Create PO with optional custom_po_number, school_name
+- `POST /api/public/po-request` - **Public** - Create PO request without authentication
+- `POST /api/purchase-orders/{id}/approve-request` - Approve request and send to vendor
 - `GET /api/schools/search?q={query}&limit={limit}` - Search schools from external API
 - `GET /api/schools/{school_id}` - Get single school details
 - `GET /api/issues?po_id={id}` - Get issues for a PO
@@ -150,7 +176,8 @@ Build a Vendor Management System for OLL organization with the following capabil
 ## Pending Tasks
 
 ### P0 - Critical
-1. ~~Distributor Role Security Bugs~~ - Needs security audit (Role-based access control for distributor)
+1. ~~Public PO Request Feature~~ - **COMPLETED Mar 9, 2025** ✅
+2. Distributor Role Security Bugs - Needs security audit (Role-based access control for distributor)
 
 ### P1 - High Priority
 1. Verify PO PDF company details are correct
@@ -167,6 +194,7 @@ Build a Vendor Management System for OLL organization with the following capabil
 - External Schools API may return empty address fields for some schools
 
 ## Changelog
+- Mar 9, 2025: **Public PO Request Feature** - Added public form at /add for external users to request POs without login. Requests appear in admin's "Requests" tab. Admin can edit, assign vendor/pricing, and approve to convert to regular PO. Tracking page at /track/:token shows status. Fixed POResponse vendor_id to be optional.
 - Feb 17, 2025: **Office Inventory Feature** - Added new inventory management section under Management for tracking office products with quantity, unit price, total value, categories, and locations
 - Feb 17, 2025: **Fixed Payments Issues** - Fixed payments page error, added logistics cost display in record payment dialog, fixed invoice status update after payment
 - Feb 17, 2025: **Fixed Returns Issues** - Added file upload endpoint, fixed GST calculation in credit amounts
