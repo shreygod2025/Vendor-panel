@@ -208,6 +208,7 @@ class POCreate(BaseModel):
     send_immediately: bool = True  # Default to sending immediately
 
 class POUpdate(BaseModel):
+    vendor_id: Optional[str] = None  # Allow assigning vendor to request POs
     school_name: Optional[str] = None
     delivery_address: Optional[str] = None
     receiver_name: Optional[str] = None
@@ -236,7 +237,7 @@ class POImport(BaseModel):
 class POResponse(BaseModel):
     id: str
     po_number: str
-    vendor_id: str
+    vendor_id: Optional[str] = None  # Optional for request status POs
     vendor_name: Optional[str] = None
     school_name: Optional[str] = None
     delivery_address: str
@@ -264,6 +265,24 @@ class POResponse(BaseModel):
     distributor_id: Optional[str] = None
     # Rejection reason
     rejection_reason: Optional[str] = None
+    # External request fields
+    requester_name: Optional[str] = None
+    is_external_request: Optional[bool] = False
+
+# Public PO Request Model (no auth required)
+class PublicPORequestItem(BaseModel):
+    product_name: str
+    quantity: int
+
+class PublicPORequest(BaseModel):
+    delivery_date: str
+    school_name: str
+    delivery_address: str
+    contact_person: str
+    contact_number: str
+    notes: Optional[str] = None
+    products: List[PublicPORequestItem]
+    requester_name: str
 
 # Dispatch Models
 class DispatchCreate(BaseModel):
@@ -1146,6 +1165,11 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
         # Add rejection reason if missing
         if "rejection_reason" not in p:
             p["rejection_reason"] = None
+        # Add external request fields if missing
+        if "requester_name" not in p:
+            p["requester_name"] = None
+        if "is_external_request" not in p:
+            p["is_external_request"] = False
         result.append(POResponse(**p))
     
     return result
@@ -1183,6 +1207,11 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
     # Add rejection reason if missing
     if "rejection_reason" not in po:
         po["rejection_reason"] = None
+    # Add external request fields if missing
+    if "requester_name" not in po:
+        po["requester_name"] = None
+    if "is_external_request" not in po:
+        po["is_external_request"] = False
     
     return POResponse(**po)
 
@@ -1435,10 +1464,10 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         if po_update.status not in ["confirmed", "rejected"]:
             raise HTTPException(status_code=403, detail="Vendors can only confirm or reject POs")
     
-    # OLL can only edit draft, sent, confirmed, or rejected POs
+    # OLL can only edit draft, sent, confirmed, rejected, or request POs
     if current_user.get("role") == "oll":
-        if existing["status"] not in ["draft", "sent", "confirmed", "rejected"]:
-            raise HTTPException(status_code=400, detail="Only draft, sent, confirmed, or rejected POs can be edited")
+        if existing["status"] not in ["draft", "sent", "confirmed", "rejected", "request"]:
+            raise HTTPException(status_code=400, detail="Only draft, sent, confirmed, rejected, or request POs can be edited")
     
     update_data = {k: v for k, v in po_update.model_dump().items() if v is not None}
     
@@ -1471,8 +1500,11 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
     asyncio.create_task(trigger_po_sync_webhook())
     
     updated = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
-    vendor = await db.vendors.find_one({"id": updated["vendor_id"]}, {"_id": 0})
-    updated["vendor_name"] = vendor.get("name") if vendor else None
+    if updated.get("vendor_id"):
+        vendor = await db.vendors.find_one({"id": updated["vendor_id"]}, {"_id": 0})
+        updated["vendor_name"] = vendor.get("name") if vendor else None
+    else:
+        updated["vendor_name"] = None
     if "final_comments" not in updated:
         updated["final_comments"] = None
     if "delivery_date" not in updated:
@@ -2232,6 +2264,112 @@ async def track_order(tracking_token: str):
         "delivery": delivery_info,
         "timeline": timeline
     }
+
+# ========================
+# PUBLIC PO REQUEST ENDPOINT (No Auth)
+# ========================
+
+@api_router.post("/public/po-request")
+async def create_public_po_request(request: PublicPORequest):
+    """Create a PO request from external users (no authentication required)"""
+    
+    if len(request.products) == 0:
+        raise HTTPException(status_code=400, detail="At least one product is required")
+    
+    if not request.requester_name.strip():
+        raise HTTPException(status_code=400, detail="Requester name is required")
+    
+    # Create line items from products (without pricing)
+    line_items = []
+    for product in request.products:
+        line_items.append({
+            "product_id": None,
+            "product_name": product.product_name,
+            "sku": None,
+            "quantity": product.quantity,
+            "unit_price": 0,
+            "tax_rate": 18.0,
+            "discount_amount": 0,
+            "discount_percent": 0,
+            "total": 0,
+            "comment": None
+        })
+    
+    # Generate PO number and tracking token
+    po_count = await db.purchase_orders.count_documents({})
+    po_number = f"REQ-{po_count + 1:04d}"
+    tracking_token = str(uuid.uuid4())[:8].upper()
+    
+    po_doc = {
+        "id": str(uuid.uuid4()),
+        "po_number": po_number,
+        "custom_po_number": None,
+        "vendor_id": None,  # No vendor assigned yet
+        "school_name": request.school_name,
+        "delivery_address": request.delivery_address,
+        "receiver_name": request.contact_person,
+        "contact_person": request.contact_person,
+        "contact_number": request.contact_number,
+        "delivery_date": request.delivery_date,
+        "line_items": line_items,
+        "subtotal": 0,
+        "total_discount": 0,
+        "total_tax": 0,
+        "grand_total": 0,
+        "order_discount_amount": 0,
+        "order_discount_percent": 0,
+        "status": "request",  # New status for external requests
+        "notes": request.notes,
+        "final_comments": None,
+        "tracking_token": tracking_token,
+        "requester_name": request.requester_name.strip(),
+        "is_external_request": True,
+        "created_by": "external",
+        "created_by_name": request.requester_name.strip(),
+        "created_by_role": "external",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.purchase_orders.insert_one(po_doc)
+    
+    logger.info(f"External PO request created: {po_number} by {request.requester_name}")
+    
+    return {
+        "success": True,
+        "po_number": po_number,
+        "tracking_token": tracking_token,
+        "message": "Your PO request has been submitted successfully. Admin will review and approve it."
+    }
+
+@api_router.post("/purchase-orders/{po_id}/approve-request")
+async def approve_po_request(po_id: str, current_user: dict = Depends(get_current_user)):
+    """Approve a PO request and change status to 'sent'"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL admin can approve requests")
+    
+    po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="PO not found")
+    
+    if po.get("status") != "request":
+        raise HTTPException(status_code=400, detail="Only requests can be approved")
+    
+    if not po.get("vendor_id"):
+        raise HTTPException(status_code=400, detail="Please assign a vendor before approving")
+    
+    # Update status to sent
+    await db.purchase_orders.update_one(
+        {"id": po_id},
+        {"$set": {
+            "status": "sent",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await create_audit_log("APPROVE_PO_REQUEST", "purchase_order", po_id, current_user, {"from": "request", "to": "sent"})
+    
+    return {"success": True, "message": "PO request approved and sent to vendor"}
 
 # ========================
 # INVOICE ENDPOINTS
@@ -4197,7 +4335,7 @@ async def integration_raise_po(
     })
     
     # Build tracking URL (base URL from environment or default)
-    base_url = os.environ.get('APP_BASE_URL', 'https://oll-returns-hub.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://public-po-request.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{tracking_token}"
     
     return IntegrationPOResponse(
@@ -4248,7 +4386,7 @@ async def integration_get_tracking(
     # Get dispatch info if available
     dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://oll-returns-hub.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://public-po-request.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{po['tracking_token']}"
     
     return TrackingLinkResponse(
@@ -4286,7 +4424,7 @@ async def integration_get_bulk_tracking(
     results = []
     errors = []
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://oll-returns-hub.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://public-po-request.preview.emergentagent.com')
     
     # Search by PO IDs
     if request.po_ids:

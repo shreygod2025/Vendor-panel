@@ -29,6 +29,7 @@ import BulkImport from "./pages/oll/BulkImport";
 import Analytics from "./pages/oll/Analytics";
 import APIKeysPage from "./pages/oll/APIKeysPage";
 import InventoryPage from "./pages/oll/InventoryPage";
+import PublicPORequest from "./pages/PublicPORequest";
 
 // Vendor Pages
 import VendorPurchaseOrders from "./pages/vendor/PurchaseOrders";
@@ -203,6 +204,7 @@ function AppRoutes() {
         user ? <Navigate to={user.role === "oll" ? "/oll" : user.role === "distributor" ? "/distributor" : "/vendor"} replace /> : <Login />
       } />
       <Route path="/track/:trackingToken" element={<PublicTracking />} />
+      <Route path="/add" element={<PublicPORequest />} />
       
       {/* OLL Routes */}
       <Route path="/oll" element={

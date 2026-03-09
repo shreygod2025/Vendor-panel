@@ -53,6 +53,7 @@ const PurchaseOrdersList = () => {
   const [vendorFilter, setVendorFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("confirmation");
   const [expandedSections, setExpandedSections] = useState({
+    request: true,
     raised: true,
     confirmed: true,
     changes: true,
@@ -143,6 +144,7 @@ const PurchaseOrdersList = () => {
 
   const getStatusColor = (status) => {
     const colors = {
+      request: "bg-orange-100 text-orange-700",
       draft: "status-draft",
       sent: "status-sent",
       confirmed: "status-confirmed",
@@ -193,6 +195,8 @@ const PurchaseOrdersList = () => {
 
   // Categorize orders by status
   const categorizedOrders = {
+    // External Requests (new)
+    request: filteredOrders.filter(o => o.status === "request"),
     // PO Confirmation section
     raised: filteredOrders.filter(o => o.status === "draft" || o.status === "sent"),
     confirmed: filteredOrders.filter(o => o.status === "confirmed"),
@@ -206,6 +210,16 @@ const PurchaseOrdersList = () => {
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const handleApproveRequest = async (orderId) => {
+    try {
+      await apiClient.post(`/purchase-orders/${orderId}/approve-request`);
+      toast.success("Request approved and sent to vendor");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to approve request");
+    }
   };
 
   const handleApproveDelivery = async () => {
@@ -379,8 +393,8 @@ const PurchaseOrdersList = () => {
   };
 
   const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
-    const canEdit = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
-    const canDelete = order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
+    const canEdit = order.status === "request" || order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
+    const canDelete = order.status === "request" || order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
     const canReRaise = order.status === "rejected";
     
     return (
@@ -803,8 +817,15 @@ const PurchaseOrdersList = () => {
             </Link>
           </div>
         ) : (
-          <Tabs defaultValue="confirmation" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 h-auto p-1">
+          <Tabs defaultValue="requests" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+              <TabsTrigger value="requests" className="py-3 data-[state=active]:bg-orange-600 data-[state=active]:text-white">
+                <div className="flex flex-col items-center gap-1">
+                  <FileText className="w-4 h-4" />
+                  <span>Requests</span>
+                  <span className="text-xs opacity-70">({categorizedOrders.request.length})</span>
+                </div>
+              </TabsTrigger>
               <TabsTrigger value="confirmation" className="py-3 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <div className="flex flex-col items-center gap-1">
                   <Clock className="w-4 h-4" />
@@ -827,6 +848,96 @@ const PurchaseOrdersList = () => {
                 </div>
               </TabsTrigger>
             </TabsList>
+
+            {/* External Requests Tab */}
+            <TabsContent value="requests" className="space-y-4">
+              {categorizedOrders.request.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center text-slate-500">
+                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-lg font-medium">No pending requests</p>
+                    <p className="text-sm">External PO requests will appear here</p>
+                    <p className="text-xs mt-2 text-blue-600">Share link: {window.location.origin}/add</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-orange-50">
+                          <TableHead>Request #</TableHead>
+                          <TableHead>Requester</TableHead>
+                          <TableHead>School</TableHead>
+                          <TableHead>Products</TableHead>
+                          <TableHead>Delivery Date</TableHead>
+                          <TableHead>Vendor</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {categorizedOrders.request.map((order) => (
+                          <TableRow key={order.id} className="hover:bg-orange-50/50">
+                            <TableCell>
+                              <div className="font-mono font-medium">{order.po_number}</div>
+                              <div className="text-xs text-slate-500">{new Date(order.created_at).toLocaleDateString()}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium text-orange-700">{order.requester_name || 'N/A'}</div>
+                              <div className="text-xs text-slate-500">External Request</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">{order.school_name || '-'}</div>
+                              <div className="text-xs text-slate-500 max-w-48 truncate">{order.delivery_address}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {order.line_items.slice(0, 2).map((item, idx) => (
+                                  <div key={idx} className="text-slate-600">
+                                    {item.product_name} x{item.quantity}
+                                  </div>
+                                ))}
+                                {order.line_items.length > 2 && (
+                                  <div className="text-xs text-slate-400">+{order.line_items.length - 2} more</div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{new Date(order.delivery_date).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              {order.vendor_name ? (
+                                <span className="badge bg-emerald-100 text-emerald-700">{order.vendor_name}</span>
+                              ) : (
+                                <span className="badge bg-red-100 text-red-700">Not Assigned</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Link to={`/oll/purchase-orders/${order.id}/edit`}>
+                                  <Button size="sm" variant="outline" className="text-blue-600">
+                                    <Edit className="w-4 h-4 mr-1" />
+                                    Edit & Assign
+                                  </Button>
+                                </Link>
+                                {order.vendor_id && (
+                                  <Button
+                                    size="sm"
+                                    className="bg-emerald-600 hover:bg-emerald-700"
+                                    onClick={() => handleApproveRequest(order.id)}
+                                  >
+                                    <Check className="w-4 h-4 mr-1" />
+                                    Approve
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
             <TabsContent value="confirmation" className="space-y-4">
               {renderSubSection(
