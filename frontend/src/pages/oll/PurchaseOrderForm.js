@@ -33,6 +33,7 @@ const PurchaseOrderForm = () => {
   const [saving, setSaving] = useState(false);
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
+  const [originalStatus, setOriginalStatus] = useState(null);  // Track original PO status
   
   const [formData, setFormData] = useState({
     vendor_id: "",
@@ -175,23 +176,52 @@ const PurchaseOrderForm = () => {
 
       if (isEdit) {
         const poRes = await apiClient.get(`/purchase-orders/${id}`);
+        const poData = poRes.data;
+        setOriginalStatus(poData.status);  // Store original status
+        
+        // For request POs, try to match products and fill pricing
+        let processedLineItems = poData.line_items;
+        if (poData.status === "request" && productsRes.data.length > 0) {
+          processedLineItems = poData.line_items.map(item => {
+            // If item already has product_id and pricing, keep it
+            if (item.product_id && item.unit_price > 0) {
+              return item;
+            }
+            // Try to find matching product by name
+            const matchingProduct = productsRes.data.find(
+              p => p.name.toLowerCase() === item.product_name.toLowerCase()
+            );
+            if (matchingProduct) {
+              return {
+                ...item,
+                product_id: matchingProduct.id,
+                product_name: matchingProduct.name,
+                sku: matchingProduct.sku,
+                unit_price: matchingProduct.unit_price,
+                tax_rate: matchingProduct.tax_rate || 18
+              };
+            }
+            return item;
+          });
+        }
+        
         setFormData({
-          vendor_id: poRes.data.vendor_id,
-          custom_po_number: poRes.data.po_number || "",
-          school_name: poRes.data.school_name || "",
-          delivery_address: poRes.data.delivery_address,
-          contact_person: poRes.data.contact_person,
-          contact_number: poRes.data.contact_number,
-          delivery_date: poRes.data.delivery_date || "",
-          order_discount_amount: poRes.data.order_discount_amount,
-          order_discount_percent: poRes.data.order_discount_percent,
-          notes: poRes.data.notes || "",
-          final_comments: poRes.data.final_comments || "",
-          line_items: poRes.data.line_items
+          vendor_id: poData.vendor_id || "",
+          custom_po_number: poData.po_number || "",
+          school_name: poData.school_name || "",
+          delivery_address: poData.delivery_address,
+          contact_person: poData.contact_person,
+          contact_number: poData.contact_number,
+          delivery_date: poData.delivery_date || "",
+          order_discount_amount: poData.order_discount_amount,
+          order_discount_percent: poData.order_discount_percent,
+          notes: poData.notes || "",
+          final_comments: poData.final_comments || "",
+          line_items: processedLineItems
         });
         // Set school search query for editing
-        if (poRes.data.school_name) {
-          setSchoolSearchQuery(poRes.data.school_name);
+        if (poData.school_name) {
+          setSchoolSearchQuery(poData.school_name);
         }
       }
     } catch (error) {
@@ -403,7 +433,12 @@ const PurchaseOrderForm = () => {
       if (isEdit) {
         await apiClient.put(`/purchase-orders/${id}`, submitData);
         toast.success("Purchase order updated successfully");
-        navigate("/oll/purchase-orders");
+        // For request POs, redirect to PO view page (where user can approve)
+        if (originalStatus === "request") {
+          navigate(`/oll/purchase-orders/${id}`);
+        } else {
+          navigate("/oll/purchase-orders");
+        }
       } else {
         const response = await apiClient.post("/purchase-orders", submitData);
         toast.success("Purchase order created successfully");

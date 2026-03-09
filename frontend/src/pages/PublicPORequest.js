@@ -6,7 +6,14 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
-import { Plus, Trash2, Loader2, Send, Package, User, MapPin, Phone, Calendar, FileText } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { Plus, Trash2, Loader2, Send, Package, User, MapPin, Calendar, FileText, Search } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -14,6 +21,10 @@ const API = process.env.REACT_APP_BACKEND_URL;
 const PublicPORequest = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  
+  // School search state
   const [schoolSearch, setSchoolSearch] = useState("");
   const [schoolResults, setSchoolResults] = useState([]);
   const [searchingSchools, setSearchingSchools] = useState(false);
@@ -26,8 +37,24 @@ const PublicPORequest = () => {
     contact_number: "",
     notes: "",
     requester_name: "",
-    products: [{ product_name: "", quantity: 1 }]
+    items: [{ product_id: "", product_name: "", quantity: 1 }]
   });
+
+  // Fetch products on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await axios.get(`${API}/api/public/products`);
+        setProducts(response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch products");
+        toast.error("Failed to load products list");
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   // Debounce school search
   useEffect(() => {
@@ -60,31 +87,47 @@ const PublicPORequest = () => {
       contact_person: school.contact_name || prev.contact_person,
       contact_number: school.contact_phone || prev.contact_number
     }));
-    setSchoolSearch("");
+    setSchoolSearch(school.school_name);
     setSchoolResults([]);
     toast.success("School details auto-filled");
   };
 
-  const handleAddProduct = () => {
+  const handleAddItem = () => {
     setFormData(prev => ({
       ...prev,
-      products: [...prev.products, { product_name: "", quantity: 1 }]
+      items: [...prev.items, { product_id: "", product_name: "", quantity: 1 }]
     }));
   };
 
-  const handleRemoveProduct = (index) => {
-    if (formData.products.length === 1) return;
+  const handleRemoveItem = (index) => {
+    if (formData.items.length === 1) return;
     setFormData(prev => ({
       ...prev,
-      products: prev.products.filter((_, i) => i !== index)
+      items: prev.items.filter((_, i) => i !== index)
     }));
   };
 
-  const handleProductChange = (index, field, value) => {
+  const handleProductSelect = (index, productId) => {
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.map((item, i) => 
+          i === index ? { 
+            ...item, 
+            product_id: productId, 
+            product_name: product.name 
+          } : item
+        )
+      }));
+    }
+  };
+
+  const handleQuantityChange = (index, quantity) => {
     setFormData(prev => ({
       ...prev,
-      products: prev.products.map((p, i) => 
-        i === index ? { ...p, [field]: value } : p
+      items: prev.items.map((item, i) => 
+        i === index ? { ...item, quantity: parseInt(quantity) || 1 } : item
       )
     }));
   };
@@ -92,16 +135,9 @@ const PublicPORequest = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Use schoolSearch as school_name if user didn't select from autocomplete
-    const finalSchoolName = formData.school_name || schoolSearch;
-    
     // Validations
     if (!formData.requester_name.trim()) {
       toast.error("Please enter your name");
-      return;
-    }
-    if (!finalSchoolName.trim()) {
-      toast.error("Please enter school name");
       return;
     }
     if (!formData.delivery_address.trim()) {
@@ -121,9 +157,9 @@ const PublicPORequest = () => {
       return;
     }
     
-    const validProducts = formData.products.filter(p => p.product_name.trim() && p.quantity > 0);
-    if (validProducts.length === 0) {
-      toast.error("Please add at least one product");
+    const validItems = formData.items.filter(item => item.product_id && item.quantity > 0);
+    if (validItems.length === 0) {
+      toast.error("Please select at least one product");
       return;
     }
 
@@ -131,15 +167,16 @@ const PublicPORequest = () => {
     try {
       const response = await axios.post(`${API}/api/public/po-request`, {
         delivery_date: formData.delivery_date,
-        school_name: finalSchoolName,
+        school_name: formData.school_name || schoolSearch || null,
         delivery_address: formData.delivery_address,
         contact_person: formData.contact_person,
         contact_number: formData.contact_number,
         notes: formData.notes,
         requester_name: formData.requester_name,
-        products: validProducts.map(p => ({
-          product_name: p.product_name.trim(),
-          quantity: parseInt(p.quantity)
+        products: validItems.map(item => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity
         }))
       });
 
@@ -156,6 +193,16 @@ const PublicPORequest = () => {
       setLoading(false);
     }
   };
+
+  // Group products by vendor for easier selection
+  const groupedProducts = products.reduce((acc, product) => {
+    const vendorName = product.vendor_name || "Other";
+    if (!acc[vendorName]) {
+      acc[vendorName] = [];
+    }
+    acc[vendorName].push(product);
+    return acc;
+  }, {});
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -203,22 +250,25 @@ const PublicPORequest = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* School Name with Search */}
+              {/* School Name with Search (Optional) */}
               <div className="relative">
-                <Label htmlFor="school_name">School Name *</Label>
-                <Input
-                  id="school_name"
-                  value={formData.school_name || schoolSearch}
-                  onChange={(e) => {
-                    if (formData.school_name) {
-                      setFormData(prev => ({ ...prev, school_name: "" }));
-                    }
-                    setSchoolSearch(e.target.value);
-                  }}
-                  placeholder="Type to search schools..."
-                  className="mt-1"
-                  data-testid="school-name"
-                />
+                <Label htmlFor="school_name">School Name (Optional - Search from database)</Label>
+                <div className="relative mt-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="school_name"
+                    value={formData.school_name || schoolSearch}
+                    onChange={(e) => {
+                      if (formData.school_name) {
+                        setFormData(prev => ({ ...prev, school_name: "" }));
+                      }
+                      setSchoolSearch(e.target.value);
+                    }}
+                    placeholder="Type to search schools or leave empty..."
+                    className="pl-10"
+                    data-testid="school-name"
+                  />
+                </div>
                 {searchingSchools && (
                   <div className="absolute right-3 top-9">
                     <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
@@ -310,7 +360,7 @@ const PublicPORequest = () => {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={handleAddProduct}
+                  onClick={handleAddItem}
                   data-testid="add-product-btn"
                 >
                   <Plus className="w-4 h-4 mr-1" />
@@ -318,43 +368,75 @@ const PublicPORequest = () => {
                 </Button>
               </div>
               <CardDescription>
-                Enter the products you need (quantity only, no pricing required)
+                Select products from our catalog
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {formData.products.map((product, index) => (
-                <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                  <div className="flex-1">
-                    <Label className="text-xs text-slate-500">Product Name</Label>
-                    <Input
-                      value={product.product_name}
-                      onChange={(e) => handleProductChange(index, 'product_name', e.target.value)}
-                      placeholder="e.g., Robotics Kit, Arduino Board..."
-                      data-testid={`product-name-${index}`}
-                    />
-                  </div>
-                  <div className="w-24">
-                    <Label className="text-xs text-slate-500">Quantity</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={product.quantity}
-                      onChange={(e) => handleProductChange(index, 'quantity', parseInt(e.target.value) || 1)}
-                      data-testid={`product-qty-${index}`}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveProduct(index)}
-                    disabled={formData.products.length === 1}
-                    className="mt-5 text-red-500 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+              {loadingProducts ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  <span className="ml-2 text-slate-500">Loading products...</span>
                 </div>
-              ))}
+              ) : (
+                formData.items.map((item, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex-1">
+                      <Label className="text-xs text-slate-500">Product *</Label>
+                      <Select
+                        value={item.product_id}
+                        onValueChange={(value) => handleProductSelect(index, value)}
+                      >
+                        <SelectTrigger className="mt-1" data-testid={`product-select-${index}`}>
+                          <SelectValue placeholder="Select a product..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(groupedProducts).map(([vendorName, vendorProducts]) => (
+                            <div key={vendorName}>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100">
+                                {vendorName}
+                              </div>
+                              {vendorProducts.map(product => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  <div className="flex flex-col">
+                                    <span>{product.name}</span>
+                                    {product.sku && (
+                                      <span className="text-xs text-slate-400">SKU: {product.sku}</span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {item.product_name && (
+                        <p className="text-xs text-emerald-600 mt-1">Selected: {item.product_name}</p>
+                      )}
+                    </div>
+                    <div className="w-24">
+                      <Label className="text-xs text-slate-500">Quantity *</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => handleQuantityChange(index, e.target.value)}
+                        className="mt-1"
+                        data-testid={`product-qty-${index}`}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveItem(index)}
+                      disabled={formData.items.length === 1}
+                      className="mt-5 text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -383,7 +465,7 @@ const PublicPORequest = () => {
               type="submit"
               size="lg"
               className="bg-[#1e3a8a] hover:bg-[#1e40af]"
-              disabled={loading}
+              disabled={loading || loadingProducts}
               data-testid="submit-btn"
             >
               {loading ? (
@@ -405,7 +487,7 @@ const PublicPORequest = () => {
             <p className="font-medium mb-1">What happens next?</p>
             <ul className="list-disc list-inside space-y-1 text-blue-600">
               <li>Your request will be reviewed by the admin team</li>
-              <li>Admin will assign a vendor and add pricing details</li>
+              <li>Admin will verify vendor and add pricing details</li>
               <li>Once approved, the PO will be sent to the vendor</li>
               <li>You can track the status using the tracking link provided after submission</li>
             </ul>

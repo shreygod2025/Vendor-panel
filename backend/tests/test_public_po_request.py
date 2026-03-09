@@ -73,7 +73,7 @@ class TestPublicPORequestFeature:
         # Verify response structure
         assert data["success"] == True
         assert "po_number" in data
-        assert data["po_number"].startswith("REQ-"), f"PO number should start with REQ-, got {data['po_number']}"
+        assert data["po_number"].startswith("PO-"), f"PO number should start with PO-, got {data['po_number']}"
         assert "tracking_token" in data
         assert len(data["tracking_token"]) > 0
         assert "message" in data
@@ -139,7 +139,7 @@ class TestPublicPORequestFeature:
         
         # Verify response structure
         assert "po_number" in data
-        assert data["po_number"].startswith("REQ-")
+        assert data["po_number"].startswith("PO-")
         assert "status" in data
         assert data["status"] == "request"  # Should be in request status
         assert "delivery_address" in data
@@ -178,7 +178,7 @@ class TestPublicPORequestFeature:
         # Find our test PO
         test_po = None
         for po in data:
-            if po["po_number"].startswith("REQ-") and po.get("requester_name") == "TEST_Public_Requester":
+            if po.get("requester_name") == "TEST_Public_Requester" and po.get("status") == "request":
                 test_po = po
                 break
         

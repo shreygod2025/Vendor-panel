@@ -271,12 +271,13 @@ class POResponse(BaseModel):
 
 # Public PO Request Model (no auth required)
 class PublicPORequestItem(BaseModel):
+    product_id: Optional[str] = None  # Reference to existing product
     product_name: str
     quantity: int
 
 class PublicPORequest(BaseModel):
     delivery_date: str
-    school_name: str
+    school_name: Optional[str] = None  # Made optional
     delivery_address: str
     contact_person: str
     contact_number: str
@@ -1480,6 +1481,48 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         )
         update_data.update(totals)
     
+    # If vendor is being assigned to a request PO, auto-fill pricing from products
+    if existing.get("status") == "request" and "vendor_id" in update_data and update_data["vendor_id"]:
+        if "line_items" not in update_data:
+            # Auto-fill pricing from products if line_items not being updated
+            updated_line_items = []
+            for item in existing.get("line_items", []):
+                # If item has product_id, fetch product pricing
+                if item.get("product_id"):
+                    product = await db.products.find_one({"id": item["product_id"]}, {"_id": 0})
+                    if product and product.get("vendor_id") == update_data["vendor_id"]:
+                        unit_price = product.get("unit_price", 0)
+                        quantity = item.get("quantity", 1)
+                        tax_rate = product.get("tax_rate", 18)
+                        discount_amount = item.get("discount_amount", 0)
+                        discount_percent = item.get("discount_percent", 0)
+                        
+                        # Calculate line item total
+                        item_total = quantity * unit_price
+                        if discount_percent > 0:
+                            discount = item_total * (discount_percent / 100)
+                        else:
+                            discount = discount_amount
+                        after_discount = item_total - discount
+                        tax = after_discount * (tax_rate / 100)
+                        line_total = after_discount + tax
+                        
+                        item = {
+                            **item,
+                            "unit_price": unit_price,
+                            "tax_rate": tax_rate,
+                            "sku": product.get("sku"),
+                            "product_name": product.get("name", item.get("product_name")),
+                            "total": round(line_total, 2)
+                        }
+                updated_line_items.append(item)
+            
+            if updated_line_items:
+                update_data["line_items"] = updated_line_items
+                line_items = [POLineItem(**item) for item in updated_line_items]
+                totals = calculate_po_totals(line_items, 0, 0)
+                update_data.update(totals)
+    
     # If OLL edits a confirmed, sent, or rejected PO, reset status to "sent" for vendor reconfirmation
     if current_user.get("role") == "oll" and existing["status"] in ["confirmed", "sent", "rejected"]:
         update_data["status"] = "sent"
@@ -2269,6 +2312,31 @@ async def track_order(tracking_token: str):
 # PUBLIC PO REQUEST ENDPOINT (No Auth)
 # ========================
 
+@api_router.get("/public/products")
+async def get_public_products():
+    """Get list of products for public PO request form (no authentication required)"""
+    products = await db.products.find({"is_active": True}, {"_id": 0}).to_list(1000)
+    
+    # Get vendor names for display
+    vendor_ids = list(set(p["vendor_id"] for p in products))
+    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
+    vendor_map = {v["id"]: v["name"] for v in vendors}
+    
+    # Return products with vendor names but without sensitive pricing info for external users
+    result = []
+    for p in products:
+        result.append({
+            "id": p["id"],
+            "name": p["name"],
+            "sku": p.get("sku", ""),
+            "vendor_id": p["vendor_id"],
+            "vendor_name": vendor_map.get(p["vendor_id"], ""),
+            "unit": p.get("unit", "pcs"),
+            "description": p.get("description", "")
+        })
+    
+    return result
+
 @api_router.post("/public/po-request")
 async def create_public_po_request(request: PublicPORequest):
     """Create a PO request from external users (no authentication required)"""
@@ -2279,15 +2347,20 @@ async def create_public_po_request(request: PublicPORequest):
     if not request.requester_name.strip():
         raise HTTPException(status_code=400, detail="Requester name is required")
     
-    # Create line items from products (without pricing)
+    # Create line items from products (without pricing - admin will add later)
     line_items = []
     for product in request.products:
+        # If product_id is provided, fetch product details
+        product_data = None
+        if product.product_id:
+            product_data = await db.products.find_one({"id": product.product_id}, {"_id": 0})
+        
         line_items.append({
-            "product_id": None,
-            "product_name": product.product_name,
-            "sku": None,
+            "product_id": product.product_id,
+            "product_name": product_data["name"] if product_data else product.product_name,
+            "sku": product_data.get("sku") if product_data else None,
             "quantity": product.quantity,
-            "unit_price": 0,
+            "unit_price": 0,  # Admin will set pricing
             "tax_rate": 18.0,
             "discount_amount": 0,
             "discount_percent": 0,
@@ -2295,9 +2368,8 @@ async def create_public_po_request(request: PublicPORequest):
             "comment": None
         })
     
-    # Generate PO number and tracking token
-    po_count = await db.purchase_orders.count_documents({})
-    po_number = f"REQ-{po_count + 1:04d}"
+    # Generate PO number using same sequence as regular POs
+    po_number = await generate_po_number_sequential()
     tracking_token = str(uuid.uuid4())[:8].upper()
     
     po_doc = {

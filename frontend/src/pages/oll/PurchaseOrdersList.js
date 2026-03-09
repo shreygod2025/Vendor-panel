@@ -912,8 +912,8 @@ const PurchaseOrdersList = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <Link to={`/oll/purchase-orders/${order.id}/edit`}>
-                                  <Button size="sm" variant="outline" className="text-blue-600">
+                                <Link to={`/oll/purchase-orders/${order.id}/edit`} className="inline-block">
+                                  <Button size="sm" variant="outline" className="text-blue-600" data-testid={`edit-request-${order.id}`}>
                                     <Edit className="w-4 h-4 mr-1" />
                                     Edit & Assign
                                   </Button>

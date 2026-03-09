@@ -140,6 +140,19 @@ const PurchaseOrderDetail = () => {
     }
   };
 
+  const handleApproveRequest = async () => {
+    setActionLoading(true);
+    try {
+      await apiClient.post(`/purchase-orders/${id}/approve-request`);
+      toast.success("Request approved and sent to vendor!");
+      fetchOrder();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to approve request");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleConfirm = async () => {
     setActionLoading(true);
     try {
@@ -298,7 +311,15 @@ const PurchaseOrderDetail = () => {
 
   if (!order) return null;
 
-  const statusSteps = [
+  // Different status steps for request POs vs regular POs
+  const statusSteps = order.status === "request" || order.is_external_request ? [
+    { key: "request", label: "Request" },
+    { key: "sent", label: "Sent to Vendor" },
+    { key: "confirmed", label: "Confirmed" },
+    { key: "dispatched", label: "Dispatched" },
+    { key: "delivered", label: "Delivered" },
+    { key: "closed", label: "Closed" }
+  ] : [
     { key: "draft", label: "Draft" },
     { key: "sent", label: "Sent" },
     { key: "confirmed", label: "Confirmed" },
@@ -360,14 +381,35 @@ const PurchaseOrderDetail = () => {
               </Button>
             )}
             
-            {/* Edit button - for draft, sent, and confirmed POs */}
-            {isOLL && (order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected") && (
+            {/* Edit button - for draft, sent, confirmed, rejected, and request POs */}
+            {isOLL && (order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected" || order.status === "request") && (
               <Link to={`/oll/purchase-orders/${order.id}/edit`}>
                 <Button variant="outline" data-testid="edit-po-btn">
                   <Edit className="w-4 h-4 mr-2" />
                   Edit PO
                 </Button>
               </Link>
+            )}
+
+            {/* Approve & Send for request status */}
+            {isOLL && order.status === "request" && order.vendor_id && (
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={handleApproveRequest}
+                disabled={actionLoading}
+                data-testid="approve-request-btn"
+              >
+                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                Approve & Send to Vendor
+              </Button>
+            )}
+
+            {/* Show warning if request has no vendor */}
+            {isOLL && order.status === "request" && !order.vendor_id && (
+              <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-lg text-sm">
+                <AlertTriangle className="w-4 h-4" />
+                <span>Assign vendor before approving</span>
+              </div>
             )}
             
             {isOLL && order.status === "draft" && (
@@ -485,6 +527,26 @@ const PurchaseOrderDetail = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Order Details */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Requester Info - for external requests */}
+            {order.is_external_request && order.requester_name && (
+              <Card className="border-orange-200 bg-orange-50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-orange-800 text-lg">External Request</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-orange-200 rounded-full flex items-center justify-center">
+                      <span className="text-orange-800 font-bold">{order.requester_name.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-orange-900">Requested by: {order.requester_name}</p>
+                      <p className="text-sm text-orange-600">Submitted on {new Date(order.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Vendor & Delivery */}
             <Card>
               <CardHeader>
@@ -500,7 +562,11 @@ const PurchaseOrderDetail = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-slate-500">Vendor</p>
-                    <p className="font-medium">{order.vendor_name}</p>
+                    {order.vendor_name ? (
+                      <p className="font-medium">{order.vendor_name}</p>
+                    ) : (
+                      <p className="font-medium text-amber-600">Not Assigned</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Contact Person</p>
