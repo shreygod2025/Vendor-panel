@@ -194,6 +194,7 @@ Build a Vendor Management System for OLL organization with the following capabil
 - External Schools API may return empty address fields for some schools
 
 ## Changelog
+- Mar 9, 2025: **Public PO Request Feature Improvements** - Added product dropdown from products API, school name made optional, vendor field now editable for request POs, auto-pricing fills when vendor is assigned, added "External PO Request" banner in edit form
 - Mar 9, 2025: **Public PO Request Feature** - Added public form at /add for external users to request POs without login. Requests appear in admin's "Requests" tab. Admin can edit, assign vendor/pricing, and approve to convert to regular PO. Tracking page at /track/:token shows status. Fixed POResponse vendor_id to be optional.
 - Feb 17, 2025: **Office Inventory Feature** - Added new inventory management section under Management for tracking office products with quantity, unit price, total value, categories, and locations
 - Feb 17, 2025: **Fixed Payments Issues** - Fixed payments page error, added logistics cost display in record payment dialog, fixed invoice status update after payment

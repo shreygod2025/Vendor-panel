@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table";
-import { ArrowLeft, Save, Loader2, Plus, Trash2, Package, MapPin, Search, Building2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Package, MapPin, Search, Building2, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 const PurchaseOrderForm = () => {
@@ -497,6 +497,23 @@ const PurchaseOrderForm = () => {
       </div>
 
       <div className="page-container">
+        {/* Request PO Banner */}
+        {originalStatus === "request" && (
+          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-200 rounded-full flex items-center justify-center">
+                <FileText className="w-5 h-5 text-orange-700" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-orange-800">External PO Request</h3>
+                <p className="text-sm text-orange-600">
+                  This is an external request. Please assign a vendor and verify product pricing before approving.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Delivery Details - Now First */}
           <Card>
@@ -509,28 +526,38 @@ const PurchaseOrderForm = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label className="form-label">Vendor</Label>
+                  <Label className="form-label">Vendor {originalStatus === "request" && <span className="text-red-500">*</span>}</Label>
                   <Select 
                     value={formData.vendor_id} 
-                    onValueChange={(value) => setFormData(prev => ({ 
-                      ...prev, 
-                      vendor_id: value, 
-                      line_items: [{
-                        product_id: "",
-                        product_name: "",
-                        sku: "",
-                        quantity: 1,
-                        unit_price: 0,
-                        tax_rate: 18,
-                        discount_amount: 0,
-                        discount_percent: 0,
-                        comment: ""
-                      }] 
-                    }))}
-                    disabled={isEdit || formData.line_items.some(item => item.product_id)}
+                    onValueChange={(value) => {
+                      // When changing vendor for request POs, keep existing products but clear pricing
+                      if (originalStatus === "request") {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          vendor_id: value
+                        }));
+                      } else {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          vendor_id: value, 
+                          line_items: [{
+                            product_id: "",
+                            product_name: "",
+                            sku: "",
+                            quantity: 1,
+                            unit_price: 0,
+                            tax_rate: 18,
+                            discount_amount: 0,
+                            discount_percent: 0,
+                            comment: ""
+                          }] 
+                        }));
+                      }
+                    }}
+                    disabled={isEdit && originalStatus !== "request" && formData.line_items.some(item => item.product_id)}
                   >
                     <SelectTrigger data-testid="vendor-select">
-                      <SelectValue placeholder="Auto-selected from products" />
+                      <SelectValue placeholder={originalStatus === "request" ? "Select vendor to assign" : "Auto-selected from products"} />
                     </SelectTrigger>
                     <SelectContent>
                       {vendors.map((vendor) => (
@@ -538,7 +565,9 @@ const PurchaseOrderForm = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-slate-500 mt-1">Auto-selected from products</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {originalStatus === "request" ? "Required: Select vendor to process this request" : "Auto-selected from products"}
+                  </p>
                 </div>
                 <div>
                   <Label className="form-label">PO Number (Optional)</Label>
