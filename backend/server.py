@@ -195,6 +195,7 @@ class POCreate(BaseModel):
     vendor_id: str
     custom_po_number: Optional[str] = None  # Optional custom PO number
     school_name: Optional[str] = None  # Optional school name
+    city: Optional[str] = None  # City for delivery
     delivery_address: str
     receiver_name: Optional[str] = None
     contact_person: str
@@ -210,6 +211,7 @@ class POCreate(BaseModel):
 class POUpdate(BaseModel):
     vendor_id: Optional[str] = None  # Allow assigning vendor to request POs
     school_name: Optional[str] = None
+    city: Optional[str] = None  # City for delivery
     delivery_address: Optional[str] = None
     receiver_name: Optional[str] = None
     contact_person: Optional[str] = None
@@ -225,6 +227,7 @@ class POUpdate(BaseModel):
 # PO Import Model
 class POImport(BaseModel):
     vendor_id: str
+    city: Optional[str] = None  # City for delivery
     delivery_address: str
     receiver_name: Optional[str] = None
     contact_person: str
@@ -240,6 +243,7 @@ class POResponse(BaseModel):
     vendor_id: Optional[str] = None  # Optional for request status POs
     vendor_name: Optional[str] = None
     school_name: Optional[str] = None
+    city: Optional[str] = None  # City for delivery
     delivery_address: str
     receiver_name: Optional[str] = None
     contact_person: str
@@ -279,6 +283,7 @@ class PublicPORequestItem(BaseModel):
 class PublicPORequest(BaseModel):
     delivery_date: str
     school_name: Optional[str] = None  # Made optional
+    city: Optional[str] = None  # City for delivery
     delivery_address: str
     contact_person: str
     contact_number: str
@@ -1138,6 +1143,7 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
         "po_number": po_number,
         "vendor_id": po.vendor_id,
         "school_name": po.school_name,
+        "city": po.city,  # Add city field
         "delivery_address": po.delivery_address,
         "receiver_name": po.receiver_name,
         "contact_person": po.contact_person,
@@ -1211,6 +1217,9 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
         # Add rejection reason if missing
         if "rejection_reason" not in p:
             p["rejection_reason"] = None
+        # Add city field if missing
+        if "city" not in p:
+            p["city"] = None
         # Add external request fields if missing
         if "requester_name" not in p:
             p["requester_name"] = None
@@ -1255,6 +1264,9 @@ async def get_purchase_order(po_id: str, current_user: dict = Depends(get_curren
     # Add rejection reason if missing
     if "rejection_reason" not in po:
         po["rejection_reason"] = None
+    # Add city field if missing
+    if "city" not in po:
+        po["city"] = None
     # Add external request fields if missing
     if "requester_name" not in po:
         po["requester_name"] = None
@@ -2463,6 +2475,7 @@ async def create_public_po_request(request: PublicPORequest):
         "custom_po_number": None,
         "vendor_id": None,  # No vendor assigned yet
         "school_name": request.school_name,
+        "city": request.city,  # Add city field
         "delivery_address": request.delivery_address,
         "receiver_name": request.contact_person,
         "contact_person": request.contact_person,

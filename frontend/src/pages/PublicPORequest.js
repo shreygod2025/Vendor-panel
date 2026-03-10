@@ -32,6 +32,7 @@ const PublicPORequest = () => {
   const [formData, setFormData] = useState({
     delivery_date: "",
     school_name: "",
+    city: "",  // Add city field
     delivery_address: "",
     contact_person: "",
     contact_number: "",
@@ -83,6 +84,7 @@ const PublicPORequest = () => {
     setFormData(prev => ({
       ...prev,
       school_name: school.school_name,
+      city: school.city || prev.city,  // Add city field
       delivery_address: [school.address, school.city, school.state].filter(Boolean).join(", "),
       contact_person: school.contact_name || prev.contact_person,
       contact_number: school.contact_phone || prev.contact_number
@@ -168,6 +170,7 @@ const PublicPORequest = () => {
       const response = await axios.post(`${API}/api/public/po-request`, {
         delivery_date: formData.delivery_date,
         school_name: formData.school_name || schoolSearch || null,
+        city: formData.city || null,  // Add city field
         delivery_address: formData.delivery_address,
         contact_person: formData.contact_person,
         contact_number: formData.contact_number,
@@ -292,18 +295,31 @@ const PublicPORequest = () => {
                 )}
               </div>
 
-              {/* Delivery Address */}
-              <div>
-                <Label htmlFor="delivery_address">Delivery Address *</Label>
-                <Textarea
-                  id="delivery_address"
-                  value={formData.delivery_address}
-                  onChange={(e) => setFormData(prev => ({ ...prev, delivery_address: e.target.value }))}
-                  placeholder="Complete delivery address"
-                  className="mt-1"
-                  rows={2}
-                  data-testid="delivery-address"
-                />
+              {/* City and Delivery Address */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <Label htmlFor="delivery_address">Delivery Address *</Label>
+                  <Textarea
+                    id="delivery_address"
+                    value={formData.delivery_address}
+                    onChange={(e) => setFormData(prev => ({ ...prev, delivery_address: e.target.value }))}
+                    placeholder="Complete delivery address"
+                    className="mt-1"
+                    rows={2}
+                    data-testid="delivery-address"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={formData.city}
+                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                    placeholder="City name"
+                    className="mt-1"
+                    data-testid="city"
+                  />
+                </div>
               </div>
 
               {/* Contact Details */}

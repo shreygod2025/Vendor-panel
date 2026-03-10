@@ -415,6 +415,7 @@ const PurchaseOrdersList = () => {
           </div>
         </TableCell>
         <TableCell>{order.vendor_name}</TableCell>
+        <TableCell className="text-slate-600">{order.city || '-'}</TableCell>
         <TableCell>
           <div className="flex flex-col">
             {order.school_name && (
@@ -601,6 +602,7 @@ const PurchaseOrdersList = () => {
           <TableRow className="bg-slate-50">
             <TableHead>PO Number</TableHead>
             <TableHead>Vendor</TableHead>
+            <TableHead>City</TableHead>
             <TableHead>Receiver</TableHead>
             <TableHead>Items</TableHead>
             <TableHead>Grand Total</TableHead>
@@ -630,6 +632,7 @@ const PurchaseOrdersList = () => {
           <TableRow className="bg-slate-50">
             <TableHead>PO Number</TableHead>
             <TableHead>Vendor</TableHead>
+            <TableHead>City</TableHead>
             <TableHead>Receiver</TableHead>
             <TableHead>Items</TableHead>
             <TableHead>Grand Total</TableHead>
@@ -654,6 +657,7 @@ const PurchaseOrdersList = () => {
                   </div>
                 </TableCell>
                 <TableCell>{order.vendor_name}</TableCell>
+                <TableCell className="text-slate-600">{order.city || '-'}</TableCell>
                 <TableCell>
                   <div className="flex flex-col">
                     {order.school_name && (
@@ -869,6 +873,7 @@ const PurchaseOrdersList = () => {
                           <TableHead>Request #</TableHead>
                           <TableHead>Requester</TableHead>
                           <TableHead>School</TableHead>
+                          <TableHead>City</TableHead>
                           <TableHead>Products</TableHead>
                           <TableHead>Delivery Date</TableHead>
                           <TableHead>Vendor</TableHead>
@@ -890,6 +895,7 @@ const PurchaseOrdersList = () => {
                               <div className="font-medium">{order.school_name || '-'}</div>
                               <div className="text-xs text-slate-500 max-w-48 truncate">{order.delivery_address}</div>
                             </TableCell>
+                            <TableCell className="text-slate-600">{order.city || '-'}</TableCell>
                             <TableCell>
                               <div className="text-sm">
                                 {order.line_items.slice(0, 2).map((item, idx) => (

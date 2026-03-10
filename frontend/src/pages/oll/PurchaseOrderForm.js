@@ -39,6 +39,7 @@ const PurchaseOrderForm = () => {
     vendor_id: "",
     custom_po_number: "",
     school_name: "",
+    city: "",  // Add city field
     delivery_address: "",
     contact_person: "",
     contact_number: "",
@@ -136,6 +137,7 @@ const PurchaseOrderForm = () => {
     setFormData(prev => ({
       ...prev,
       school_name: school.school_name,
+      city: school.city || prev.city,  // Add city field
       delivery_address: fullAddress || prev.delivery_address,
       contact_person: school.contact_name || prev.contact_person,
       contact_number: school.contact_phone || prev.contact_number,
@@ -209,6 +211,7 @@ const PurchaseOrderForm = () => {
           vendor_id: poData.vendor_id || "",
           custom_po_number: poData.po_number || "",
           school_name: poData.school_name || "",
+          city: poData.city || "",  // Add city field
           delivery_address: poData.delivery_address,
           contact_person: poData.contact_person,
           contact_number: poData.contact_number,
@@ -689,16 +692,27 @@ const PurchaseOrderForm = () => {
                 </p>
               </div>
 
-              <div>
-                <Label className="form-label">Delivery Address *</Label>
-                <Textarea
-                  value={formData.delivery_address}
-                  onChange={(e) => setFormData(prev => ({ ...prev, delivery_address: e.target.value }))}
-                  rows={2}
-                  required
-                  placeholder="Enter complete delivery address"
-                  data-testid="delivery-address-input"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <Label className="form-label">Delivery Address *</Label>
+                  <Textarea
+                    value={formData.delivery_address}
+                    onChange={(e) => setFormData(prev => ({ ...prev, delivery_address: e.target.value }))}
+                    rows={2}
+                    required
+                    placeholder="Enter complete delivery address"
+                    data-testid="delivery-address-input"
+                  />
+                </div>
+                <div>
+                  <Label className="form-label">City</Label>
+                  <Input
+                    value={formData.city}
+                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                    placeholder="City name"
+                    data-testid="city-input"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

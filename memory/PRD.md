@@ -194,6 +194,7 @@ Build a Vendor Management System for OLL organization with the following capabil
 - External Schools API may return empty address fields for some schools
 
 ## Changelog
+- Mar 10, 2025: **City Column Added** - Added city field to PO creation form, PO tables (admin & vendor), and public PO request form. City auto-fills when school is selected.
 - Mar 9, 2025: **External PO Request API** - Enhanced `/api/public/po-request` endpoint with full response including po_id, tracking_url, and source_system. Added `/api/public/po-status/{identifier}` for status checking by po_id or tracking_token.
 - Mar 9, 2025: **Distributor Security Fix** - Fixed critical security vulnerabilities: distributors can now only see their own POs, invoices, payments, returns, and vendors they have POs with. Product pricing hidden for distributors.
 - Mar 9, 2025: **Public PO Request Feature Improvements** - Added product dropdown from products API, school name made optional, vendor field now editable for request POs, auto-pricing fills when vendor is assigned, added "External PO Request" banner in edit form

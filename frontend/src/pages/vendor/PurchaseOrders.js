@@ -325,6 +325,7 @@ const VendorPurchaseOrders = () => {
             )}
           </div>
         </TableCell>
+        <TableCell className="text-slate-600">{order.city || '-'}</TableCell>
         <TableCell>{order.contact_person || "-"}</TableCell>
         <TableCell>{order.line_items?.length || 0} items</TableCell>
         <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
@@ -411,6 +412,7 @@ const VendorPurchaseOrders = () => {
         <TableHeader>
           <TableRow className="bg-slate-50">
             <TableHead>PO Number</TableHead>
+            <TableHead>City</TableHead>
             <TableHead>Receiver</TableHead>
             <TableHead>Items</TableHead>
             <TableHead>Total</TableHead>
@@ -439,6 +441,7 @@ const VendorPurchaseOrders = () => {
         <TableHeader>
           <TableRow className="bg-slate-50">
             <TableHead>PO Number</TableHead>
+            <TableHead>City</TableHead>
             <TableHead>Receiver</TableHead>
             <TableHead>Items</TableHead>
             <TableHead>Total</TableHead>
@@ -453,6 +456,7 @@ const VendorPurchaseOrders = () => {
             return (
               <TableRow key={order.id}>
                 <TableCell className="font-mono font-medium">{order.po_number}</TableCell>
+                <TableCell className="text-slate-600">{order.city || '-'}</TableCell>
                 <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
                 <TableCell>{order.line_items?.length || 0} items</TableCell>
                 <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
