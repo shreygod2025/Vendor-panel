@@ -606,10 +606,14 @@ const PurchaseOrderDetail = () => {
                     <TableRow>
                       <TableHead>Product</TableHead>
                       <TableHead className="text-center">Qty</TableHead>
-                      <TableHead className="text-right">Unit Price</TableHead>
-                      <TableHead className="text-right">Discount</TableHead>
-                      <TableHead className="text-right">Tax</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
+                      {!isDistributor && (
+                        <>
+                          <TableHead className="text-right">Unit Price</TableHead>
+                          <TableHead className="text-right">Discount</TableHead>
+                          <TableHead className="text-right">Tax</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -629,12 +633,16 @@ const PurchaseOrderDetail = () => {
                             <p className="text-xs text-slate-500">{item.sku}</p>
                           </TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-right font-mono">{formatCurrency(item.unit_price)}</TableCell>
-                          <TableCell className="text-right font-mono text-red-600">
-                            {discount > 0 ? `-${formatCurrency(discount)}` : '-'}
-                          </TableCell>
-                          <TableCell className="text-right">{item.tax_rate}%</TableCell>
-                          <TableCell className="text-right font-mono font-medium">{formatCurrency(lineTotal)}</TableCell>
+                          {!isDistributor && (
+                            <>
+                              <TableCell className="text-right font-mono">{formatCurrency(item.unit_price)}</TableCell>
+                              <TableCell className="text-right font-mono text-red-600">
+                                {discount > 0 ? `-${formatCurrency(discount)}` : '-'}
+                              </TableCell>
+                              <TableCell className="text-right">{item.tax_rate}%</TableCell>
+                              <TableCell className="text-right font-mono font-medium">{formatCurrency(lineTotal)}</TableCell>
+                            </>
+                          )}
                         </TableRow>
                       );
                     })}
@@ -833,36 +841,38 @@ const PurchaseOrderDetail = () => {
             )}
           </div>
 
-          {/* Order Summary */}
-          <div>
-            <Card className="sticky top-24">
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal</span>
-                    <span className="font-mono">{formatCurrency(order.subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Discount</span>
-                    <span className="font-mono text-red-600">-{formatCurrency(order.total_discount)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Tax (GST)</span>
-                    <span className="font-mono">{formatCurrency(order.total_tax)}</span>
-                  </div>
-                  <div className="border-t pt-3">
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Grand Total</span>
-                      <span className="font-mono text-[#1e3a8a]">{formatCurrency(order.grand_total)}</span>
+          {/* Order Summary - Hidden for Distributors */}
+          {!isDistributor && (
+            <div>
+              <Card className="sticky top-24">
+                <CardHeader>
+                  <CardTitle>Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Subtotal</span>
+                      <span className="font-mono">{formatCurrency(order.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Discount</span>
+                      <span className="font-mono text-red-600">-{formatCurrency(order.total_discount)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Tax (GST)</span>
+                      <span className="font-mono">{formatCurrency(order.total_tax)}</span>
+                    </div>
+                    <div className="border-t pt-3">
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Grand Total</span>
+                        <span className="font-mono text-[#1e3a8a]">{formatCurrency(order.grand_total)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
 
