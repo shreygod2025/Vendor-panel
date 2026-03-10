@@ -603,22 +603,46 @@ const PurchaseOrderForm = () => {
                     <Building2 className="w-4 h-4" />
                     School Name (Optional)
                   </Label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        school_name: "OLL Office",
-                        delivery_address: "103 1st floor - Kshitij building, Veera Desai Rd, Dattaguru Nagar, Azad Nagar, Andheri West, Mumbai, Maharashtra 400053"
-                      }));
-                      setSchoolSearchQuery("OLL Office");
-                      toast.success("OLL Office address filled");
-                    }}
-                    className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 transition-colors flex items-center gap-1"
-                  >
-                    <MapPin className="w-3 h-3" />
-                    OLL Office
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          school_name: "OLL Office",
+                          delivery_address: "103 1st floor - Kshitij building, Veera Desai Rd, Dattaguru Nagar, Azad Nagar, Andheri West, Mumbai, Maharashtra 400053",
+                          city: "Mumbai"
+                        }));
+                        setSchoolSearchQuery("OLL Office");
+                        toast.success("OLL Office address filled");
+                      }}
+                      className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 transition-colors flex items-center gap-1"
+                    >
+                      <MapPin className="w-3 h-3" />
+                      OLL Office
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Get selected vendor's address
+                        const selectedVendor = vendors.find(v => v.id === formData.vendor_id);
+                        const vendorAddress = selectedVendor?.address || "Vendor's Factory/Office";
+                        const vendorCity = selectedVendor?.city || "";
+                        setFormData(prev => ({
+                          ...prev,
+                          school_name: "Vendor Pickup",
+                          delivery_address: vendorAddress,
+                          city: vendorCity
+                        }));
+                        setSchoolSearchQuery("Vendor Pickup");
+                        toast.success("Vendor pickup selected - will collect from vendor directly");
+                      }}
+                      className="text-xs px-2 py-1 bg-purple-50 text-purple-600 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors flex items-center gap-1"
+                    >
+                      <Building2 className="w-3 h-3" />
+                      Vendor Pickup
+                    </button>
+                  </div>
                 </div>
                 <div className="relative" ref={schoolSearchRef}>
                   <div className="relative">

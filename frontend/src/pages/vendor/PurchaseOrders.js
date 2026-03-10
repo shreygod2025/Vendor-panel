@@ -334,7 +334,7 @@ const VendorPurchaseOrders = () => {
             {order.status === "pending_approval" ? "Pending Approval" : order.status}
           </span>
         </TableCell>
-        <TableCell className="text-slate-500">{formatDate(order.created_at)}</TableCell>
+        <TableCell className="text-slate-500">{order.delivery_date ? formatDate(order.delivery_date) : '-'}</TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-2">
             <Link to={`/vendor/purchase-orders/${order.id}`}>
@@ -417,7 +417,7 @@ const VendorPurchaseOrders = () => {
             <TableHead>Items</TableHead>
             <TableHead>Total</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Date</TableHead>
+            <TableHead>Delivery Date</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
