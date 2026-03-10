@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Plus, Trash2, Save, ArrowLeft, Package } from "lucide-react";
+import { Plus, Trash2, Save, ArrowLeft, Package, MapPin, Building2 } from "lucide-react";
 import { toast } from "sonner";
 
 const DistributorPurchaseOrderForm = () => {
@@ -36,6 +36,7 @@ const DistributorPurchaseOrderForm = () => {
 
   const [formData, setFormData] = useState({
     vendor_id: "",
+    city: "",
     delivery_address: "",
     contact_person: "",
     contact_number: "",
@@ -306,7 +307,27 @@ const DistributorPurchaseOrderForm = () => {
           {/* Delivery Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Delivery Details</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Delivery Details</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const selectedVendorData = vendors.find(v => v.id === formData.vendor_id);
+                    const vendorAddress = selectedVendorData?.address || "Vendor's Factory/Office";
+                    const vendorCity = selectedVendorData?.city || "";
+                    setFormData(prev => ({
+                      ...prev,
+                      delivery_address: `Pickup from Vendor: ${vendorAddress}`,
+                      city: vendorCity
+                    }));
+                    toast.success("Vendor pickup selected - will collect from vendor directly");
+                  }}
+                  className="text-xs px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors flex items-center gap-1"
+                >
+                  <Building2 className="w-3 h-3" />
+                  Pickup from Vendor
+                </button>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -318,6 +339,15 @@ const DistributorPurchaseOrderForm = () => {
                     value={formData.delivery_date}
                     onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })}
                     required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    placeholder="City name"
                   />
                 </div>
               </div>

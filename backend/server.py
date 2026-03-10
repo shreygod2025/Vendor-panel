@@ -840,17 +840,10 @@ async def get_vendors(is_active: Optional[bool] = None, current_user: dict = Dep
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["id"] = current_user["vendor_id"]
     
-    # Security: Distributors can only see vendors they have POs with
+    # Distributors can see ALL active vendors to create POs
+    # (They need to be able to select vendors when creating orders)
     if current_user.get("role") == "distributor":
-        distributor_pos = await db.purchase_orders.find(
-            {"distributor_id": current_user["user_id"]},
-            {"vendor_id": 1, "_id": 0}
-        ).to_list(1000)
-        distributor_vendor_ids = list(set(p["vendor_id"] for p in distributor_pos if p.get("vendor_id")))
-        if distributor_vendor_ids:
-            query["id"] = {"$in": distributor_vendor_ids}
-        else:
-            return []  # No vendors if no POs
+        query["is_active"] = True  # Only show active vendors
     
     vendors = await db.vendors.find(query, {"_id": 0}).to_list(1000)
     return [VendorResponse(**v) for v in vendors]
@@ -860,15 +853,7 @@ async def get_vendor(vendor_id: str, current_user: dict = Depends(get_current_us
     if current_user.get("role") == "vendor" and current_user.get("vendor_id") != vendor_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    # Security: Distributors can only see vendors they have POs with
-    if current_user.get("role") == "distributor":
-        has_po_with_vendor = await db.purchase_orders.find_one({
-            "distributor_id": current_user["user_id"],
-            "vendor_id": vendor_id
-        })
-        if not has_po_with_vendor:
-            raise HTTPException(status_code=403, detail="Access denied")
-    
+    # Distributors can view any active vendor's details
     vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
@@ -1047,17 +1032,9 @@ async def get_products(vendor_id: Optional[str] = None, is_active: Optional[bool
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
     
-    # Security: Distributors can only see products from vendors they have POs with
+    # Distributors can see ALL active products to create POs (pricing hidden below)
     if current_user.get("role") == "distributor":
-        distributor_pos = await db.purchase_orders.find(
-            {"distributor_id": current_user["user_id"]},
-            {"vendor_id": 1, "_id": 0}
-        ).to_list(1000)
-        distributor_vendor_ids = list(set(p["vendor_id"] for p in distributor_pos if p.get("vendor_id")))
-        if distributor_vendor_ids:
-            query["vendor_id"] = {"$in": distributor_vendor_ids}
-        else:
-            return []  # No products if no POs
+        query["is_active"] = True  # Only show active products
     
     products = await db.products.find(query, {"_id": 0}).to_list(1000)
     
