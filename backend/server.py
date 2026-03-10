@@ -744,6 +744,36 @@ async def register(user_data: UserCreate, current_user: dict = Depends(get_curre
     
     return UserResponse(**{k: v for k, v in user.items() if k != "password"})
 
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    email: Optional[str] = None
+    name: Optional[str] = None
+
+@api_router.put("/users/{user_id}", response_model=UserResponse)
+async def update_user(user_id: str, user_update: UserUpdate, current_user: dict = Depends(get_current_user)):
+    """Update user details (admin only). Use this to reset passwords for distributors."""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL admins can update users")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    update_data = {}
+    if user_update.password:
+        update_data["password"] = hash_password(user_update.password)
+    if user_update.email is not None:
+        update_data["email"] = user_update.email
+    if user_update.name is not None:
+        update_data["name"] = user_update.name
+    
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.users.update_one({"id": user_id}, {"$set": update_data})
+    
+    updated_user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    return UserResponse(**updated_user)
+
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     user = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0, "password": 0})
