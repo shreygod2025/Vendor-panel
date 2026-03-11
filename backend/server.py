@@ -48,7 +48,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
-SECRET_KEY = os.environ.get('SECRET_KEY', 'oll-vendor-management-secret-key-2024')
+SECRET_KEY = os.environ['SECRET_KEY']
 ALGORITHM = "HS256"
 
 # PO Sync Webhook Configuration
