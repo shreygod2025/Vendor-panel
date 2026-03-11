@@ -27,6 +27,7 @@ from email_service import (
     notify_admin_dispatched,
     notify_admin_delivered,
     notify_admin_issue_resolved,
+    notify_accounts_invoice,
     get_admin_emails,
     is_email_configured
 )
@@ -1946,6 +1947,12 @@ async def approve_delivery(po_id: str, current_user: dict = Depends(get_current_
     
     # Trigger webhook to sync PO data
     asyncio.create_task(trigger_po_sync_webhook())
+    
+    # Send invoice to accounts when delivery is confirmed
+    invoice = await db.invoices.find_one({"po_id": po_id}, {"_id": 0})
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    if invoice and vendor:
+        asyncio.create_task(notify_accounts_invoice(invoice, po, vendor))
     
     return {"message": "Delivery approved successfully"}
 

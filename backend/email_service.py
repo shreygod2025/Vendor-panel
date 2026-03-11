@@ -294,9 +294,10 @@ def template_issue_raised(issue_data: Dict, po_data: Dict, vendor_data: Dict) ->
     return subject, get_base_template(content, subject)
 
 
-def template_payment_made(payment_data: Dict, invoice_data: Dict, vendor_data: Dict) -> tuple:
+def template_payment_made(payment_data: Dict, invoice_data: Dict, vendor_data: Dict, po_number: str = None) -> tuple:
     """Email template when payment is made"""
-    subject = f"💰 Payment Received - {format_currency(payment_data.get('amount', 0))}"
+    po_ref = f" for {po_number}" if po_number else ""
+    subject = f"💰 Payment Received{po_ref} - {format_currency(payment_data.get('amount', 0))}"
     
     content = f"""
     <h2 style="margin: 0 0 16px 0; color: #16a34a; font-size: 20px;">Payment Confirmation</h2>
@@ -724,3 +725,115 @@ async def get_admin_emails(db) -> List[str]:
 def is_email_configured() -> bool:
     """Check if email service is configured"""
     return EMAIL_ENABLED
+
+
+# ========================
+# ACCOUNTS EMAIL (Invoice on Delivery Confirmation)
+# ========================
+
+ACCOUNTS_EMAIL = "accounts@clonefutura.com"
+
+def template_invoice_for_accounts(invoice_data: Dict, po_data: Dict, vendor_data: Dict) -> tuple:
+    """Email template for sending invoice to accounts when delivery is confirmed"""
+    po_number = po_data.get('po_number', 'N/A')
+    subject = f"📄 Invoice for {po_number} - {invoice_data.get('invoice_number')} - Delivery Confirmed"
+    
+    items_html = ""
+    for item in po_data.get('line_items', []):
+        item_total = item.get('quantity', 0) * item.get('unit_price', 0)
+        items_html += f"""
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">{item.get('product_name', 'N/A')}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">{item.get('quantity', 0)}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">{format_currency(item.get('unit_price', 0))}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">{format_currency(item_total)}</td>
+        </tr>
+        """
+    
+    content = f"""
+    <h2 style="margin: 0 0 16px 0; color: #1e3a8a; font-size: 20px;">Invoice - Delivery Confirmed</h2>
+    
+    <div style="background-color: #dcfce7; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+        <p style="margin: 0; color: #166534; font-weight: bold;">
+            Delivery for {po_number} has been confirmed
+        </p>
+        <p style="margin: 8px 0 0 0; color: #166534;">
+            Invoice Number: {invoice_data.get('invoice_number')}
+        </p>
+    </div>
+    
+    <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+        <table width="100%" cellspacing="0" cellpadding="0">
+            <tr>
+                <td style="padding: 4px 0; color: #64748b;">PO Number:</td>
+                <td style="padding: 4px 0; color: #334155; font-weight: bold;">{po_number}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 0; color: #64748b;">Vendor:</td>
+                <td style="padding: 4px 0; color: #334155; font-weight: bold;">{vendor_data.get('name', 'N/A')}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 0; color: #64748b;">Invoice Date:</td>
+                <td style="padding: 4px 0; color: #334155; font-weight: bold;">{format_date(invoice_data.get('invoice_date', 'N/A'))}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 0; color: #64748b;">Delivery Date:</td>
+                <td style="padding: 4px 0; color: #334155; font-weight: bold;">{format_date(po_data.get('delivery_date', 'N/A'))}</td>
+            </tr>
+            <tr>
+                <td style="padding: 4px 0; color: #64748b;">Delivery Address:</td>
+                <td style="padding: 4px 0; color: #334155;">{po_data.get('delivery_address', 'N/A')}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <h3 style="color: #475569; font-size: 16px; margin: 24px 0 12px 0;">Invoice Items</h3>
+    <table width="100%" cellspacing="0" cellpadding="0" style="border: 1px solid #e2e8f0; border-radius: 4px;">
+        <tr style="background-color: #1e3a8a;">
+            <th style="padding: 12px 10px; text-align: left; color: #fff;">Product</th>
+            <th style="padding: 12px 10px; text-align: center; color: #fff;">Qty</th>
+            <th style="padding: 12px 10px; text-align: right; color: #fff;">Unit Price</th>
+            <th style="padding: 12px 10px; text-align: right; color: #fff;">Total</th>
+        </tr>
+        {items_html}
+    </table>
+    
+    <div style="margin-top: 16px; text-align: right;">
+        <table style="margin-left: auto;">
+            <tr>
+                <td style="padding: 8px 16px; color: #64748b;">Subtotal:</td>
+                <td style="padding: 8px 0; color: #334155; font-weight: bold;">{format_currency(po_data.get('subtotal', 0))}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 16px; color: #64748b;">GST ({po_data.get('gst_percentage', 18)}%):</td>
+                <td style="padding: 8px 0; color: #334155; font-weight: bold;">{format_currency(po_data.get('gst_amount', 0))}</td>
+            </tr>
+            <tr style="background-color: #f1f5f9;">
+                <td style="padding: 12px 16px; color: #1e3a8a; font-weight: bold; font-size: 16px;">Grand Total:</td>
+                <td style="padding: 12px 0; color: #1e3a8a; font-weight: bold; font-size: 18px;">{format_currency(invoice_data.get('total_amount', 0) or po_data.get('grand_total', 0))}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div style="margin-top: 24px; padding: 16px; background-color: #fef3c7; border-radius: 8px;">
+        <p style="margin: 0; color: #92400e; font-size: 14px;">
+            <strong>Vendor Bank Details:</strong><br>
+            {vendor_data.get('bank_name', 'N/A')} | A/C: {vendor_data.get('account_number', 'N/A')} | IFSC: {vendor_data.get('ifsc_code', 'N/A')}
+        </p>
+    </div>
+    
+    <div style="margin-top: 24px; text-align: center;">
+        <a href="{APP_BASE_URL}/oll/invoices" 
+           style="display: inline-block; background-color: #1e3a8a; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            View in System
+        </a>
+    </div>
+    """
+    
+    return subject, get_base_template(content, subject)
+
+
+async def notify_accounts_invoice(invoice_data: Dict, po_data: Dict, vendor_data: Dict):
+    """Send invoice to accounts when delivery is confirmed"""
+    subject, html = template_invoice_for_accounts(invoice_data, po_data, vendor_data)
+    send_email_background(ACCOUNTS_EMAIL, subject, html)
