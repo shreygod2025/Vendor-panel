@@ -709,17 +709,27 @@ async def notify_admin_issue_resolved(issue_data: Dict, po_data: Dict, vendor_da
 # UTILITY FUNCTIONS
 # ========================
 
-async def get_admin_emails(db) -> List[str]:
-    """Get all admin user emails from database"""
-    try:
-        admins = await db.users.find(
-            {"role": "oll", "is_active": True},
-            {"_id": 0, "email": 1}
-        ).to_list(100)
-        return [a['email'] for a in admins if a.get('email')]
-    except Exception as e:
-        logger.error(f"Failed to get admin emails: {e}")
-        return []
+# Configured admin emails from environment
+ADMIN_EMAILS_CONFIG = os.environ.get('ADMIN_EMAILS', '').split(',')
+ADMIN_EMAILS_CONFIG = [e.strip() for e in ADMIN_EMAILS_CONFIG if e.strip()]
+
+async def get_admin_emails(db=None) -> List[str]:
+    """Get admin emails - uses configured emails from .env if available, otherwise falls back to database"""
+    if ADMIN_EMAILS_CONFIG:
+        return ADMIN_EMAILS_CONFIG
+    
+    # Fallback to database if no config
+    if db:
+        try:
+            admins = await db.users.find(
+                {"role": "oll", "is_active": True},
+                {"_id": 0, "email": 1}
+            ).to_list(100)
+            return [a['email'] for a in admins if a.get('email')]
+        except Exception as e:
+            logger.error(f"Failed to get admin emails: {e}")
+    
+    return []
 
 
 def is_email_configured() -> bool:
