@@ -17,6 +17,20 @@ import asyncio
 from io import BytesIO
 import httpx
 
+# Email notification service
+from email_service import (
+    notify_vendor_po_raised,
+    notify_vendor_po_status,
+    notify_vendor_issue_raised,
+    notify_vendor_payment_made,
+    notify_admin_po_confirmed,
+    notify_admin_dispatched,
+    notify_admin_delivered,
+    notify_admin_issue_resolved,
+    get_admin_emails,
+    is_email_configured
+)
+
 # PDF Generation imports
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -1178,6 +1192,10 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     # Trigger webhook to sync PO data to external panel
     asyncio.create_task(trigger_po_sync_webhook())
     
+    # Send email notification to vendor when PO is raised (only if status is "sent")
+    if initial_status == "sent":
+        asyncio.create_task(notify_vendor_po_raised(po_doc, vendor))
+    
     po_doc["vendor_name"] = vendor.get("name")
     return POResponse(**po_doc)
 
@@ -1714,6 +1732,12 @@ async def confirm_po(po_id: str, current_user: dict = Depends(get_current_user))
     # Trigger webhook to sync PO data
     asyncio.create_task(trigger_po_sync_webhook())
     
+    # Notify admin that vendor confirmed the PO
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    if vendor:
+        admin_emails = await get_admin_emails(db)
+        asyncio.create_task(notify_admin_po_confirmed(po, vendor, admin_emails))
+    
     return {"message": "PO confirmed successfully"}
 
 @api_router.post("/purchase-orders/{po_id}/reject")
@@ -1886,6 +1910,12 @@ async def vendor_submit_delivery(po_id: str, delivery: VendorDeliverySubmit, cur
     
     # Trigger webhook to sync PO data
     asyncio.create_task(trigger_po_sync_webhook())
+    
+    # Notify admin that delivery is submitted for approval
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    if vendor:
+        admin_emails = await get_admin_emails(db)
+        asyncio.create_task(notify_admin_delivered(po, vendor, admin_emails))
     
     return {"message": "Delivery submitted for approval", "invoice_id": invoice_doc["id"]}
 
@@ -2065,6 +2095,12 @@ async def create_dispatch(dispatch: DispatchCreate, current_user: dict = Depends
     
     await create_audit_log("CREATE_DISPATCH", "dispatch", dispatch_doc["id"], current_user, {"po_id": dispatch.po_id})
     
+    # Notify admin that order is dispatched
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    if vendor:
+        admin_emails = await get_admin_emails(db)
+        asyncio.create_task(notify_admin_dispatched(po, dispatch_doc, vendor, admin_emails))
+    
     return DispatchResponse(**dispatch_doc)
 
 @api_router.get("/dispatch/{po_id}", response_model=DispatchResponse)
@@ -2121,6 +2157,10 @@ async def create_issue(issue: IssueCreate, current_user: dict = Depends(get_curr
     vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
     issue_doc["vendor_name"] = vendor.get("name") if vendor else None
     issue_doc["po_number"] = po["po_number"]
+    
+    # Notify vendor about the issue
+    if vendor:
+        asyncio.create_task(notify_vendor_issue_raised(issue_doc, po, vendor))
     
     return IssueResponse(**issue_doc)
 
@@ -2206,6 +2246,8 @@ async def update_issue(issue_id: str, issue_update: IssueUpdate, current_user: d
     update_data = {k: v for k, v in issue_update.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
+    was_resolved = update_data.get("status") == "resolved" and existing.get("status") != "resolved"
+    
     if update_data.get("status") == "resolved":
         update_data["resolved_by"] = current_user["user_id"]
     
@@ -2227,6 +2269,11 @@ async def update_issue(issue_id: str, issue_update: IssueUpdate, current_user: d
         updated["created_by_name"] = None
     if "created_by_role" not in updated:
         updated["created_by_role"] = "oll"
+    
+    # Notify admin when issue is resolved
+    if was_resolved and vendor and po:
+        admin_emails = await get_admin_emails(db)
+        asyncio.create_task(notify_admin_issue_resolved(updated, po, vendor, admin_emails))
     
     return IssueResponse(**updated)
 
@@ -2622,6 +2669,11 @@ async def approve_po_request(po_id: str, current_user: dict = Depends(get_curren
     
     await create_audit_log("APPROVE_PO_REQUEST", "purchase_order", po_id, current_user, {"from": "request", "to": "sent"})
     
+    # Notify vendor that the PO has been approved and sent
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    if vendor:
+        asyncio.create_task(notify_vendor_po_raised(po, vendor))
+    
     return {"success": True, "message": "PO request approved and sent to vendor"}
 
 # ========================
@@ -2818,6 +2870,11 @@ async def create_payment(payment: PaymentCreate, current_user: dict = Depends(ge
     )
     
     await create_audit_log("CREATE_PAYMENT", "payment", payment_doc["id"], current_user, {"invoice_id": payment.invoice_id})
+    
+    # Notify vendor about payment
+    vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
+    if vendor:
+        asyncio.create_task(notify_vendor_payment_made(payment_doc, invoice, vendor))
     
     return PaymentResponse(**payment_doc)
 
@@ -4871,6 +4928,18 @@ async def integration_list_products(
             }
             for p in products
         ]
+    }
+
+# Email configuration status endpoint
+@api_router.get("/email-status")
+async def get_email_status(current_user: dict = Depends(get_current_user)):
+    """Check if email notifications are configured"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can check email status")
+    
+    return {
+        "configured": is_email_configured(),
+        "message": "Email notifications are active" if is_email_configured() else "Email not configured. Add RESEND_API_KEY to .env file."
     }
 
 # Include the router

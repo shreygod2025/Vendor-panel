@@ -186,7 +186,7 @@ Build a Vendor Management System for OLL organization with the following capabil
 
 ### P2 - Medium Priority
 1. Downloadable reports
-2. Email notifications (Resend integration)
+2. ~~Email notifications (Resend integration)~~ ✅ DONE
 3. Google Drive integration
 
 ## Known Issues
@@ -194,6 +194,15 @@ Build a Vendor Management System for OLL organization with the following capabil
 - External Schools API may return empty address fields for some schools
 
 ## Changelog
+- Mar 11, 2025: **Email Notifications System** - Added comprehensive email notification system using Resend:
+  - **Vendor Notifications**: PO raised, delivery reminders (6/4/2/0 days), PO approved/rejected, issues raised, payment received
+  - **Admin Notifications**: PO confirmed by vendor, order dispatched, delivery pending approval, payment due reminders, issue resolved
+  - Background cron scheduler for delivery and payment reminders (`notification_scheduler.py`)
+  - Non-blocking async email sending (doesn't slow down the website)
+  - Email templates with OLL branding
+  - Endpoint `/api/email-status` to check configuration
+  - To activate: Add `RESEND_API_KEY=re_xxxxx` to `/app/backend/.env`
+- Mar 11, 2025: **Searchable Product Dropdowns** - Fixed and verified searchable product selection (combobox) on Admin PO Form, Distributor PO Form, and Public PO Request Form
 - Mar 10, 2025: **City Column Added** - Added city field to PO creation form, PO tables (admin & vendor), and public PO request form. City auto-fills when school is selected.
 - Mar 9, 2025: **External PO Request API** - Enhanced `/api/public/po-request` endpoint with full response including po_id, tracking_url, and source_system. Added `/api/public/po-status/{identifier}` for status checking by po_id or tracking_token.
 - Mar 9, 2025: **Distributor Security Fix** - Fixed critical security vulnerabilities: distributors can now only see their own POs, invoices, payments, returns, and vendors they have POs with. Product pricing hidden for distributors.
