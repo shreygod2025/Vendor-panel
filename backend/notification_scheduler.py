@@ -36,7 +36,8 @@ from email_service import (
     is_email_configured,
     send_email_async,
     template_delivery_reminder,
-    template_admin_payment_due
+    template_admin_payment_due,
+    send_daily_delivery_report
 )
 
 # Configure logging
@@ -281,14 +282,22 @@ async def run_scheduler():
         return
     
     try:
-        # Send delivery reminders
-        delivery_count = await send_delivery_reminders()
+        # Get admin emails once
+        admin_emails = await get_admin_emails(db)
         
-        # Send payment due reminders
+        # Send daily delivery report to admins
+        if admin_emails:
+            report_sent, delivery_count = await send_daily_delivery_report(db, admin_emails)
+            logger.info(f"Daily delivery report sent to {report_sent} admins ({delivery_count} deliveries due today)")
+        
+        # Send delivery reminders to vendors
+        delivery_reminder_count = await send_delivery_reminders()
+        
+        # Send payment due reminders to admins
         payment_count = await send_payment_due_reminders()
         
         logger.info("=" * 60)
-        logger.info(f"Scheduler run complete. Delivery: {delivery_count}, Payment: {payment_count}")
+        logger.info(f"Scheduler run complete. Delivery reminders: {delivery_reminder_count}, Payment reminders: {payment_count}")
         logger.info("=" * 60)
         
     except Exception as e:

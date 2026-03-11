@@ -837,3 +837,154 @@ async def notify_accounts_invoice(invoice_data: Dict, po_data: Dict, vendor_data
     """Send invoice to accounts when delivery is confirmed"""
     subject, html = template_invoice_for_accounts(invoice_data, po_data, vendor_data)
     send_email_background(ACCOUNTS_EMAIL, subject, html)
+
+
+# ========================
+# DAILY REPORT TEMPLATES
+# ========================
+
+def template_daily_delivery_report(deliveries_today: List[Dict], admin_name: str = "Admin") -> tuple:
+    """Daily report of deliveries due today for admin"""
+    today_str = datetime.now().strftime("%d %B %Y")
+    count = len(deliveries_today)
+    
+    subject = f"📋 Daily Delivery Report - {count} Deliveries Due Today ({today_str})"
+    
+    if count == 0:
+        content = f"""
+        <h2 style="margin: 0 0 16px 0; color: #1e3a8a; font-size: 20px;">Daily Delivery Report</h2>
+        
+        <div style="background-color: #f0fdf4; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+            <p style="margin: 0; color: #166534; font-weight: bold;">
+                📅 {today_str}
+            </p>
+        </div>
+        
+        <p style="color: #334155; line-height: 1.6;">Good morning {admin_name},</p>
+        
+        <div style="background-color: #dcfce7; padding: 24px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <p style="margin: 0; color: #166534; font-size: 18px;">
+                ✅ No deliveries scheduled for today!
+            </p>
+        </div>
+        
+        <div style="margin-top: 24px; text-align: center;">
+            <a href="{APP_BASE_URL}/oll/deliveries" 
+               style="display: inline-block; background-color: #1e3a8a; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                View All Deliveries
+            </a>
+        </div>
+        """
+    else:
+        # Build deliveries table
+        rows_html = ""
+        total_value = 0
+        for d in deliveries_today:
+            status_colors = {
+                'confirmed': '#0284c7',
+                'dispatched': '#7c3aed',
+                'pending_approval': '#ea580c'
+            }
+            status = d.get('status', 'confirmed')
+            status_color = status_colors.get(status, '#64748b')
+            total_value += d.get('grand_total', 0)
+            
+            rows_html += f"""
+            <tr>
+                <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0;">
+                    <strong style="color: #1e3a8a;">{d.get('po_number', 'N/A')}</strong>
+                </td>
+                <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0;">
+                    {d.get('vendor_name', 'N/A')}
+                </td>
+                <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0;">
+                    {d.get('school_name', d.get('delivery_address', 'N/A')[:30])}...
+                </td>
+                <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: right;">
+                    {format_currency(d.get('grand_total', 0))}
+                </td>
+                <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                    <span style="background-color: {status_color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">
+                        {status.replace('_', ' ')}
+                    </span>
+                </td>
+            </tr>
+            """
+        
+        content = f"""
+        <h2 style="margin: 0 0 16px 0; color: #1e3a8a; font-size: 20px;">Daily Delivery Report</h2>
+        
+        <div style="background-color: #dbeafe; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+            <p style="margin: 0; color: #1e40af; font-weight: bold;">
+                📅 {today_str}
+            </p>
+            <p style="margin: 8px 0 0 0; color: #1e40af; font-size: 24px; font-weight: bold;">
+                {count} Deliver{'y' if count == 1 else 'ies'} Due Today
+            </p>
+        </div>
+        
+        <p style="color: #334155; line-height: 1.6;">Good morning {admin_name},</p>
+        <p style="color: #334155; line-height: 1.6;">Here's your daily summary of deliveries scheduled for today:</p>
+        
+        <table width="100%" cellspacing="0" cellpadding="0" style="border: 1px solid #e2e8f0; border-radius: 8px; margin: 20px 0;">
+            <tr style="background-color: #1e3a8a;">
+                <th style="padding: 12px 8px; text-align: left; color: #fff;">PO #</th>
+                <th style="padding: 12px 8px; text-align: left; color: #fff;">Vendor</th>
+                <th style="padding: 12px 8px; text-align: left; color: #fff;">Delivery To</th>
+                <th style="padding: 12px 8px; text-align: right; color: #fff;">Value</th>
+                <th style="padding: 12px 8px; text-align: center; color: #fff;">Status</th>
+            </tr>
+            {rows_html}
+        </table>
+        
+        <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <table width="100%">
+                <tr>
+                    <td style="color: #64748b;">Total Deliveries:</td>
+                    <td style="text-align: right; font-weight: bold; color: #334155;">{count}</td>
+                </tr>
+                <tr>
+                    <td style="color: #64748b;">Total Value:</td>
+                    <td style="text-align: right; font-weight: bold; color: #1e3a8a; font-size: 18px;">{format_currency(total_value)}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div style="margin-top: 24px; text-align: center;">
+            <a href="{APP_BASE_URL}/oll/deliveries" 
+               style="display: inline-block; background-color: #1e3a8a; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                Manage Deliveries
+            </a>
+        </div>
+        """
+    
+    return subject, get_base_template(content, subject)
+
+
+async def send_daily_delivery_report(db, admin_emails: List[str]):
+    """Send daily delivery report to all admins"""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Get all deliveries due today
+    deliveries = await db.purchase_orders.find(
+        {
+            "delivery_date": today,
+            "status": {"$in": ["confirmed", "dispatched", "pending_approval"]}
+        },
+        {"_id": 0}
+    ).to_list(100)
+    
+    # Enrich with vendor names
+    for d in deliveries:
+        vendor = await db.vendors.find_one({"id": d.get("vendor_id")}, {"_id": 0, "name": 1})
+        d["vendor_name"] = vendor.get("name") if vendor else "Unknown"
+    
+    subject, html = template_daily_delivery_report(deliveries)
+    
+    sent = 0
+    for email in admin_emails:
+        success = await send_email_async(email, subject, html)
+        if success:
+            sent += 1
+    
+    return sent, len(deliveries)
