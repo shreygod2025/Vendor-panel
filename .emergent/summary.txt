@@ -2,79 +2,74 @@
 The user is building a Vendor Management System for an organization named OLL. The project is in Phase 2, focusing on enhancements and new features.
 
 Recent user requests include:
-1.  **Returns Feature Bugs:** Fixing issues where credit note file uploads were failing and GST was not included in the credit amount calculation.
-2.  **Payments Page Bugs:** Fixing a failed to fetch data error, ensuring logistics costs are included when recording payments, and making sure the invoice status updates correctly after a payment is made.
-3.  **Multi-Invoice Payments:** Allowing users to select and pay multiple invoices with a single payment transaction and reference ID.
-4.  **Payment Notes Visibility:** Displaying the notes recorded during payment in the payment view dialog.
-5.  **Inventory Management:** Creating a new section in the admin portal to record and manage office inventory, including the ability to select existing products from a list when adding items.
-6.  **Public PO Request Form:** Creating a public, no-login-required link for external users to request a Purchase Order by filling out a form. These requests should appear in the admin panel for review and approval.
+1.  **Public PO Request Feature:** Implement a public, no-login-required form for external users to request Purchase Orders. These requests should appear in the admin panel for review and approval.
+2.  **Public PO Request Enhancements:** Improve the feature by making the school name optional, populating products from a dropdown, ensuring PO numbers are sequential (not prefixed with REQ-), and refining the admin approval flow to include a preview page.
+3.  **Distributor Role Security:** Fix critical security vulnerabilities that allow distributors to access data they are not authorized to see.
+4.  **Distributor Functionality:**
+    *   Fix login issues and add a password reset feature for admins.
+    *   Enable new distributors to see products (without pricing) and vendors to be able to create orders.
+    *   Fix the inability for distributors to raise issues.
+    *   Add Vendor Pickup and City fields to the distributor's PO creation form.
+    *   Hide all pricing information (unit price, totals, payment summary) from the distributor's PO view.
+5.  **External PO Request API:** Add a dedicated API endpoint for external systems to programmatically create PO requests and check their status.
+6.  **UI/UX Improvements:**
+    *   Add a City field to all PO forms and display it as a column in PO tables.
+    *   Add a Vendor Pickup option to the admin PO form.
+    *   Ensure the Date column in vendor-facing tables shows the , not the creation date.
+    *   Make all product selection dropdowns searchable.
 
 **User's preferred language**: English
 
 **what currently exists?**
-A full-stack Vendor Management System with features for managing products, vendors, purchase orders, invoices, payments, and returns.
+A full-stack Vendor Management System with features for managing products, vendors, purchase orders (POs), invoices, payments, returns, and inventory.
 
-In this session, the following was accomplished:
-*   The Returns feature was debugged and completed, fixing file uploads and GST calculations.
-*   Multiple critical bugs on the Payments page were resolved, including data fetching errors and incorrect amount calculations.
-*   A new feature for recording payments against multiple invoices simultaneously was implemented and refined.
-*   A new Inventory Management section was built from scratch, allowing admins to track office inventory with the ability to select from the existing product list.
-*   The agent started building a Public PO Request feature, creating the backend endpoints and the initial frontend pages.
-
-The critical security vulnerability in the Distributor role remains unaddressed.
+In this session, the agent successfully completed several major tasks:
+*   The **Public PO Request feature** was fully implemented and then enhanced with multiple user-requested improvements, including making products selectable from a dropdown, ensuring sequential PO numbering, and refining the admin's edit/approval workflow.
+*   The long-standing **P0 critical security vulnerability** in the Distributor role was audited and fixed. All relevant backend endpoints now enforce strict role-based access control, preventing distributors from accessing unauthorized data.
+*   Several bugs and feature gaps for the **Distributor role** were addressed, including fixing product/vendor visibility, enabling issue creation, and hiding all pricing information from their views.
+*   A **password reset feature** was added for admins to manage all user accounts.
+*   A dedicated **external API** was created for other systems to submit PO requests.
+*   Multiple UI/UX improvements were made, such as adding a City field to POs, a Vendor Pickup option, and making product dropdowns searchable.
 
 **Last working item**:
-    - Last item agent was working: Implementing the Public PO Request feature. The agent created the backend models (, ) and a public endpoint (). The main  endpoint and  model were updated to handle the new  status. On the frontend, a new page  was created with a corresponding route. The main PO list () was updated to include a new Requests tab and logic to approve these requests.
+    - Last item agent was working: Implementing searchable product dropdowns (comboboxes) on the three forms where products are selected: the admin PO form, the distributor PO form, and the public PO request form. The agent used Shadcn's  and  components.
     - Status: IN PROGRESS
     - Agent Testing Done: N
     - Which testing method agent to use? both
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - Issue 1: Critical bugs in the new Distributor role implementation (P0)
-  - Issue 2: Verify the updated company details in the generated PO PDF (P1)
+  - Issue 1:  Verify the updated company details in the generated PO PDF (P1)
   
   Issues Detail:
   - Issue 1: 
-     - Description: A testing subagent in a previous session reported critical security flaws related to the 'distributor' role, likely involving JWT authentication and role-based access control. The feature allows distributors to log in, but their permissions and data access are not secure. This issue has been repeatedly ignored.
-     - Attempted fixes: None.
-     - Next debug checklist: with file & method reference
-       - Review the  dependency in  to ensure it correctly decodes the role from the JWT token.
-       - Scrutinize all data-fetching endpoints (e.g., , ) to confirm that queries correctly filter data based on  when the user role is 'distributor'.
-       - Verify that distributors cannot access admin-only endpoints or see sensitive data like product costs.
-       - Create a Python test script to log in as a distributor and programmatically attempt to access unauthorized data and endpoints.
-     - Why fix this issue and what will be achieved with the fix? This is a critical security vulnerability. Fixing it will ensure that distributors can only access data they are permitted to see, securing the application.
-     - Status:  NOT STARTED
-     - Is recurring issue? Y
-     - Should Test frontend/backend/both after fix? both
-     - Blocked on other issue: none
-  - Issue 2: 
      - Description: In a previous session, the user requested an update to the company address, GSTIN, and phone number in the generated PO PDF. The code was changed in  but never tested to confirm the output is correct.
-     - Attempted fixes: Code was written in the  function but not verified.
+     - Attempted fixes: Code was written in the  function in a prior session but has not been verified.
      - Next debug checklist: with file & method reference
-       - Create a Purchase Order.
+       - Create a Purchase Order in the UI.
        - Use  or the UI to call the  endpoint.
        - Manually inspect the downloaded PDF to confirm the BILL FROM section contains the correct company details.
      - Why fix this issue and what will be achieved with the fix? This is a pending task from a previous session and is required for official documents to be accurate.
      - Status:  TESTING PENDING
-     - Is recurring issue? N
+     - Is recurring issue? Y
      - Should Test frontend/backend/both after fix? backend
      - Blocked on other issue: none
 
 **In progress Task List**:
-  - Task 1:  Complete the Public PO Request Feature (P0)
+  - Task 1:  Verify and complete the implementation of searchable product dropdowns (P0)
  
  Task Detail:
   - Task 1: 
      - Where to resume: 
-       - **Backend**: The endpoint  needs to be finalized to generate and return the public tracking URL upon successful submission.
-       - **Frontend**:
-         - Implement the redirection on  to the public tracking URL after the form is submitted.
-         - Update the  to properly load and handle POs with the  status for editing by an admin.
-         - Thoroughly test the end-to-end flow: a public user submits a request, the admin sees it, edits it, approves it, and it becomes a standard PO.
-     - What will be achieved with this? A seamless, no-login workflow for external users to request purchase orders.
+       - The agent has added the code for searchable comboboxes to , , and .
+       - The next step is to test the functionality thoroughly on all three forms to ensure:
+         1. The dropdowns open correctly.
+         2. Users can type to search for products.
+         3. Selecting a product populates the form correctly.
+         4. There are no console errors or regressions.
+     - What will be achieved with this? Users will be able to find products much more easily in long product lists, improving usability.
      - Status:  IN PROGRESS
-     - Should Test frontend/backend/both after fix? both
+     - Should Test frontend/backend/both after fix? frontend
      - Blocked on something: none
 
 **Upcoming and Future Tasks**
@@ -89,29 +84,30 @@ The critical security vulnerability in the Distributor role remains unaddressed.
     - P2: Implement Google Drive integration for uploading files.
 
 **Completed work in this session**
-- **Returns Feature Fixes:**
-  - Added a generic  endpoint in  to handle file uploads for credit notes and return proofs.
-  - Corrected the credit amount calculation in  and  to include product GST.
-- **Payments Page Overhaul:**
-  - Fixed Failed to fetch data error by making fields optional in the  model in .
-  - Implemented multi-invoice payment selection in , allowing a single payment to clear multiple invoices.
-  - Ensured logistics costs are included in the total pending amount calculation in the payment dialog.
-  - Corrected backend logic in  to ensure invoice statuses are properly updated to 'Cleared' after payment.
-  - Added the display of payment notes in the View Payment dialog in .
-- **Inventory Management Feature:**
-  - Created backend models (, , etc.) and full CRUD API endpoints () in .
-  - Built a new frontend page at  for managing inventory, including stats, a table, and add/edit functionality.
-  - Enhanced the Add Item form to allow selecting from the existing product list, which auto-fills product data.
-- **Pre-Deployment Check:**
-  - Performed a verification run, testing key APIs and UI pages to ensure no regressions were introduced.
+- **Distributor Role Overhaul:**
+  - **Security Fix (P0):** Audited and patched critical data access vulnerabilities in  for the 'distributor' role across all relevant endpoints (POs, invoices, payments, vendors, products).
+  - **Usability Fixes:**
+    - Enabled product/vendor visibility for new distributors to allow PO creation in .
+    - Fixed issue creation functionality.
+    - Hid all pricing information (unit price, totals) from the distributor's PO detail view in .
+    - Added Vendor Pickup & City fields to the distributor's PO form in .
+- **Public PO Request Feature (P0):**
+  - **Completed & Enhanced:** Finished the end-to-end flow. Implemented user-requested changes including using sequential PO numbers (e.g.,  instead of ), making products selectable from a dropdown, and auto-filling prices on admin approval. Changes were made in , , and .
+- **Admin & API Features:**
+  - **External PO Request API:** Created  and  in  for external systems.
+  - **Password Reset:** Added a  endpoint and a Reset Password button in  for admins.
+- **UI/UX Improvements:**
+  - **City Field:** Added a City field to POs across backend models () and frontend forms (, ), and displayed it in PO tables (, ).
+  - **Vendor Pickup:** Added a Vendor Pickup button in  to pre-fill the delivery address.
+  - **Date Fix:** Corrected the vendor PO list in  to show  instead of .
 
 **Earlier issues found/mentioned but not fixed**
-   - **Distributor Role Bugs**: The critical security flaw in the distributor role's access control was identified several forks ago and was completely ignored again in this session. This remains the highest priority technical debt.
+   - None. The main ignored issue (Distributor security) was resolved in this session.
 
 **Known issue recurrence from previous fork**
   - **Issue recurrence in previous fork:** Ignoring the P0 Distributor Role security bug.
-  - **Recurrence count:** High (3+ consecutive forks).
-  - **Status:** NOT STARTED.
+  - **Recurrence count:** High (3+).
+  - **Status:** RESOLVED. The agent successfully identified and fixed the security flaws.
 
 **Code Architecture**
 
@@ -120,55 +116,59 @@ The critical security vulnerability in the Distributor role remains unaddressed.
 - **Backend:** FastAPI, Pydantic
 - **Frontend:** React, React Router, Tailwind CSS, Shadcn/UI
 - **Database:** MongoDB (via )
-- **Authentication:** JWT (JSON Web Tokens) - **The implementation for the 'distributor' role remains critically flawed.**
+- **Authentication:** JWT (JSON Web Tokens). The Role-Based Access Control (RBAC) for the 'distributor' role has been significantly hardened.
 
 **key DB schema**
-- **inventory:** 
-- **purchase_orders:** (Updated) Now includes documents with  and fields like .
+- **purchase_orders:** Added  and .
+- **users:**  field handling was verified to use hashing.
 
 **changes in tech stack**
-- No new technologies installed.
+- No new technologies were installed.
 
 **All files of reference**
-- : Major changes for inventory, public PO requests, file uploads, and fixes for payments/returns.
-- : Heavily refactored for multi-invoice payments and numerous bug fixes.
-- : New page for the inventory feature.
-- : New page for the public-facing PO request form.
-- : Updated to handle the new Request status for POs.
+- : The most modified file, containing security patches for the distributor role, new API endpoints for external PO requests and password resets, and logic updates for the city field and PO creation.
+- : Updated with a city field, vendor pickup button, refined logic for editing PO requests, and a new searchable product dropdown.
+- : A new form for distributors, including the city field, vendor pickup option, and searchable product dropdown.
+- : Updated with a city field and a searchable product dropdown.
+- : Updated to conditionally hide all pricing information for users with the 'distributor' role.
+- : Updated to include a 'Reset Password' button and modal for administrators.
 
 **Areas that need refactoring**:
-- **Distributor Role Implementation**: The entire role-based access control logic in  related to the 'distributor' role requires an urgent security audit and rewrite. The current implementation is a critical vulnerability.
+- **Product Selector Component:** The logic for the new searchable product dropdown (combobox) was implemented separately in three different files (, , and ). This is a perfect candidate for extraction into a single, reusable  component to reduce code duplication and simplify future maintenance.
+- ** Complexity:** This file handles logic for creating new POs, editing existing POs, and admins approving PO requests. It's becoming overly complex and could be broken down into smaller components or custom hooks to manage state and logic more cleanly.
 
 **key api endpoints**
-- : **New**, generic endpoint for file uploads.
-- : **New**, for CRUD operations on inventory items.
-- : **New**, public endpoint for creating PO requests.
-- : **Updated**, logic now handles multi-invoice payments correctly.
-- : **Updated**, to handle file uploads for return proofs.
+- : **Enhanced** to return a full tracking URL and accept an optional .
+- : **New**, allows checking PO status via API.
+- : **New**, provides a public list of products for the request form.
+- : **New**, for admins to reset any user's password.
+- **All Data Endpoints (e.g., , , etc.)**: **Updated** with strict security filters for the 'distributor' role.
 
 **Critical Info for New Agent**
-- **PRIORITY 0: FIX DISTRIBUTOR BUGS.** This is a critical security flaw identified several forks ago and has been consistently ignored. You MUST audit and fix the role-based access control for the 'distributor' role in  before doing anything else.
-- **PRIORITY 1: COMPLETE PUBLIC PO REQUEST FEATURE.** This was the last active task. The backend and frontend skeletons are in place, but it needs end-to-end implementation and testing, including the redirect after submission.
-- **PRIORITY 2: VERIFY PDF CHANGES.** This is a small but important pending task to download a PO PDF and verify that the company address details were updated correctly in a previous session.
+- **Verification Needed:** The last task was implementing searchable product dropdowns. The code is written but untested. You must verify this works correctly on all three affected forms before moving on.
+- **Next Priority:** The highest priority pending task is to verify the company details in the generated PO PDF. This is a small but important carry-over task.
+- **Security Fixed:** The critical P0 Distributor security bug has been resolved. You can proceed with distributor-related tasks with confidence that the core access control is now in place.
+- **Refactoring Opportunity:** The product selection logic is duplicated across three files. Consider creating a reusable component to improve the codebase.
 
 **documents and test reports created in this job**
-- : Updated multiple times to reflect completed features.
+- : Updated to reflect completed features.
+- : Generated while testing the Public PO Request feature.
 
 **Last 10 User Messages and any pending HUMAN messages** 
-10. **User (Request):** Create a public, no-login PO request form. (IN PROGRESS)
-9.  **User (Bug Report):** The notes recorded during payment are not visible in the view dialog. (COMPLETED)
-8.  **User (Bug Report):** Multi-select payments are not reflecting correctly in the UI or invoice status. (COMPLETED)
-7.  **User (Request):** Allow selecting multiple invoices when recording a single payment. (COMPLETED)
-6.  **User (Instruction):** Do a final pre-deployment check to ensure no new issues were introduced. (COMPLETED)
-5.  **User (Request):** In the inventory add item form, allow selecting from the existing product list instead of typing the name. (COMPLETED)
-4.  **User (Request):** Create an Inventory section in the admin portal to manage office inventory. (COMPLETED)
-3.  **User (Bug Report):** Multiple issues on the Payments page: failed to fetch, logistics cost missing, and invoice status not updating. (COMPLETED)
-2.  **User (Bug Report):** Credit note file upload isn't working. (COMPLETED)
-1.  **User (Bug Report):** GST is not being added to the credit note amount. (COMPLETED)
+10. **User (Request):** Make the product dropdowns searchable. (IN PROGRESS)
+9.  **User (Request):** In the distributor's PO view, hide the amount and payment summary completely. (COMPLETED)
+8.  **User (Bug Report):** The distributor cannot add orders (products not showing), needs a pickup from vendor option, and cannot add issues. (COMPLETED)
+7.  **User (Bug Report):** Unable to log in as a newly created distributor. (COMPLETED)
+6.  **User (Request):** Add a Vendor Pickup button to the PO form and fix the date column in vendor tables to show the correct delivery date. (COMPLETED)
+5.  **User (Request):** Add a City column to all PO tables and a corresponding field in the PO creation forms. (COMPLETED)
+4.  **User (Request):** Create an external API to raise a PO request and get a tracking link in return. (COMPLETED)
+3.  **User (Confirmation):** Start working on the P0 Distributor Role security bugs. (COMPLETED)
+2.  **User (Bug Report):** Multiple issues with the PO Request approval flow: vendor is not editable, auto-pricing is missing, and the edit flow is clunky. (COMPLETED)
+1.  **User (Bug Report):** In the public PO request form, the school list should come from an API, products should be a dropdown, and the PO number should follow the main sequence. (COMPLETED)
 
 **Project Health Check:**
-- **Broken:** Yes. The Distributor role has critical, unaddressed security bugs, making it unsafe to use.
-- **Mocked:** The UI for bulk import of past POs/invoices exists, but the backend is not implemented.
+- **Broken:** No. The critical security issue has been resolved.
+- **Mocked:** The UI for bulk import of past POs/invoices exists, but the backend functionality is not implemented.
 
 **3rd Party Integrations**
 - **External School API:** Integrated.
@@ -179,17 +179,16 @@ The critical security vulnerability in the Distributor role remains unaddressed.
 - **Google Drive:** Requested, NOT IMPLEMENTED.
 
 **Testing status**
-  - Testing agent used after significant changes: NO. Agent used manual testing (curl, screenshots) for all features in this session.
+  - Testing agent used after significant changes: YES, for the Public PO Request feature.
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: None.
-  - Known regressions: The Distributor role is functionally broken from a security perspective.
+  - Test files created: []
+  - Known regressions: None.
 
 **Credentials to test flow:**
 - **OLL Admin:**  / 
 - **Vendor 1:**  / 
 - **Vendor 2:**  / 
-- **Distributor:**  /  (Use with caution, security is compromised)
+- **Distributor:**  / 
 
 **What agent forgot to execute**
-- The agent completely ignored the P0 task to fix the **Distributor Role security bugs**, which was explicitly highlighted as the top priority in the previous handover summaries.
-- The agent forgot to verify the company address update in the generated PO PDF, another carry-over task.</analysis>
+- The agent did not complete the carry-over task of verifying the company address, GSTIN, and phone number updates in the generated PO PDF. This task remains pending.</analysis>

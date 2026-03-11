@@ -7,13 +7,19 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
-import { Plus, Trash2, Loader2, Send, Package, User, MapPin, Calendar, FileText, Search } from "lucide-react";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../components/ui/command";
+import { Plus, Trash2, Loader2, Send, Package, User, MapPin, FileText, Search, Check, ChevronsUpDown } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -23,6 +29,7 @@ const PublicPORequest = () => {
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [productPopoverOpen, setProductPopoverOpen] = useState({});  // Track popover state
   
   // School search state
   const [schoolSearch, setSchoolSearch] = useState("");
@@ -398,36 +405,61 @@ const PublicPORequest = () => {
                   <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
                     <div className="flex-1">
                       <Label className="text-xs text-slate-500">Product *</Label>
-                      <Select
-                        value={item.product_id}
-                        onValueChange={(value) => handleProductSelect(index, value)}
+                      <Popover 
+                        open={productPopoverOpen[index]} 
+                        onOpenChange={(open) => setProductPopoverOpen(prev => ({ ...prev, [index]: open }))}
                       >
-                        <SelectTrigger className="mt-1" data-testid={`product-select-${index}`}>
-                          <SelectValue placeholder="Select a product..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(groupedProducts).map(([vendorName, vendorProducts]) => (
-                            <div key={vendorName}>
-                              <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100">
-                                {vendorName}
-                              </div>
-                              {vendorProducts.map(product => (
-                                <SelectItem key={product.id} value={product.id}>
-                                  <div className="flex flex-col">
-                                    <span>{product.name}</span>
-                                    {product.sku && (
-                                      <span className="text-xs text-slate-400">SKU: {product.sku}</span>
-                                    )}
-                                  </div>
-                                </SelectItem>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={productPopoverOpen[index]}
+                            className="w-full justify-between font-normal mt-1"
+                            data-testid={`product-select-${index}`}
+                          >
+                            {item.product_id ? (
+                              <span className="truncate">
+                                {products.find(p => p.id === item.product_id)?.name || item.product_name || "Select product"}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">Search product...</span>
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[350px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search products..." />
+                            <CommandList>
+                              <CommandEmpty>No product found.</CommandEmpty>
+                              {Object.entries(groupedProducts).map(([vendorName, vendorProducts]) => (
+                                <CommandGroup key={vendorName} heading={vendorName}>
+                                  {vendorProducts.map(product => (
+                                    <CommandItem
+                                      key={product.id}
+                                      value={`${product.name} ${product.sku || ''} ${vendorName}`}
+                                      onSelect={() => {
+                                        handleProductSelect(index, product.id);
+                                        setProductPopoverOpen(prev => ({ ...prev, [index]: false }));
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${item.product_id === product.id ? "opacity-100" : "opacity-0"}`}
+                                      />
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{product.name}</span>
+                                        {product.sku && (
+                                          <span className="text-xs text-slate-500">SKU: {product.sku}</span>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
                               ))}
-                            </div>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {item.product_name && (
-                        <p className="text-xs text-emerald-600 mt-1">Selected: {item.product_name}</p>
-                      )}
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="w-24">
                       <Label className="text-xs text-slate-500">Quantity *</Label>

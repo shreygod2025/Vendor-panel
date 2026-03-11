@@ -13,6 +13,19 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../../components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../../components/ui/command";
+import {
   Table,
   TableBody,
   TableCell,
@@ -21,7 +34,7 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Plus, Trash2, Save, ArrowLeft, Package, MapPin, Building2 } from "lucide-react";
+import { Plus, Trash2, Save, ArrowLeft, Package, MapPin, Building2, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 
 const DistributorPurchaseOrderForm = () => {
@@ -33,6 +46,7 @@ const DistributorPurchaseOrderForm = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [productPopoverOpen, setProductPopoverOpen] = useState({});  // Track popover state
 
   const [formData, setFormData] = useState({
     vendor_id: "",
@@ -240,21 +254,56 @@ const DistributorPurchaseOrderForm = () => {
                       {formData.line_items.map((item, index) => (
                         <TableRow key={index}>
                           <TableCell>
-                            <Select
-                              value={item.product_id}
-                              onValueChange={(value) => updateLineItem(index, "product_id", value)}
+                            <Popover 
+                              open={productPopoverOpen[index]} 
+                              onOpenChange={(open) => setProductPopoverOpen(prev => ({ ...prev, [index]: open }))}
                             >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select product" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {filteredProducts.map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    {product.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={productPopoverOpen[index]}
+                                  className="w-full justify-between font-normal"
+                                >
+                                  {item.product_id ? (
+                                    <span className="truncate">
+                                      {filteredProducts.find(p => p.id === item.product_id)?.name || "Select product"}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500">Search product...</span>
+                                  )}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[300px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder="Search products..." />
+                                  <CommandList>
+                                    <CommandEmpty>No product found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {filteredProducts.map((product) => (
+                                        <CommandItem
+                                          key={product.id}
+                                          value={`${product.name} ${product.sku}`}
+                                          onSelect={() => {
+                                            updateLineItem(index, "product_id", product.id);
+                                            setProductPopoverOpen(prev => ({ ...prev, [index]: false }));
+                                          }}
+                                        >
+                                          <Check
+                                            className={`mr-2 h-4 w-4 ${item.product_id === product.id ? "opacity-100" : "opacity-0"}`}
+                                          />
+                                          <div className="flex flex-col">
+                                            <span className="font-medium">{product.name}</span>
+                                            <span className="text-xs text-slate-500">{product.sku}</span>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                           </TableCell>
                           <TableCell>
                             <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">
