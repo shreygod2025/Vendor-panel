@@ -89,26 +89,57 @@ const PurchaseOrdersList = () => {
   });
   const [issueAttachment, setIssueAttachment] = useState(null);
   const [submittingIssue, setSubmittingIssue] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const ITEMS_PER_PAGE = 50;
 
   useEffect(() => {
     document.title = "OLL - Purchase Orders";
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (loadMore = false) => {
     try {
-      const [ordersRes, vendorsRes, invoicesRes] = await Promise.all([
-        apiClient.get("/purchase-orders"),
-        apiClient.get("/vendors"),
-        apiClient.get("/invoices")
+      if (loadMore) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setPage(1);
+      }
+      
+      const currentPage = loadMore ? page + 1 : 1;
+      
+      const [ordersRes, vendorsRes, invoicesRes, countRes] = await Promise.all([
+        apiClient.get(`/purchase-orders?page=${currentPage}&limit=${ITEMS_PER_PAGE}`),
+        !loadMore ? apiClient.get("/vendors") : Promise.resolve({ data: vendors }),
+        !loadMore ? apiClient.get("/invoices") : Promise.resolve({ data: invoices }),
+        !loadMore ? apiClient.get("/purchase-orders/count") : Promise.resolve({ data: { count: totalCount } })
       ]);
-      setOrders(ordersRes.data);
-      setVendors(vendorsRes.data);
-      setInvoices(invoicesRes.data);
+      
+      if (loadMore) {
+        setOrders(prev => [...prev, ...ordersRes.data]);
+        setPage(currentPage);
+      } else {
+        setOrders(ordersRes.data);
+        setVendors(vendorsRes.data);
+        setInvoices(invoicesRes.data);
+        setTotalCount(countRes.data.count);
+      }
+      
+      setHasMore(ordersRes.data.length === ITEMS_PER_PAGE);
     } catch (error) {
       toast.error("Failed to fetch purchase orders");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMoreOrders = () => {
+    if (!loadingMore && hasMore) {
+      fetchData(true);
     }
   };
 
@@ -821,6 +852,7 @@ const PurchaseOrdersList = () => {
             </Link>
           </div>
         ) : (
+          <>
           <Tabs defaultValue="requests" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-4 h-auto p-1">
               <TabsTrigger value="requests" className="py-3 data-[state=active]:bg-orange-600 data-[state=active]:text-white">
@@ -995,6 +1027,28 @@ const PurchaseOrdersList = () => {
               </Card>
             </TabsContent>
           </Tabs>
+          
+          {/* Load More Button */}
+          {hasMore && !loading && (
+            <div className="flex justify-center mt-6">
+              <Button 
+                variant="outline" 
+                onClick={loadMoreOrders}
+                disabled={loadingMore}
+                className="px-8"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>Load More ({orders.length} of {totalCount})</>
+                )}
+              </Button>
+            </div>
+          )}
+        </>
         )}
       </div>
 

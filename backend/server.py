@@ -1201,7 +1201,13 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
     return POResponse(**po_doc)
 
 @api_router.get("/purchase-orders", response_model=List[POResponse])
-async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+async def get_purchase_orders(
+    status: Optional[str] = None, 
+    vendor_id: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
     query = {}
     if status:
         query["status"] = status
@@ -1215,47 +1221,64 @@ async def get_purchase_orders(status: Optional[str] = None, vendor_id: Optional[
         # Distributors can only see POs they created
         query["distributor_id"] = current_user["user_id"]
     
-    pos = await db.purchase_orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    # Calculate skip for pagination
+    skip = (page - 1) * limit
     
-    vendor_ids = list(set(p["vendor_id"] for p in pos))
-    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
+    # Fetch POs with pagination - include all fields needed for POResponse
+    pos = await db.purchase_orders.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    # Batch fetch vendors
+    vendor_ids = list(set(p.get("vendor_id") for p in pos if p.get("vendor_id")))
+    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(100)
     vendor_map = {v["id"]: v["name"] for v in vendors}
     
     result = []
     for p in pos:
-        p["vendor_name"] = vendor_map.get(p["vendor_id"])
-        if "final_comments" not in p:
-            p["final_comments"] = None
-        if "delivery_date" not in p:
-            p["delivery_date"] = ""
-        if "receiver_name" not in p:
-            p["receiver_name"] = None
-        # Add school_name if missing
-        if "school_name" not in p:
-            p["school_name"] = None
-        # Add distributor fields if missing
-        if "created_by_role" not in p:
-            p["created_by_role"] = "oll"
-        if "created_by_name" not in p:
-            p["created_by_name"] = None
-        if "distributor_id" not in p:
-            p["distributor_id"] = None
-        # Add rejection reason if missing
-        if "rejection_reason" not in p:
-            p["rejection_reason"] = None
-        # Add city field if missing
-        if "city" not in p:
-            p["city"] = None
-        # Add external request fields if missing
-        if "requester_name" not in p:
-            p["requester_name"] = None
-        if "is_external_request" not in p:
-            p["is_external_request"] = False
-        if "source_system" not in p:
-            p["source_system"] = None
+        p["vendor_name"] = vendor_map.get(p.get("vendor_id"))
+        # Set defaults for missing fields
+        p.setdefault("final_comments", None)
+        p.setdefault("delivery_date", "")
+        p.setdefault("receiver_name", None)
+        p.setdefault("school_name", None)
+        p.setdefault("created_by_role", "oll")
+        p.setdefault("created_by_name", None)
+        p.setdefault("created_by", "system")
+        p.setdefault("distributor_id", None)
+        p.setdefault("rejection_reason", None)
+        p.setdefault("city", None)
+        p.setdefault("requester_name", None)
+        p.setdefault("is_external_request", False)
+        p.setdefault("source_system", None)
+        p.setdefault("line_items", [])
+        p.setdefault("order_discount_amount", 0)
+        p.setdefault("order_discount_percent", 0)
+        p.setdefault("tracking_token", None)
+        p.setdefault("custom_po_number", None)
         result.append(POResponse(**p))
     
     return result
+
+
+@api_router.get("/purchase-orders/count")
+async def get_purchase_orders_count(
+    status: Optional[str] = None,
+    vendor_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get total count of POs for pagination"""
+    query = {}
+    if status:
+        query["status"] = status
+    if vendor_id:
+        query["vendor_id"] = vendor_id
+    
+    if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
+        query["vendor_id"] = current_user["vendor_id"]
+    elif current_user.get("role") == "distributor":
+        query["distributor_id"] = current_user["user_id"]
+    
+    count = await db.purchase_orders.count_documents(query)
+    return {"count": count}
 
 @api_router.get("/purchase-orders/{po_id}", response_model=POResponse)
 async def get_purchase_order(po_id: str, current_user: dict = Depends(get_current_user)):
@@ -4959,6 +4982,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def create_indexes():
+    """Create database indexes for faster queries"""
+    try:
+        # PO indexes for faster listing and filtering
+        await db.purchase_orders.create_index([("created_at", -1)])
+        await db.purchase_orders.create_index([("status", 1), ("created_at", -1)])
+        await db.purchase_orders.create_index([("vendor_id", 1), ("created_at", -1)])
+        await db.purchase_orders.create_index([("distributor_id", 1), ("created_at", -1)])
+        await db.purchase_orders.create_index([("delivery_date", 1)])
+        await db.purchase_orders.create_index([("po_number", 1)], unique=True)
+        
+        # Invoice indexes
+        await db.invoices.create_index([("po_id", 1)])
+        await db.invoices.create_index([("vendor_id", 1)])
+        await db.invoices.create_index([("payment_status", 1)])
+        
+        # Product indexes
+        await db.products.create_index([("vendor_id", 1)])
+        await db.products.create_index([("is_active", 1)])
+        
+        logger.info("Database indexes created successfully")
+    except Exception as e:
+        logger.warning(f"Index creation warning: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
