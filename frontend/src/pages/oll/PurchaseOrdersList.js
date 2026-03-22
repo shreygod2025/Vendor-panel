@@ -27,7 +27,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle, Clock, Truck, Package, ChevronDown, ChevronRight, AlertTriangle, RotateCcw, MoreHorizontal, Edit, CheckCircle, XCircle, Loader2, Trash2, Receipt, Download, Image, X, MessageSquare, Paperclip } from "lucide-react";
+import { Plus, Search, Eye, FileText, ExternalLink, Check, Circle, Clock, Truck, Package, ChevronDown, ChevronRight, AlertTriangle, RotateCcw, MoreHorizontal, Edit, CheckCircle, XCircle, Loader2, Trash2, Receipt, Download, Image, X, MessageSquare, Paperclip, Upload } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,6 +94,24 @@ const PurchaseOrdersList = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const ITEMS_PER_PAGE = 50;
+  
+  // Delete request dialog
+  const [requestDeleteDialogOpen, setRequestDeleteDialogOpen] = useState(false);
+  const [poToDelete, setPoToDelete] = useState(null);
+  const [deletingRequest, setDeletingRequest] = useState(false);
+  
+  // Invoice upload dialog for delivered POs
+  const [invoiceUploadDialog, setInvoiceUploadDialog] = useState(false);
+  const [poForInvoice, setPoForInvoice] = useState(null);
+  const [invoiceUploadForm, setInvoiceUploadForm] = useState({
+    invoice_url: "",
+    logistics_invoice_url: "",
+    invoice_number: "",
+    invoice_date: "",
+    invoice_amount: "",
+    logistics_cost: ""
+  });
+  const [uploadingInvoice, setUploadingInvoice] = useState(false);
 
   useEffect(() => {
     document.title = "OLL - Purchase Orders";
@@ -141,6 +159,73 @@ const PurchaseOrdersList = () => {
     if (!loadingMore && hasMore) {
       fetchData(true);
     }
+  };
+
+  // Delete PO request
+  const handleDeleteRequest = async () => {
+    if (!poToDelete) return;
+    
+    setDeletingRequest(true);
+    try {
+      await apiClient.delete(`/purchase-orders/${poToDelete.id}`);
+      toast.success(`Request ${poToDelete.po_number} deleted successfully`);
+      setRequestDeleteDialogOpen(false);
+      setPoToDelete(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to delete request");
+    } finally {
+      setDeletingRequest(false);
+    }
+  };
+
+  // Upload invoices for delivered PO
+  const handleInvoiceUpload = async () => {
+    if (!poForInvoice) return;
+    
+    setUploadingInvoice(true);
+    try {
+      const payload = {
+        invoice_url: invoiceUploadForm.invoice_url || null,
+        logistics_invoice_url: invoiceUploadForm.logistics_invoice_url || null,
+        invoice_number: invoiceUploadForm.invoice_number || null,
+        invoice_date: invoiceUploadForm.invoice_date || null,
+        invoice_amount: invoiceUploadForm.invoice_amount ? parseFloat(invoiceUploadForm.invoice_amount) : null,
+        logistics_cost: invoiceUploadForm.logistics_cost ? parseFloat(invoiceUploadForm.logistics_cost) : null
+      };
+      
+      await apiClient.post(`/purchase-orders/${poForInvoice.id}/admin-upload-invoices`, payload);
+      toast.success("Invoices uploaded successfully");
+      setInvoiceUploadDialog(false);
+      setPoForInvoice(null);
+      setInvoiceUploadForm({
+        invoice_url: "",
+        logistics_invoice_url: "",
+        invoice_number: "",
+        invoice_date: "",
+        invoice_amount: "",
+        logistics_cost: ""
+      });
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to upload invoices");
+    } finally {
+      setUploadingInvoice(false);
+    }
+  };
+
+  const openInvoiceUploadDialog = (order) => {
+    const existingInvoice = getInvoiceForPO(order.id);
+    setPoForInvoice(order);
+    setInvoiceUploadForm({
+      invoice_url: existingInvoice?.invoice_url || existingInvoice?.file_url || "",
+      logistics_invoice_url: existingInvoice?.logistics_bill_url || "",
+      invoice_number: existingInvoice?.invoice_number || "",
+      invoice_date: existingInvoice?.invoice_date || "",
+      invoice_amount: existingInvoice?.amount || "",
+      logistics_cost: existingInvoice?.logistics_cost || ""
+    });
+    setInvoiceUploadDialog(true);
   };
 
   const getInvoiceForPO = (poId) => {
@@ -716,6 +801,15 @@ const PurchaseOrdersList = () => {
                         <Eye className="w-4 h-4" />
                       </Button>
                     </Link>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      title="Upload Invoices" 
+                      className="text-blue-600"
+                      onClick={() => openInvoiceUploadDialog(order)}
+                    >
+                      <FileText className="w-4 h-4" />
+                    </Button>
                     {invoice ? (
                       <Button 
                         variant="ghost" 
@@ -950,6 +1044,18 @@ const PurchaseOrdersList = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-red-600 hover:bg-red-50"
+                                  onClick={() => {
+                                    setPoToDelete(order);
+                                    setRequestDeleteDialogOpen(true);
+                                  }}
+                                  data-testid={`delete-request-${order.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                                 <Link to={`/oll/purchase-orders/${order.id}/edit`} className="inline-block">
                                   <Button size="sm" variant="outline" className="text-blue-600" data-testid={`edit-request-${order.id}`}>
                                     <Edit className="w-4 h-4 mr-1" />
@@ -1713,6 +1819,155 @@ const PurchaseOrdersList = () => {
           
           <DialogFooter className="border-t pt-4">
             <Button variant="outline" onClick={() => setPoIssuesDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Request Dialog */}
+      <Dialog open={requestDeleteDialogOpen} onOpenChange={setRequestDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete PO Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this PO request? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {poToDelete && (
+            <div className="py-4">
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">PO Number:</span>
+                  <span className="font-mono font-medium">{poToDelete.po_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Requester:</span>
+                  <span className="font-medium">{poToDelete.requester_name || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">School:</span>
+                  <span>{poToDelete.school_name || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRequestDeleteDialogOpen(false)} disabled={deletingRequest}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteRequest}
+              disabled={deletingRequest}
+            >
+              {deletingRequest ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Request
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Upload Dialog */}
+      <Dialog open={invoiceUploadDialog} onOpenChange={setInvoiceUploadDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Upload Invoices</DialogTitle>
+            <DialogDescription>
+              {poForInvoice && `Upload invoice files for ${poForInvoice.po_number}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Invoice Number</Label>
+                <Input
+                  placeholder="INV-001"
+                  value={invoiceUploadForm.invoice_number}
+                  onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, invoice_number: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Invoice Date</Label>
+                <Input
+                  type="date"
+                  value={invoiceUploadForm.invoice_date}
+                  onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, invoice_date: e.target.value }))}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Invoice Amount (₹)</Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={invoiceUploadForm.invoice_amount}
+                  onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, invoice_amount: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Logistics Cost (₹)</Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={invoiceUploadForm.logistics_cost}
+                  onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, logistics_cost: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-blue-600" />
+                Product Invoice URL
+              </Label>
+              <Input
+                placeholder="https://drive.google.com/..."
+                value={invoiceUploadForm.invoice_url}
+                onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, invoice_url: e.target.value }))}
+              />
+              <p className="text-xs text-slate-500">Paste a link to the product invoice (Google Drive, etc.)</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-orange-600" />
+                Logistics Invoice URL
+              </Label>
+              <Input
+                placeholder="https://drive.google.com/..."
+                value={invoiceUploadForm.logistics_invoice_url}
+                onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, logistics_invoice_url: e.target.value }))}
+              />
+              <p className="text-xs text-slate-500">Paste a link to the logistics/shipping invoice</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInvoiceUploadDialog(false)} disabled={uploadingInvoice}>
+              Cancel
+            </Button>
+            <Button onClick={handleInvoiceUpload} disabled={uploadingInvoice}>
+              {uploadingInvoice ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Save Invoices
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

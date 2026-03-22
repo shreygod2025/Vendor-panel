@@ -1706,8 +1706,8 @@ async def delete_purchase_order(po_id: str, force: bool = False, current_user: d
         }
     
     # Normal delete - only for certain statuses
-    if po["status"] not in ["draft", "sent", "confirmed", "rejected"]:
-        raise HTTPException(status_code=400, detail="Only draft, sent, confirmed, or rejected POs can be deleted. Use force=true for delivered POs.")
+    if po["status"] not in ["draft", "sent", "confirmed", "rejected", "request"]:
+        raise HTTPException(status_code=400, detail="Only draft, sent, confirmed, rejected, or request POs can be deleted. Use force=true for delivered POs.")
     
     await db.purchase_orders.delete_one({"id": po_id})
     await create_audit_log("DELETE_PO", "purchase_order", po_id, current_user)
@@ -2006,6 +2006,84 @@ async def reject_delivery(po_id: str, reason: Optional[str] = None, current_user
     
     await create_audit_log("REJECT_DELIVERY", "purchase_order", po_id, current_user, {"reason": reason})
     return {"message": "Delivery rejected"}
+
+
+class AdminInvoiceUpload(BaseModel):
+    """Model for admin to upload invoices to delivered POs"""
+    invoice_url: Optional[str] = None
+    logistics_invoice_url: Optional[str] = None
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[str] = None
+    invoice_amount: Optional[float] = None
+    logistics_cost: Optional[float] = None
+
+
+@api_router.post("/purchase-orders/{po_id}/admin-upload-invoices")
+async def admin_upload_invoices(po_id: str, data: AdminInvoiceUpload, current_user: dict = Depends(get_current_user)):
+    """Admin uploads invoice files to a delivered PO"""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can upload invoices")
+    
+    po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    if po["status"] != "delivered":
+        raise HTTPException(status_code=400, detail="Invoices can only be uploaded to delivered POs")
+    
+    # Check if invoice exists for this PO
+    invoice = await db.invoices.find_one({"po_id": po_id}, {"_id": 0})
+    
+    update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if data.invoice_url:
+        update_data["invoice_url"] = data.invoice_url
+        update_data["file_url"] = data.invoice_url
+    if data.logistics_invoice_url:
+        update_data["logistics_bill_url"] = data.logistics_invoice_url
+    if data.invoice_number:
+        update_data["invoice_number"] = data.invoice_number
+    if data.invoice_date:
+        update_data["invoice_date"] = data.invoice_date
+    if data.invoice_amount is not None:
+        update_data["amount"] = data.invoice_amount
+        update_data["total_amount"] = data.invoice_amount + (data.logistics_cost or invoice.get("logistics_cost", 0) if invoice else 0)
+    if data.logistics_cost is not None:
+        update_data["logistics_cost"] = data.logistics_cost
+        if invoice:
+            update_data["total_amount"] = (data.invoice_amount or invoice.get("amount", 0)) + data.logistics_cost
+    
+    if invoice:
+        # Update existing invoice
+        await db.invoices.update_one({"po_id": po_id}, {"$set": update_data})
+    else:
+        # Create new invoice
+        invoice_doc = {
+            "id": str(uuid.uuid4()),
+            "invoice_number": data.invoice_number or f"INV-{po['po_number']}",
+            "po_id": po_id,
+            "vendor_id": po["vendor_id"],
+            "invoice_date": data.invoice_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "amount": data.invoice_amount or po.get("grand_total", 0),
+            "total_amount": (data.invoice_amount or po.get("grand_total", 0)) + (data.logistics_cost or 0),
+            "logistics_cost": data.logistics_cost or 0,
+            "paid_amount": 0,
+            "payment_status": "pending",
+            "invoice_url": data.invoice_url,
+            "file_url": data.invoice_url,
+            "logistics_bill_url": data.logistics_invoice_url,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.invoices.insert_one(invoice_doc)
+    
+    await create_audit_log("ADMIN_UPLOAD_INVOICES", "purchase_order", po_id, current_user, {
+        "invoice_url": data.invoice_url,
+        "logistics_invoice_url": data.logistics_invoice_url
+    })
+    
+    return {"message": "Invoices uploaded successfully"}
+
 
 @api_router.post("/purchase-orders/import", response_model=POResponse)
 async def import_purchase_order(po: POImport, current_user: dict = Depends(get_current_user)):
