@@ -3564,31 +3564,48 @@ async def get_inventory_stats(current_user: dict = Depends(get_current_user)):
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     if current_user.get("role") == "oll":
-        total_vendors = await db.vendors.count_documents({})
-        active_vendors = await db.vendors.count_documents({"is_active": True})
-        total_products = await db.products.count_documents({})
-        total_pos = await db.purchase_orders.count_documents({})
+        # Run all count queries in parallel
+        counts = await asyncio.gather(
+            db.vendors.count_documents({}),
+            db.vendors.count_documents({"is_active": True}),
+            db.products.count_documents({}),
+            db.purchase_orders.count_documents({}),
+            db.issues.count_documents({"status": "open"})
+        )
+        total_vendors, active_vendors, total_products, total_pos, pending_issues = counts
         
-        po_by_status = {}
-        for status in ["draft", "sent", "confirmed", "dispatched", "delivered", "closed", "rejected"]:
-            po_by_status[status] = await db.purchase_orders.count_documents({"status": status})
+        # PO counts by status - use aggregation for efficiency
+        pipeline = [
+            {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+        ]
+        status_counts = await db.purchase_orders.aggregate(pipeline).to_list(20)
+        po_by_status = {s["_id"]: s["count"] for s in status_counts if s["_id"]}
         
-        # Upcoming deliveries
+        # Upcoming deliveries (just 5)
         upcoming_deliveries = await db.purchase_orders.find(
             {"status": {"$in": ["confirmed", "dispatched"]}},
-            {"_id": 0}
-        ).sort("delivery_date", 1).to_list(5)
+            {"_id": 0, "id": 1, "po_number": 1, "delivery_date": 1, "vendor_id": 1, "status": 1, "school_name": 1}
+        ).sort("delivery_date", 1).limit(5).to_list(5)
         
-        # Pending issues
-        pending_issues = await db.issues.count_documents({"status": "open"})
-        open_issues = await db.issues.find({"status": "open"}, {"_id": 0}).sort("created_at", -1).to_list(5)
+        # Open issues (just 5)
+        open_issues = await db.issues.find(
+            {"status": "open"}, 
+            {"_id": 0, "id": 1, "issue_number": 1, "issue_type": 1, "priority": 1, "po_id": 1, "created_at": 1}
+        ).sort("created_at", -1).limit(5).to_list(5)
         
-        # Pending payments
-        pending_invoices = await db.invoices.find(
-            {"payment_status": {"$in": ["pending", "partially_paid"]}},
-            {"_id": 0}
-        ).to_list(100)
-        total_pending_amount = sum(inv["amount"] - inv.get("paid_amount", 0) for inv in pending_invoices)
+        # Pending payments summary
+        pending_pipeline = [
+            {"$match": {"payment_status": {"$in": ["pending", "partial"]}}},
+            {"$group": {
+                "_id": None,
+                "count": {"$sum": 1},
+                "total_amount": {"$sum": "$amount"},
+                "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}
+            }}
+        ]
+        pending_result = await db.invoices.aggregate(pending_pipeline).to_list(1)
+        pending_data = pending_result[0] if pending_result else {"count": 0, "total_amount": 0, "total_paid": 0}
+        total_pending_amount = pending_data.get("total_amount", 0) - pending_data.get("total_paid", 0)
         
         return {
             "total_vendors": total_vendors,
@@ -3599,7 +3616,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
             "upcoming_deliveries": upcoming_deliveries,
             "pending_issues": pending_issues,
             "open_issues": open_issues,
-            "pending_payment_count": len(pending_invoices),
+            "pending_payment_count": pending_data.get("count", 0),
             "total_pending_amount": total_pending_amount
         }
     elif current_user.get("role") == "distributor":
@@ -5077,10 +5094,14 @@ async def create_indexes():
         await db.invoices.create_index([("po_id", 1)])
         await db.invoices.create_index([("vendor_id", 1)])
         await db.invoices.create_index([("payment_status", 1)])
+        await db.invoices.create_index([("created_at", -1)])
         
         # Product indexes
         await db.products.create_index([("vendor_id", 1)])
         await db.products.create_index([("is_active", 1)])
+        
+        # Vendor indexes
+        await db.vendors.create_index([("is_active", 1)])
         
         logger.info("Database indexes created successfully")
     except Exception as e:

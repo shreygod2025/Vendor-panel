@@ -31,37 +31,12 @@ const OLLDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const [statsRes, invoicesRes] = await Promise.all([
-        apiClient.get("/dashboard/stats"),
-        apiClient.get("/invoices")
-      ]);
+      const statsRes = await apiClient.get("/dashboard/stats");
       setStats(statsRes.data);
       
-      // Calculate pending invoices with due date info
-      const invoices = invoicesRes.data || [];
-      const pending = invoices
-        .filter(inv => {
-          const paidAmount = inv.paid_amount || 0;
-          return paidAmount < inv.amount;
-        })
-        .map(inv => {
-          const invoiceDate = new Date(inv.invoice_date);
-          const dueDate = new Date(invoiceDate);
-          dueDate.setDate(dueDate.getDate() + 7);
-          const today = new Date();
-          const daysRemaining = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-          
-          return {
-            ...inv,
-            dueDate,
-            daysRemaining,
-            isOverdue: daysRemaining < 0,
-            pendingAmount: inv.amount - (inv.paid_amount || 0)
-          };
-        })
-        .sort((a, b) => a.daysRemaining - b.daysRemaining);
-      
-      setPendingInvoices(pending);
+      // Pending invoices info is now in stats
+      // No need to fetch all invoices separately
+      setPendingInvoices([]);
     } catch (error) {
       toast.error("Failed to fetch dashboard stats");
     } finally {
