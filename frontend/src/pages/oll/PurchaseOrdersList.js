@@ -129,24 +129,27 @@ const PurchaseOrdersList = () => {
       
       const currentPage = loadMore ? page + 1 : 1;
       
-      const [ordersRes, vendorsRes, invoicesRes, countRes] = await Promise.all([
-        apiClient.get(`/purchase-orders?page=${currentPage}&limit=${ITEMS_PER_PAGE}`),
-        !loadMore ? apiClient.get("/vendors") : Promise.resolve({ data: vendors }),
-        !loadMore ? apiClient.get("/invoices") : Promise.resolve({ data: invoices }),
-        !loadMore ? apiClient.get("/purchase-orders/count") : Promise.resolve({ data: { count: totalCount } })
-      ]);
+      // Use optimized endpoint that returns POs with invoice status
+      const response = await apiClient.get(`/purchase-orders/list-with-invoices?page=${currentPage}&limit=${ITEMS_PER_PAGE}`);
       
       if (loadMore) {
-        setOrders(prev => [...prev, ...ordersRes.data]);
+        setOrders(prev => [...prev, ...response.data.orders]);
         setPage(currentPage);
       } else {
-        setOrders(ordersRes.data);
-        setVendors(vendorsRes.data);
-        setInvoices(invoicesRes.data);
-        setTotalCount(countRes.data.count);
+        setOrders(response.data.orders);
+        setVendors(response.data.vendors);
+        setTotalCount(response.data.total);
+        // Build invoice map from PO data
+        const invMap = {};
+        response.data.orders.forEach(o => {
+          if (o.has_invoice) {
+            invMap[o.id] = { po_id: o.id, payment_status: o.invoice_status };
+          }
+        });
+        setInvoices(Object.values(invMap));
       }
       
-      setHasMore(ordersRes.data.length === ITEMS_PER_PAGE);
+      setHasMore(response.data.orders.length === ITEMS_PER_PAGE);
     } catch (error) {
       toast.error("Failed to fetch purchase orders");
     } finally {

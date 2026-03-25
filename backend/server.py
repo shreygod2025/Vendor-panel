@@ -1280,6 +1280,80 @@ async def get_purchase_orders_count(
     count = await db.purchase_orders.count_documents(query)
     return {"count": count}
 
+
+@api_router.get("/purchase-orders/list-with-invoices")
+async def get_purchase_orders_with_invoice_status(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """Optimized endpoint for PO list page - includes invoice status"""
+    query = {}
+    
+    if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
+        query["vendor_id"] = current_user["vendor_id"]
+    elif current_user.get("role") == "distributor":
+        query["distributor_id"] = current_user["user_id"]
+    
+    skip = (page - 1) * limit
+    
+    # Get POs and count in parallel
+    pos, total_count = await asyncio.gather(
+        db.purchase_orders.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit),
+        db.purchase_orders.count_documents(query)
+    )
+    
+    if not pos:
+        return {"orders": [], "total": 0, "vendors": []}
+    
+    # Get vendor IDs and PO IDs
+    vendor_ids = list(set(p.get("vendor_id") for p in pos if p.get("vendor_id")))
+    po_ids = [p["id"] for p in pos]
+    
+    # Batch fetch vendors and invoices in parallel
+    vendors_task = db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(100)
+    invoices_task = db.invoices.find(
+        {"po_id": {"$in": po_ids}}, 
+        {"_id": 0, "po_id": 1, "invoice_number": 1, "amount": 1, "paid_amount": 1, "payment_status": 1}
+    ).to_list(200)
+    
+    vendors, invoices = await asyncio.gather(vendors_task, invoices_task)
+    
+    vendor_map = {v["id"]: v["name"] for v in vendors}
+    invoice_map = {i["po_id"]: i for i in invoices}
+    
+    # Enrich POs
+    for p in pos:
+        p["vendor_name"] = vendor_map.get(p.get("vendor_id"))
+        inv = invoice_map.get(p["id"])
+        p["has_invoice"] = inv is not None
+        p["invoice_status"] = inv.get("payment_status") if inv else None
+        # Set defaults
+        p.setdefault("final_comments", None)
+        p.setdefault("delivery_date", "")
+        p.setdefault("receiver_name", None)
+        p.setdefault("school_name", None)
+        p.setdefault("created_by_role", "oll")
+        p.setdefault("created_by_name", None)
+        p.setdefault("created_by", "system")
+        p.setdefault("distributor_id", None)
+        p.setdefault("rejection_reason", None)
+        p.setdefault("city", None)
+        p.setdefault("requester_name", None)
+        p.setdefault("is_external_request", False)
+        p.setdefault("source_system", None)
+        p.setdefault("line_items", [])
+        p.setdefault("order_discount_amount", 0)
+        p.setdefault("order_discount_percent", 0)
+        p.setdefault("tracking_token", None)
+        p.setdefault("custom_po_number", None)
+    
+    return {
+        "orders": pos,
+        "total": total_count,
+        "vendors": vendors
+    }
+
 @api_router.get("/purchase-orders/{po_id}", response_model=POResponse)
 async def get_purchase_order(po_id: str, current_user: dict = Depends(get_current_user)):
     po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
