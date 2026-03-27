@@ -93,7 +93,7 @@ const Analytics = () => {
     if (data.purchaseOrders.length > 0) {
       calculateAnalytics();
     }
-  }, [data, monthFilter, vendorFilter]);
+  }, [data, monthFilter, vendorFilter, timeline]);
 
   const fetchAllData = async () => {
     try {
@@ -161,28 +161,59 @@ const Analytics = () => {
     const deliveredPOs = filteredPOs.filter(po => po.status === "delivered" || po.status === "closed");
     const deliveredOrders = deliveredPOs.length;
 
-    // On-time deliveries (compare delivery_date with actual delivery - simplified: assume delivered on time if delivered)
-    // In a real system, you'd compare actual delivery date with expected delivery date
-    let onTimeDeliveries = 0;
-    let lateDeliveries = 0;
-    
-    deliveredPOs.forEach(po => {
-      // Check if there's a delivery delay issue for this PO
-      const hasDelayIssue = filteredIssues.some(issue => 
-        issue.po_id === po.id && 
-        (issue.issue_type === "delay" || issue.issue_type === "delivery_delay")
-      );
-      if (hasDelayIssue) {
-        lateDeliveries++;
-      } else {
-        onTimeDeliveries++;
+    // On-time deliveries — use timeline delivery_delay_days if available, fallback to issue check
+    // Build a quick lookup: po_id -> delivery_delay_days from timeline
+    const timelineDelayMap = {};
+    (timeline.po_timelines || []).forEach(t => {
+      if (t.po_id && t.delivery_delay_days != null) {
+        timelineDelayMap[t.po_id] = t.delivery_delay_days;
       }
     });
 
-    // Issue-free POs
-    const posWithIssueIds = new Set(filteredIssues.map(i => i.po_id));
-    const issueFreePOs = deliveredPOs.filter(po => !posWithIssueIds.has(po.id)).length;
-    const posWithIssues = deliveredPOs.filter(po => posWithIssueIds.has(po.id)).length;
+    let onTimeDeliveries = 0;
+    let lateDeliveries = 0;
+
+    deliveredPOs.forEach(po => {
+      const delayDays = timelineDelayMap[po.id];
+      if (delayDays != null) {
+        // Use actual date comparison: positive = late, 0 or negative = on time
+        if (delayDays > 0) {
+          lateDeliveries++;
+        } else {
+          onTimeDeliveries++;
+        }
+      } else if (po.delivery_date) {
+        // Fallback: compare expected delivery date with today
+        const expected = new Date(po.delivery_date);
+        const delivered = po.delivered_at ? new Date(po.delivered_at) : null;
+        if (delivered) {
+          if (delivered > expected) lateDeliveries++; else onTimeDeliveries++;
+        } else {
+          // Check if there's a delay issue as last resort
+          const hasDelayIssue = filteredIssues.some(issue =>
+            issue.po_id === po.id &&
+            (issue.issue_type === "delay" || issue.issue_type === "delivery_delay")
+          );
+          if (hasDelayIssue) lateDeliveries++; else onTimeDeliveries++;
+        }
+      } else {
+        // No date info — count as on-time only if no delay issue
+        const hasDelayIssue = filteredIssues.some(issue =>
+          issue.po_id === po.id &&
+          (issue.issue_type === "delay" || issue.issue_type === "delivery_delay")
+        );
+        if (hasDelayIssue) lateDeliveries++; else onTimeDeliveries++;
+      }
+    });
+
+    // Issue-free POs — check both: issues collection AND has_delivery_issues flag on PO
+    const posWithIssueIds = new Set(filteredIssues.filter(i => i.po_id).map(i => i.po_id));
+    const issueFreePOs = deliveredPOs.filter(po =>
+      !posWithIssueIds.has(po.id) && !po.has_delivery_issues
+    ).length;
+    const posWithIssues = deliveredPOs.filter(po =>
+      posWithIssueIds.has(po.id) || po.has_delivery_issues
+    ).length;
 
     // Popular products
     const productCount = {};
