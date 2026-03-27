@@ -3791,24 +3791,40 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
 # SCHOOLS API (External)
 # ========================
 
-SCHOOLS_API_URL = os.environ.get('SCHOOLS_API_URL', '')
+SCHOOLS_API_URL = os.environ.get('SCHOOLS_API_URL', 'https://www.oll.co/api/external/schools/active')
 SCHOOLS_API_KEY = os.environ.get('SCHOOLS_API_KEY', '')
+
+def _get_schools_url() -> str:
+    """Return the canonical /active schools URL regardless of what's stored in env."""
+    url = SCHOOLS_API_URL.rstrip("/")
+    if not url.endswith("/active"):
+        url = url + "/active"
+    return url
 
 @api_router.get("/schools/search")
 async def search_schools(q: str = "", limit: int = 20):
     """Search schools from external API and return suggestions"""
-    if not SCHOOLS_API_URL or not SCHOOLS_API_KEY:
-        raise HTTPException(status_code=500, detail="Schools API not configured")
-    
+    if not SCHOOLS_API_KEY:
+        logger.warning("SCHOOLS_API_KEY not configured — returning empty school list")
+        return {"schools": [], "total": 0}
+
+    active_url = _get_schools_url()
+
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            # Fetch schools from external API (active endpoint)
             response = await client.get(
-                SCHOOLS_API_URL,
+                active_url,
                 params={"limit": 500},
                 headers={"X-API-Key": SCHOOLS_API_KEY}
             )
             response.raise_for_status()
+
+            # Guard against empty / non-JSON body
+            raw = response.text.strip()
+            if not raw:
+                logger.warning(f"Schools API returned empty body from {active_url}")
+                return {"schools": [], "total": 0}
+
             data = response.json()
             
             # Handle both /active endpoint (schools array) and /schools endpoint (data array)
@@ -3826,9 +3842,7 @@ async def search_schools(q: str = "", limit: int = 20):
             # Transform to simpler format for frontend
             results = []
             for school in schools[:limit]:
-                # Handle both response formats
                 if "location" in school:
-                    # Full endpoint format
                     results.append({
                         "id": school.get("id"),
                         "school_name": school.get("school_name", ""),
@@ -3840,7 +3854,6 @@ async def search_schools(q: str = "", limit: int = 20):
                         "contact_email": school.get("contact", {}).get("email") or "",
                     })
                 else:
-                    # Active endpoint format (flat structure)
                     results.append({
                         "id": school.get("id", school.get("school_name", "")),
                         "school_name": school.get("school_name", ""),
@@ -3853,41 +3866,55 @@ async def search_schools(q: str = "", limit: int = 20):
                     })
             
             return {"schools": results, "total": len(schools)}
-            
+
     except httpx.RequestError as e:
         logger.error(f"Schools API request error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to connect to schools API")
+        return {"schools": [], "total": 0}
     except httpx.HTTPStatusError as e:
         logger.error(f"Schools API status error: {e}")
-        raise HTTPException(status_code=500, detail="Schools API returned an error")
+        return {"schools": [], "total": 0}
+    except ValueError as e:
+        # json.JSONDecodeError is a subclass of ValueError
+        logger.error(f"Schools API returned non-JSON response from {active_url}: {e}")
+        return {"schools": [], "total": 0}
     except Exception as e:
         logger.error(f"Schools API error: {e}")
-        raise HTTPException(status_code=500, detail=f"Schools API error: {str(e)}")
+        return {"schools": [], "total": 0}
 
 @api_router.get("/schools/{school_id}")
 async def get_school_details(school_id: str, current_user: dict = Depends(get_current_user)):
     """Get detailed school info by ID"""
-    if not SCHOOLS_API_URL or not SCHOOLS_API_KEY:
+    if not SCHOOLS_API_KEY:
         raise HTTPException(status_code=500, detail="Schools API not configured")
+    
+    # Use the base URL without /active for individual school lookup
+    base_url = SCHOOLS_API_URL.rstrip("/")
+    if base_url.endswith("/active"):
+        base_url = base_url[:-7]  # strip /active
     
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
-                f"{SCHOOLS_API_URL}/{school_id}",
+                f"{base_url}/{school_id}",
                 headers={"X-API-Key": SCHOOLS_API_KEY}
             )
             response.raise_for_status()
+
+            raw = response.text.strip()
+            if not raw:
+                raise HTTPException(status_code=404, detail="School not found")
+
             school = response.json()
             
             return {
                 "id": school.get("id"),
                 "school_name": school.get("school_name", ""),
-                "address": school.get("location", {}).get("address") or "",
-                "city": school.get("location", {}).get("city") or "",
-                "state": school.get("location", {}).get("state") or "",
-                "contact_name": school.get("contact", {}).get("name") or "",
-                "contact_phone": school.get("contact", {}).get("phone") or "",
-                "contact_email": school.get("contact", {}).get("email") or "",
+                "address": school.get("location", {}).get("address") or school.get("address") or "",
+                "city": school.get("location", {}).get("city") or school.get("city") or "",
+                "state": school.get("location", {}).get("state") or school.get("state") or "",
+                "contact_name": school.get("contact", {}).get("name") or school.get("contact_person") or "",
+                "contact_phone": school.get("contact", {}).get("phone") or school.get("contact_phone") or "",
+                "contact_email": school.get("contact", {}).get("email") or school.get("contact_email") or "",
             }
             
     except httpx.RequestError as e:
@@ -3895,6 +3922,9 @@ async def get_school_details(school_id: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail="Failed to connect to schools API")
     except httpx.HTTPStatusError as e:
         logger.error(f"Schools API status error: {e}")
+        raise HTTPException(status_code=404, detail="School not found")
+    except ValueError as e:
+        logger.error(f"Schools API non-JSON response for school {school_id}: {e}")
         raise HTTPException(status_code=404, detail="School not found")
 
 # ========================
