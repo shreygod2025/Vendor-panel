@@ -3791,12 +3791,19 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
 # SCHOOLS API (External)
 # ========================
 
-SCHOOLS_API_URL = os.environ.get('SCHOOLS_API_URL', 'https://www.oll.co/api/external/schools/active')
+SCHOOLS_API_URL = os.environ.get('SCHOOLS_API_URL', 'https://oll.co/api/external/schools/active')
 SCHOOLS_API_KEY = os.environ.get('SCHOOLS_API_KEY', '')
 
 def _get_schools_url() -> str:
-    """Return the canonical /active schools URL regardless of what's stored in env."""
-    url = SCHOOLS_API_URL.rstrip("/")
+    """Return the canonical schools /active URL.
+    Fixes two common misconfiguration patterns seen on production:
+    1. www.oll.co  → oll.co  (www serves the React app, not the API)
+    2. /schools    → /schools/active  (bare endpoint returns HTML/empty)
+    """
+    url = SCHOOLS_API_URL.strip().rstrip("/")
+    # Strip www. — the API lives on oll.co not www.oll.co
+    url = url.replace("://www.oll.co/", "://oll.co/")
+    # Ensure /active suffix
     if not url.endswith("/active"):
         url = url + "/active"
     return url
