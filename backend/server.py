@@ -1,6 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Query, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -41,6 +42,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 
 ROOT_DIR = Path(__file__).parent
+UPLOADS_DIR = ROOT_DIR / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
@@ -5161,8 +5164,41 @@ async def get_email_status(current_user: dict = Depends(get_current_user)):
         "message": "Email notifications are active" if is_email_configured() else "Email not configured. Add RESEND_API_KEY to .env file."
     }
 
+# File upload endpoint - for invoice PDFs, logistics invoices, etc.
+@api_router.post("/upload")
+async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """Upload a file and return its URL. Accepts PDF, images, and Excel files."""
+    allowed_types = {
+        "application/pdf", "image/jpeg", "image/png", "image/webp",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel", "text/csv"
+    }
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail=f"File type not allowed: {file.content_type}")
+    
+    max_size = 10 * 1024 * 1024  # 10MB
+    content = await file.read()
+    if len(content) > max_size:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
+    
+    # Generate unique filename
+    ext = Path(file.filename).suffix if file.filename else ".bin"
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+    file_path = UPLOADS_DIR / unique_name
+    
+    with open(file_path, "wb") as f:
+        f.write(content)
+    
+    base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
+    file_url = f"{base_url}/api/files/{unique_name}"
+    
+    return {"url": file_url, "filename": file.filename, "size": len(content)}
+
 # Include the router
 app.include_router(api_router)
+
+# Mount static files for uploaded documents
+app.mount("/api/files", StaticFiles(directory=str(UPLOADS_DIR)), name="uploaded_files")
 
 app.add_middleware(
     CORSMiddleware,

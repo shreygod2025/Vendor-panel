@@ -112,6 +112,8 @@ const PurchaseOrdersList = () => {
     logistics_cost: ""
   });
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
+  const [uploadingInvoiceFile, setUploadingInvoiceFile] = useState(false);
+  const [uploadingLogisticsFile, setUploadingLogisticsFile] = useState(false);
 
   useEffect(() => {
     document.title = "OLL - Purchase Orders";
@@ -229,6 +231,23 @@ const PurchaseOrdersList = () => {
       logistics_cost: existingInvoice?.logistics_cost || ""
     });
     setInvoiceUploadDialog(true);
+  };
+
+  const handleFileUpload = async (file, field) => {
+    if (!file) return;
+    const setUploading = field === "invoice_url" ? setUploadingInvoiceFile : setUploadingLogisticsFile;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await apiClient.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setInvoiceUploadForm(prev => ({ ...prev, [field]: res.data.url }));
+      toast.success("File uploaded successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to upload file");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const getInvoiceForPO = (poId) => {
@@ -1880,94 +1899,164 @@ const PurchaseOrdersList = () => {
 
       {/* Invoice Upload Dialog */}
       <Dialog open={invoiceUploadDialog} onOpenChange={setInvoiceUploadDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Upload Invoices</DialogTitle>
+            <DialogTitle>Edit Invoice & Logistics</DialogTitle>
             <DialogDescription>
-              {poForInvoice && `Upload invoice files for ${poForInvoice.po_number}`}
+              {poForInvoice && `Update invoice details for ${poForInvoice.po_number}`}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-2">
+            {/* Invoice Number + Date */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>Invoice Number</Label>
                 <Input
                   placeholder="INV-001"
                   value={invoiceUploadForm.invoice_number}
                   onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, invoice_number: e.target.value }))}
+                  data-testid="invoice-number-input"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>Invoice Date</Label>
                 <Input
                   type="date"
                   value={invoiceUploadForm.invoice_date}
                   onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, invoice_date: e.target.value }))}
+                  data-testid="invoice-date-input"
                 />
               </div>
             </div>
-            
+
+            {/* Invoice Amount + Logistics Cost */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>Invoice Amount (₹)</Label>
                 <Input
                   type="number"
                   placeholder="0.00"
                   value={invoiceUploadForm.invoice_amount}
                   onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, invoice_amount: e.target.value }))}
+                  data-testid="invoice-amount-input"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>Logistics Cost (₹)</Label>
                 <Input
                   type="number"
                   placeholder="0.00"
                   value={invoiceUploadForm.logistics_cost}
                   onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, logistics_cost: e.target.value }))}
+                  data-testid="logistics-cost-input"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
+            {/* Product Invoice Upload */}
+            <div className="space-y-2 border rounded-lg p-3 bg-slate-50">
+              <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                 <Receipt className="w-4 h-4 text-blue-600" />
-                Product Invoice URL
+                Product Invoice
               </Label>
+              <div className="flex items-center gap-2">
+                <label className="flex-1 cursor-pointer">
+                  <div className="flex items-center gap-2 border border-dashed border-slate-300 rounded-md px-3 py-2 bg-white hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                    {uploadingInvoiceFile ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-500 shrink-0" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-slate-400 shrink-0" />
+                    )}
+                    <span className="text-sm text-slate-500 truncate">
+                      {uploadingInvoiceFile ? "Uploading..." : "Upload PDF / Image"}
+                    </span>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    disabled={uploadingInvoiceFile}
+                    onChange={(e) => handleFileUpload(e.target.files[0], "invoice_url")}
+                    data-testid="invoice-file-input"
+                  />
+                </label>
+                {invoiceUploadForm.invoice_url && (
+                  <a href={invoiceUploadForm.invoice_url} target="_blank" rel="noreferrer"
+                    className="shrink-0 text-blue-600 hover:underline text-xs flex items-center gap-1 border rounded px-2 py-1.5 bg-white">
+                    <ExternalLink className="w-3 h-3" /> View
+                  </a>
+                )}
+              </div>
               <Input
-                placeholder="https://drive.google.com/..."
+                placeholder="Or paste URL (Google Drive, etc.)"
                 value={invoiceUploadForm.invoice_url}
                 onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, invoice_url: e.target.value }))}
+                className="text-xs bg-white"
+                data-testid="invoice-url-input"
               />
-              <p className="text-xs text-slate-500">Paste a link to the product invoice (Google Drive, etc.)</p>
             </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Truck className="w-4 h-4 text-orange-600" />
-                Logistics Invoice URL
+            {/* Logistics Invoice Upload */}
+            <div className="space-y-2 border rounded-lg p-3 bg-slate-50">
+              <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <Truck className="w-4 h-4 text-orange-500" />
+                Logistics Invoice
               </Label>
+              <div className="flex items-center gap-2">
+                <label className="flex-1 cursor-pointer">
+                  <div className="flex items-center gap-2 border border-dashed border-slate-300 rounded-md px-3 py-2 bg-white hover:border-orange-400 hover:bg-orange-50 transition-colors">
+                    {uploadingLogisticsFile ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-orange-500 shrink-0" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-slate-400 shrink-0" />
+                    )}
+                    <span className="text-sm text-slate-500 truncate">
+                      {uploadingLogisticsFile ? "Uploading..." : "Upload PDF / Image"}
+                    </span>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    disabled={uploadingLogisticsFile}
+                    onChange={(e) => handleFileUpload(e.target.files[0], "logistics_invoice_url")}
+                    data-testid="logistics-file-input"
+                  />
+                </label>
+                {invoiceUploadForm.logistics_invoice_url && (
+                  <a href={invoiceUploadForm.logistics_invoice_url} target="_blank" rel="noreferrer"
+                    className="shrink-0 text-orange-600 hover:underline text-xs flex items-center gap-1 border rounded px-2 py-1.5 bg-white">
+                    <ExternalLink className="w-3 h-3" /> View
+                  </a>
+                )}
+              </div>
               <Input
-                placeholder="https://drive.google.com/..."
+                placeholder="Or paste URL (Google Drive, etc.)"
                 value={invoiceUploadForm.logistics_invoice_url}
                 onChange={(e) => setInvoiceUploadForm(prev => ({ ...prev, logistics_invoice_url: e.target.value }))}
+                className="text-xs bg-white"
+                data-testid="logistics-url-input"
               />
-              <p className="text-xs text-slate-500">Paste a link to the logistics/shipping invoice</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setInvoiceUploadDialog(false)} disabled={uploadingInvoice}>
               Cancel
             </Button>
-            <Button onClick={handleInvoiceUpload} disabled={uploadingInvoice}>
+            <Button
+              onClick={handleInvoiceUpload}
+              disabled={uploadingInvoice || uploadingInvoiceFile || uploadingLogisticsFile}
+              data-testid="save-invoice-btn"
+            >
               {uploadingInvoice ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Uploading...
+                  Saving...
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-2" />
-                  Save Invoices
+                  Save
                 </>
               )}
             </Button>

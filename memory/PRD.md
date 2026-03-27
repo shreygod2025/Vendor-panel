@@ -194,6 +194,9 @@ Build a Vendor Management System for OLL organization with the following capabil
 - External Schools API may return empty address fields for some schools
 
 ## Changelog
+- Mar 27, 2026: **Invoice & Logistics File Upload for Delivered POs** — Added real file upload (PDF/Image) via new `POST /api/upload` endpoint + `/api/files/` static serving. "Edit Invoice & Logistics" dialog now supports: Invoice Number, Invoice Date, Invoice Amount, Logistics Cost edits + file picker uploads for Product Invoice and Logistics Invoice. Also fixed missing `/api/upload` endpoint that was breaking Returns upload too.
+- Mar 27, 2026: **Schools API Auth Fix** — Made `/api/schools/search` endpoint public (no auth). Public PO Request form now correctly shows school dropdown suggestions.
+- Mar 27, 2026: **PO PDF Verified** — Confirmed PO PDF generates with correct: Clonefutura Live Solutions Pvt Ltd., address, Phone: +919699188188, GST No: 27AAKCC1113B1ZC.
 - Mar 27, 2026: **Schools API Auth Fix** - Made `/api/schools/search` endpoint public (no auth required). The Public PO Request form is unauthenticated and was getting 401 errors when searching for schools. School dropdown now works correctly on the `/add` form.
 - Mar 27, 2026: **PO PDF Verified** - Confirmed PO PDF generates with correct company details: Clonefutura Live Solutions Pvt Ltd., 103 1st floor - Kshitij building, Veera Desai Rd, Mumbai 400053, Phone: +919699188188, GST No: 27AAKCC1113B1ZC.
 - Mar 11, 2025: **Email Notifications System** - Added comprehensive email notification system using Resend:
