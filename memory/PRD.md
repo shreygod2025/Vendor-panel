@@ -180,8 +180,8 @@ Build a Vendor Management System for OLL organization with the following capabil
 2. Distributor Role Security Bugs - Needs security audit (Role-based access control for distributor)
 
 ### P1 - High Priority
-1. Verify PO PDF company details are correct
-2. Bulk import for past POs and invoices
+1. ~~Verify PO PDF company details are correct~~ ✅ VERIFIED Mar 27, 2026
+2. Bulk import for past POs and invoices (UI exists, backend mocked)
 3. AuditLogs page implementation
 
 ### P2 - Medium Priority
@@ -194,6 +194,8 @@ Build a Vendor Management System for OLL organization with the following capabil
 - External Schools API may return empty address fields for some schools
 
 ## Changelog
+- Mar 27, 2026: **Schools API Auth Fix** - Made `/api/schools/search` endpoint public (no auth required). The Public PO Request form is unauthenticated and was getting 401 errors when searching for schools. School dropdown now works correctly on the `/add` form.
+- Mar 27, 2026: **PO PDF Verified** - Confirmed PO PDF generates with correct company details: Clonefutura Live Solutions Pvt Ltd., 103 1st floor - Kshitij building, Veera Desai Rd, Mumbai 400053, Phone: +919699188188, GST No: 27AAKCC1113B1ZC.
 - Mar 11, 2025: **Email Notifications System** - Added comprehensive email notification system using Resend:
   - **Vendor Notifications**: PO raised, delivery reminders (6/4/2/0 days), PO approved/rejected, issues raised, payment received
   - **Admin Notifications**: PO confirmed by vendor, order dispatched, delivery pending approval, payment due reminders, issue resolved

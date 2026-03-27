@@ -1,194 +1,164 @@
-<analysis>**original_problem_statement:**
-The user is building a Vendor Management System for an organization named OLL. The project is in Phase 2, focusing on enhancements and new features.
+<analysis>**original_problem_statement:** 
+The user is building a Vendor Management System for an organization named OLL. The project is in Phase 2, focusing on enhancements and new features. The user requested searchable product dropdowns, a comprehensive automated email notification system using Resend, API performance optimizations (Dashboard and PO lists were loading too slowly), the ability to delete PO requests, logistics invoice uploads for delivered POs, and fixing a broken external Schools API integration.
 
-Recent user requests include:
-1.  **Public PO Request Feature:** Implement a public, no-login-required form for external users to request Purchase Orders. These requests should appear in the admin panel for review and approval.
-2.  **Public PO Request Enhancements:** Improve the feature by making the school name optional, populating products from a dropdown, ensuring PO numbers are sequential (not prefixed with REQ-), and refining the admin approval flow to include a preview page.
-3.  **Distributor Role Security:** Fix critical security vulnerabilities that allow distributors to access data they are not authorized to see.
-4.  **Distributor Functionality:**
-    *   Fix login issues and add a password reset feature for admins.
-    *   Enable new distributors to see products (without pricing) and vendors to be able to create orders.
-    *   Fix the inability for distributors to raise issues.
-    *   Add Vendor Pickup and City fields to the distributor's PO creation form.
-    *   Hide all pricing information (unit price, totals, payment summary) from the distributor's PO view.
-5.  **External PO Request API:** Add a dedicated API endpoint for external systems to programmatically create PO requests and check their status.
-6.  **UI/UX Improvements:**
-    *   Add a City field to all PO forms and display it as a column in PO tables.
-    *   Add a Vendor Pickup option to the admin PO form.
-    *   Ensure the Date column in vendor-facing tables shows the , not the creation date.
-    *   Make all product selection dropdowns searchable.
+**User's preferred language**: English (INSTRUCT next agent to respond in English only)
 
-**User's preferred language**: English
+**what currently exists?** 
+A highly optimized full-stack Vendor Management System (React + FastAPI + MongoDB). In this session, a robust automated email notification system (Resend + Cron) was implemented for vendors, admins, and accounting. The application underwent massive performance refactoring, reducing Dashboard load times from ~1000ms to 136ms and PO list loads from ~664ms to 182ms via parallel processing, pagination, and MongoDB aggregation pipelines. UI features for deleting PO requests and uploading logistics invoices were added. The external Schools API was fixed to point to OLL's production servers.
 
-**what currently exists?**
-A full-stack Vendor Management System with features for managing products, vendors, purchase orders (POs), invoices, payments, returns, and inventory.
-
-In this session, the agent successfully completed several major tasks:
-*   The **Public PO Request feature** was fully implemented and then enhanced with multiple user-requested improvements, including making products selectable from a dropdown, ensuring sequential PO numbering, and refining the admin's edit/approval workflow.
-*   The long-standing **P0 critical security vulnerability** in the Distributor role was audited and fixed. All relevant backend endpoints now enforce strict role-based access control, preventing distributors from accessing unauthorized data.
-*   Several bugs and feature gaps for the **Distributor role** were addressed, including fixing product/vendor visibility, enabling issue creation, and hiding all pricing information from their views.
-*   A **password reset feature** was added for admins to manage all user accounts.
-*   A dedicated **external API** was created for other systems to submit PO requests.
-*   Multiple UI/UX improvements were made, such as adding a City field to POs, a Vendor Pickup option, and making product dropdowns searchable.
-
-**Last working item**:
-    - Last item agent was working: Implementing searchable product dropdowns (comboboxes) on the three forms where products are selected: the admin PO form, the distributor PO form, and the public PO request form. The agent used Shadcn's  and  components.
-    - Status: IN PROGRESS
-    - Agent Testing Done: N
-    - Which testing method agent to use? both
+**Last working item**: 
+    - Last item agent was working: Fixing the external Schools API integration in . The agent updated the endpoint to , updated the API key in , and modified the response parsing to map the  array (instead of ).
+    - Status: USER VERIFICATION PENDING
+    - Agent Testing Done: Y (Verified via backend curl responses)
+    - Which testing method agent to use? screenshot tool (Navigate to a form that uses the School dropdown, such as the Public PO Request form, and verify the dropdown populates with actual school names).
     - User Testing Done: N
 
-**All Pending/In progress Issue list**:
-  - Issue 1:  Verify the updated company details in the generated PO PDF (P1)
+**All Pending/In progress Issue list**: 
+  Issue 1: Verify the updated company details in the generated PO PDF (P1)
   
   Issues Detail:
   - Issue 1: 
-     - Description: In a previous session, the user requested an update to the company address, GSTIN, and phone number in the generated PO PDF. The code was changed in  but never tested to confirm the output is correct.
-     - Attempted fixes: Code was written in the  function in a prior session but has not been verified.
-     - Next debug checklist: with file & method reference
-       - Create a Purchase Order in the UI.
-       - Use  or the UI to call the  endpoint.
-       - Manually inspect the downloaded PDF to confirm the BILL FROM section contains the correct company details.
-     - Why fix this issue and what will be achieved with the fix? This is a pending task from a previous session and is required for official documents to be accurate.
-     - Status:  TESTING PENDING
-     - Is recurring issue? Y
-     - Should Test frontend/backend/both after fix? backend
-     - Blocked on other issue: none
+     - Attempted fixes: Code was written in  in a prior session but was never tested or verified in this session or the last. 
+     - Next debug checklist: 
+       - Create or locate a Purchase Order in the UI.
+       - Use  or the UI to call .
+       - Manually inspect the downloaded PDF to confirm the BILL FROM section contains the correct company address, GSTIN, and phone number.
+     - Why fix this issue and what will be achieved with the fix? Pending carry-over task. Accurate official documents are required for legal/accounting compliance.
+     - Status: TESTING PENDING
+     - Is recurring issue? Y (Ignored across multiple forks)
+     - Should Test frontend/backend/both after fix? backend (via curl/file inspection)
+     - Blocked on other issue: None
 
-**In progress Task List**:
-  - Task 1:  Verify and complete the implementation of searchable product dropdowns (P0)
- 
- Task Detail:
-  - Task 1: 
-     - Where to resume: 
-       - The agent has added the code for searchable comboboxes to , , and .
-       - The next step is to test the functionality thoroughly on all three forms to ensure:
-         1. The dropdowns open correctly.
-         2. Users can type to search for products.
-         3. Selecting a product populates the form correctly.
-         4. There are no console errors or regressions.
-     - What will be achieved with this? Users will be able to find products much more easily in long product lists, improving usability.
-     - Status:  IN PROGRESS
-     - Should Test frontend/backend/both after fix? frontend
-     - Blocked on something: none
+**In progress Task List**: 
+  None currently in progress. 
 
 **Upcoming and Future Tasks**
-    **Upcoming Tasks:**
+    Upcoming Tasks:
     - P1: Confirm with the user if the temporary Delete Delivered PO feature can be removed.
-    - P1: Implement the bulk import feature for past POs and invoices.
+    - P1: Implement the bulk import feature for past POs and invoices (UI exists, backend pending).
+    
+    Future Tasks:
     - P2: Implement the  page and its corresponding backend functionality.
     - P2: Implement a downloadable reports feature.
-
-    **Future Tasks:**
-    - P2: Implement email notifications using Resend for key events.
     - P2: Implement Google Drive integration for uploading files.
 
 **Completed work in this session**
-- **Distributor Role Overhaul:**
-  - **Security Fix (P0):** Audited and patched critical data access vulnerabilities in  for the 'distributor' role across all relevant endpoints (POs, invoices, payments, vendors, products).
-  - **Usability Fixes:**
-    - Enabled product/vendor visibility for new distributors to allow PO creation in .
-    - Fixed issue creation functionality.
-    - Hid all pricing information (unit price, totals) from the distributor's PO detail view in .
-    - Added Vendor Pickup & City fields to the distributor's PO form in .
-- **Public PO Request Feature (P0):**
-  - **Completed & Enhanced:** Finished the end-to-end flow. Implemented user-requested changes including using sequential PO numbers (e.g.,  instead of ), making products selectable from a dropdown, and auto-filling prices on admin approval. Changes were made in , , and .
-- **Admin & API Features:**
-  - **External PO Request API:** Created  and  in  for external systems.
-  - **Password Reset:** Added a  endpoint and a Reset Password button in  for admins.
-- **UI/UX Improvements:**
-  - **City Field:** Added a City field to POs across backend models () and frontend forms (, ), and displayed it in PO tables (, ).
-  - **Vendor Pickup:** Added a Vendor Pickup button in  to pre-fill the delivery address.
-  - **Date Fix:** Corrected the vendor PO list in  to show  instead of .
+- Searchable product dropdowns implemented across Admin, Distributor, and Public PO forms (DONE)
+- Automated Email Notifications via Resend integrated for Vendors, Admins, and Accounts, including a daily cron job report (DONE)
+- Deployment blockers fixed (Supervisor config validated,  added explicitly without fallbacks) (DONE)
+- Added ability to Delete PO requests (DONE)
+- Added ability for Admins to upload Logistics + Product Invoices on delivered POs (DONE)
+- Massive API Performance Optimization: Pagination added, DB indexes created,  implemented for parallel queries, and a highly optimized  endpoint created (DONE)
+- External Schools API integration fixed and pointed to production URL (DONE)
 
 **Earlier issues found/mentioned but not fixed**
-   - None. The main ignored issue (Distributor security) was resolved in this session.
+   - Issue 1: Verifying the PO PDF generation company details.
+   - Debug checklist: Generate PDF and visually verify BILL FROM details.
+   - Why to solve this issue and what will be achieved with this: Ensuring legal compliance on documents.
+   - Should Test frontend/backend/both after fix: Backend
+   - Is recurring issue? Y
 
 **Known issue recurrence from previous fork**
-  - **Issue recurrence in previous fork:** Ignoring the P0 Distributor Role security bug.
-  - **Recurrence count:** High (3+).
-  - **Status:** RESOLVED. The agent successfully identified and fixed the security flaws.
+  - Issue recurrence in previous fork: Ignoring the PO PDF verification task.
+  - Recurrence count: 2
+  - Status: NOT STARTED
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Backend:** FastAPI, Pydantic
-- **Frontend:** React, React Router, Tailwind CSS, Shadcn/UI
-- **Database:** MongoDB (via )
-- **Authentication:** JWT (JSON Web Tokens). The Role-Based Access Control (RBAC) for the 'distributor' role has been significantly hardened.
+- **Backend:** FastAPI, Pydantic, Asyncio (Parallel processing used heavily in this session for speed), MongoDB Aggregation Pipelines.
+- **Frontend:** React, Tailwind CSS, Shadcn/UI (Combobox/Command used for dropdowns).
+- **Background Jobs:** Shell scripts triggered via system  to run Python async scripts.
+- **Email:** Resend API.
 
 **key DB schema**
-- **purchase_orders:** Added  and .
-- **users:**  field handling was verified to use hashing.
+  - : New DB indexes added for , , , , .
+  - : Uses , ,  fields.
 
 **changes in tech stack**
-- No new technologies were installed.
+  - Added  library for Python.
+  - Introduced traditional  jobs for scheduled background tasks (Daily Reports/Reminders).
 
-**All files of reference**
-- : The most modified file, containing security patches for the distributor role, new API endpoints for external PO requests and password resets, and logic updates for the city field and PO creation.
-- : Updated with a city field, vendor pickup button, refined logic for editing PO requests, and a new searchable product dropdown.
-- : A new form for distributors, including the city field, vendor pickup option, and searchable product dropdown.
-- : Updated with a city field and a searchable product dropdown.
-- : Updated to conditionally hide all pricing information for users with the 'distributor' role.
-- : Updated to include a 'Reset Password' button and modal for administrators.
+**All files of reference** 
+  - : Optimized endpoints, new invoice upload routes, fixed schools API.
+  - : (Created) Contains all HTML templates and Resend trigger logic.
+  - 2026-03-27 05:17:37,796 - notification_scheduler - INFO - ============================================================
+2026-03-27 05:17:37,796 - notification_scheduler - INFO - Starting notification scheduler run
+2026-03-27 05:17:37,796 - notification_scheduler - INFO - Current time: 2026-03-27T05:17:37.796561+00:00
+2026-03-27 05:17:37,796 - notification_scheduler - INFO - ============================================================
+2026-03-27 05:17:38,388 - email_service - INFO - Email sent successfully: 📋 Daily Delivery Report - 0 Deliveries Due Today (27 March 2026) to lavisha@oll.co, ID: 504e1266-4ba2-4a29-b1d1-fb1ac642b3ca
+2026-03-27 05:17:38,667 - email_service - INFO - Email sent successfully: 📋 Daily Delivery Report - 0 Deliveries Due Today (27 March 2026) to vendors@oll.co, ID: a3853f11-6059-4f79-ac26-0213a37f95e3
+2026-03-27 05:17:38,667 - notification_scheduler - INFO - Daily delivery report sent to 2 admins (0 deliveries due today)
+2026-03-27 05:17:38,667 - notification_scheduler - INFO - Starting delivery reminder check...
+2026-03-27 05:17:38,667 - notification_scheduler - INFO - Checking for deliveries on 2026-04-02 (6 days ahead)
+2026-03-27 05:17:38,668 - notification_scheduler - INFO - Found 0 POs with delivery date 2026-04-02
+2026-03-27 05:17:38,668 - notification_scheduler - INFO - Checking for deliveries on 2026-03-31 (4 days ahead)
+2026-03-27 05:17:38,669 - notification_scheduler - INFO - Found 0 POs with delivery date 2026-03-31
+2026-03-27 05:17:38,669 - notification_scheduler - INFO - Checking for deliveries on 2026-03-29 (2 days ahead)
+2026-03-27 05:17:38,670 - notification_scheduler - INFO - Found 0 POs with delivery date 2026-03-29
+2026-03-27 05:17:38,670 - notification_scheduler - INFO - Checking for deliveries on 2026-03-27 (0 days ahead)
+2026-03-27 05:17:38,671 - notification_scheduler - INFO - Found 0 POs with delivery date 2026-03-27
+2026-03-27 05:17:38,671 - notification_scheduler - INFO - Delivery reminder check complete. Sent 0 reminders.
+2026-03-27 05:17:38,671 - notification_scheduler - INFO - Starting payment due reminder check...
+2026-03-27 05:17:38,724 - notification_scheduler - INFO - Found 1 pending invoices to check
+2026-03-27 05:17:38,761 - notification_scheduler - INFO - Payment reminder check complete. Sent 0 reminders.
+2026-03-27 05:17:38,761 - notification_scheduler - INFO - ============================================================
+2026-03-27 05:17:38,761 - notification_scheduler - INFO - Scheduler run complete. Delivery reminders: 0, Payment reminders: 0
+2026-03-27 05:17:38,761 - notification_scheduler - INFO - ============================================================: (Created) Calculates PO delivery due dates and sends batch emails.
+  - : (Created) Executable to run the scheduler.
+  - : Added infinite/pagination loading, deleting requests, uploading logistics invoices.
+  - : Stripped out heavy invoice fetching to rely strictly on fast aggregation endpoints.
+  - : (Created) Documentation for the external OLL Schools API.
 
-**Areas that need refactoring**:
-- **Product Selector Component:** The logic for the new searchable product dropdown (combobox) was implemented separately in three different files (, , and ). This is a perfect candidate for extraction into a single, reusable  component to reduce code duplication and simplify future maintenance.
-- ** Complexity:** This file handles logic for creating new POs, editing existing POs, and admins approving PO requests. It's becoming overly complex and could be broken down into smaller components or custom hooks to manage state and logic more cleanly.
+**Areas that need refactoring**: 
+-  is currently over 5,100 lines long. It urgently needs to be broken down into modular routers (e.g., , ). 
+- Product Selector Component logic (Searchable Combobox) is currently duplicated across , , and . Needs extraction into a reusable component.
 
 **key api endpoints**
-- : **Enhanced** to return a full tracking URL and accept an optional .
-- : **New**, allows checking PO status via API.
-- : **New**, provides a public list of products for the request form.
-- : **New**, for admins to reset any user's password.
-- **All Data Endpoints (e.g., , , etc.)**: **Updated** with strict security filters for the 'distributor' role.
+- : **NEW/CRITICAL** - highly optimized endpoint combining POs, Vendors, and Invoice Status using parallel DB queries. Replaces 4 separate slow API calls.
+- : **UPDATED** - Uses MongoDB aggregation for instant status counts.
+- : **NEW** - For logistics/product invoice URLs and amounts.
+- : **UPDATED** - Points to  production, uses , expects  array mapping.
 
-**Critical Info for New Agent**
-- **Verification Needed:** The last task was implementing searchable product dropdowns. The code is written but untested. You must verify this works correctly on all three affected forms before moving on.
-- **Next Priority:** The highest priority pending task is to verify the company details in the generated PO PDF. This is a small but important carry-over task.
-- **Security Fixed:** The critical P0 Distributor security bug has been resolved. You can proceed with distributor-related tasks with confidence that the core access control is now in place.
-- **Refactoring Opportunity:** The product selection logic is duplicated across three files. Consider creating a reusable component to improve the codebase.
+**Critical Info for New Agent** 
+- **Performance Standard:** In this session, API speeds were reduced from ~1000ms to ~130ms. *Do not regress this*. Use  for parallel DB lookups and MongoDB aggregation pipelines instead of multiple  calls when building lists/dashboards.
+- **Email System is Live:** Resend is active in . Emails fire automatically on PO creation, dispatch, approval, etc. Admin emails route to .
+- **Schools API:** The external API requires the exact endpoint  and the header .
 
-**documents and test reports created in this job**
-- : Updated to reflect completed features.
-- : Generated while testing the Public PO Request feature.
+**documents and test reports created in this job** 
+  - 
+  - 
 
 **Last 10 User Messages and any pending HUMAN messages** 
-10. **User (Request):** Make the product dropdowns searchable. (IN PROGRESS)
-9.  **User (Request):** In the distributor's PO view, hide the amount and payment summary completely. (COMPLETED)
-8.  **User (Bug Report):** The distributor cannot add orders (products not showing), needs a pickup from vendor option, and cannot add issues. (COMPLETED)
-7.  **User (Bug Report):** Unable to log in as a newly created distributor. (COMPLETED)
-6.  **User (Request):** Add a Vendor Pickup button to the PO form and fix the date column in vendor tables to show the correct delivery date. (COMPLETED)
-5.  **User (Request):** Add a City column to all PO tables and a corresponding field in the PO creation forms. (COMPLETED)
-4.  **User (Request):** Create an external API to raise a PO request and get a tracking link in return. (COMPLETED)
-3.  **User (Confirmation):** Start working on the P0 Distributor Role security bugs. (COMPLETED)
-2.  **User (Bug Report):** Multiple issues with the PO Request approval flow: vendor is not editable, auto-pricing is missing, and the edit flow is clunky. (COMPLETED)
-1.  **User (Bug Report):** In the public PO request form, the school list should come from an API, products should be a dropdown, and the PO number should follow the main sequence. (COMPLETED)
+ - *User*: i don't want the Admin AI preview - i want the live data from OLL.co production url (RESOLVED)
+ - *User*: the base url is oll.co (RESOLVED)
+ - *User*: Here's the complete documentation — saved at /app/memory/OLL_External_API_Docs.md... (RESOLVED)
+ - *User*: the school names aren't coming from the API, any reason? can u fix it (RESOLVED)
+ - *User*: po list still taking way too much time (RESOLVED - 3.6x faster now)
+ - *User*: why is loading time so high of this and purchase orders both (RESOLVED - Dashboard 7x faster now)
+ - *User*: please update api key that use to get school name... (RESOLVED)
+ - *User*: Give option to delete PO requests. Also in delivered POs give admin option to upload invoices both logistics and normal (RESOLVED)
+ - *User*: i want you to give the API a capability to raise a PO which goes in as a PO request (RESOLVED - API already existed, documented for user)
+ - *User*: admin email ids: lavisha@oll.co, vendors@oll.co (RESOLVED)
 
 **Project Health Check:**
-- **Broken:** No. The critical security issue has been resolved.
-- **Mocked:** The UI for bulk import of past POs/invoices exists, but the backend functionality is not implemented.
+- **Broken:** None.
+- **Mocked:** Bulk import features UI exists but backend logic is mocked/unimplemented. 
 
 **3rd Party Integrations**
-- **External School API:** Integrated.
-- **External PO Sync Webhook:** Integrated.
-- **reportlab, Pillow:** Used for PDF generation.
-- **pandas, openpyxl:** Used for XLSX/CSV product import.
-- **Resend (Email notifications):** Requested, NOT IMPLEMENTED.
-- **Google Drive:** Requested, NOT IMPLEMENTED.
+  - Resend (Emails) — requires User API Key (Configured and live)
+  - OLL Schools External API — requires User API Key (Configured and live)
 
 **Testing status**
-  - Testing agent used after significant changes: YES, for the Public PO Request feature.
-  - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: []
+  - Testing agent used after significant changes: YES (Used initially for Dropdowns).
+  - Troubleshoot agent used after agent stuck in loop: NO.
+  - Test files created: None.
   - Known regressions: None.
 
 **Credentials to test flow:**
-- **OLL Admin:**  / 
-- **Vendor 1:**  / 
-- **Vendor 2:**  / 
-- **Distributor:**  / 
+- Admin:  / 
+- Distributor:  /  (Note the username is distributor1, not distributor)
 
 **What agent forgot to execute**
-- The agent did not complete the carry-over task of verifying the company address, GSTIN, and phone number updates in the generated PO PDF. This task remains pending.</analysis>
+- Agent completely ignored the P1 inherited task: Verify the updated company details in the generated PO PDF. This MUST be tested and verified by the next agent.</analysis>

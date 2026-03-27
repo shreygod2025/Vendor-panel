@@ -1,6 +1,6 @@
 # OLL Schools External API — Documentation
 
-**Base URL:** `https://admin-ai-suite.preview.emergentagent.com`
+**Base URL:** `https://vendor-hub-phase2.preview.emergentagent.com`
 
 ## Authentication
 

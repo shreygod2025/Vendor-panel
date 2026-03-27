@@ -2743,7 +2743,7 @@ async def create_public_po_request(request: PublicPORequest):
     logger.info(f"External PO request created: {po_number} by {request.requester_name} from {request.source_system or 'unknown'}")
     
     # Build tracking URL - use environment variable or default
-    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://vendor-mgmt-v2.preview.emergentagent.com')
+    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{tracking_token}"
     
     return PublicPORequestResponse(
@@ -2793,7 +2793,7 @@ async def get_public_po_status(identifier: str):
         vendor_name = vendor.get("name") if vendor else None
     
     # Build tracking URL
-    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://vendor-mgmt-v2.preview.emergentagent.com')
+    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{po.get('tracking_token', '')}"
     
     # Status descriptions
@@ -3790,14 +3790,14 @@ SCHOOLS_API_URL = os.environ.get('SCHOOLS_API_URL', '')
 SCHOOLS_API_KEY = os.environ.get('SCHOOLS_API_KEY', '')
 
 @api_router.get("/schools/search")
-async def search_schools(q: str = "", limit: int = 20, current_user: dict = Depends(get_current_user)):
+async def search_schools(q: str = "", limit: int = 20):
     """Search schools from external API and return suggestions"""
     if not SCHOOLS_API_URL or not SCHOOLS_API_KEY:
         raise HTTPException(status_code=500, detail="Schools API not configured")
     
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            # Fetch all schools (up to 500) from external API
+            # Fetch schools from external API (active endpoint)
             response = await client.get(
                 SCHOOLS_API_URL,
                 params={"limit": 500},
@@ -3806,29 +3806,46 @@ async def search_schools(q: str = "", limit: int = 20, current_user: dict = Depe
             response.raise_for_status()
             data = response.json()
             
-            schools = data.get("data", [])
+            # Handle both /active endpoint (schools array) and /schools endpoint (data array)
+            schools = data.get("schools", data.get("data", []))
             
             # Filter by search query if provided
             if q:
                 q_lower = q.lower()
                 schools = [
                     s for s in schools 
-                    if q_lower in s.get("school_name", "").lower()
+                    if q_lower in s.get("school_name", "").lower() or
+                       q_lower in (s.get("city") or s.get("location", {}).get("city") or "").lower()
                 ]
             
             # Transform to simpler format for frontend
             results = []
             for school in schools[:limit]:
-                results.append({
-                    "id": school.get("id"),
-                    "school_name": school.get("school_name", ""),
-                    "address": school.get("location", {}).get("address") or "",
-                    "city": school.get("location", {}).get("city") or "",
-                    "state": school.get("location", {}).get("state") or "",
-                    "contact_name": school.get("contact", {}).get("name") or "",
-                    "contact_phone": school.get("contact", {}).get("phone") or "",
-                    "contact_email": school.get("contact", {}).get("email") or "",
-                })
+                # Handle both response formats
+                if "location" in school:
+                    # Full endpoint format
+                    results.append({
+                        "id": school.get("id"),
+                        "school_name": school.get("school_name", ""),
+                        "address": school.get("location", {}).get("address") or "",
+                        "city": school.get("location", {}).get("city") or "",
+                        "state": school.get("location", {}).get("state") or "",
+                        "contact_name": school.get("contact", {}).get("name") or "",
+                        "contact_phone": school.get("contact", {}).get("phone") or "",
+                        "contact_email": school.get("contact", {}).get("email") or "",
+                    })
+                else:
+                    # Active endpoint format (flat structure)
+                    results.append({
+                        "id": school.get("id", school.get("school_name", "")),
+                        "school_name": school.get("school_name", ""),
+                        "address": school.get("address") or "",
+                        "city": school.get("city") or "",
+                        "state": school.get("state") or "",
+                        "contact_name": school.get("contact_person") or "",
+                        "contact_phone": school.get("contact_phone") or "",
+                        "contact_email": school.get("contact_email") or "",
+                    })
             
             return {"schools": results, "total": len(schools)}
             
@@ -3838,6 +3855,9 @@ async def search_schools(q: str = "", limit: int = 20, current_user: dict = Depe
     except httpx.HTTPStatusError as e:
         logger.error(f"Schools API status error: {e}")
         raise HTTPException(status_code=500, detail="Schools API returned an error")
+    except Exception as e:
+        logger.error(f"Schools API error: {e}")
+        raise HTTPException(status_code=500, detail=f"Schools API error: {str(e)}")
 
 @api_router.get("/schools/{school_id}")
 async def get_school_details(school_id: str, current_user: dict = Depends(get_current_user)):
@@ -4885,7 +4905,7 @@ async def integration_raise_po(
     })
     
     # Build tracking URL (base URL from environment or default)
-    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-mgmt-v2.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{tracking_token}"
     
     return IntegrationPOResponse(
@@ -4936,7 +4956,7 @@ async def integration_get_tracking(
     # Get dispatch info if available
     dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-mgmt-v2.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{po['tracking_token']}"
     
     return TrackingLinkResponse(
@@ -4974,7 +4994,7 @@ async def integration_get_bulk_tracking(
     results = []
     errors = []
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-mgmt-v2.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
     
     # Search by PO IDs
     if request.po_ids:
