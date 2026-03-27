@@ -4302,6 +4302,146 @@ async def get_po_pdf_external(po_number: str, _: bool = Depends(verify_external_
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+@api_router.get("/external/analytics")
+async def get_external_analytics(_: bool = Depends(verify_external_api_key)):
+    """
+    External API: Returns comprehensive analytics data.
+    Includes PO stats, delivery timeline averages, inventory summary, monthly spend, and status breakdown.
+    Authentication: Requires X-API-Key header
+    """
+    # Fetch data in parallel
+    pos_task = db.purchase_orders.find(
+        {"status": {"$nin": ["draft", "request"]}}, {"_id": 0}
+    ).to_list(2000)
+    inventory_task = db.inventory.find({}, {"_id": 0}).to_list(1000)
+    vendors_task = db.vendors.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(500)
+    dispatches_task = db.dispatches.find({}, {"_id": 0, "po_id": 1, "created_at": 1}).to_list(2000)
+    audit_task = db.audit_logs.find(
+        {"action": {"$in": ["SEND_PO", "CONFIRM_PO", "CREATE_DISPATCH", "APPROVE_DELIVERY", "VENDOR_SUBMIT_DELIVERY"]}},
+        {"_id": 0}
+    ).to_list(5000)
+
+    pos, inventory_items, vendors_raw, dispatches, audit_logs = await asyncio.gather(
+        pos_task, inventory_task, vendors_task, dispatches_task, audit_task
+    )
+
+    vendor_map = {v["id"]: v["name"] for v in vendors_raw}
+    dispatch_map = {d["po_id"]: d["created_at"] for d in dispatches if d.get("po_id") and d.get("created_at")}
+
+    # Build audit lookup map
+    audit_map = {}
+    for log in audit_logs:
+        eid, action, ts = log.get("entity_id"), log.get("action"), log.get("timestamp")
+        if eid and action and ts:
+            audit_map.setdefault(eid, {}).setdefault(action, ts)
+
+    def parse_dt(val):
+        if not val: return None
+        try:
+            return datetime.fromisoformat(str(val).replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    def days_between(t1, t2):
+        d1, d2 = parse_dt(t1), parse_dt(t2)
+        return round((d2 - d1).total_seconds() / 86400, 1) if d1 and d2 else None
+
+    # --- PO stats ---
+    total_pos = len(pos)
+    status_counts = {}
+    for po in pos:
+        s = po.get("status", "unknown")
+        status_counts[s] = status_counts.get(s, 0) + 1
+
+    delivered_pos = [p for p in pos if p.get("status") in ("delivered", "closed")]
+    total_spend = sum(p.get("grand_total", 0) for p in pos)
+
+    # --- Monthly spend ---
+    monthly_map = {}
+    for po in pos:
+        dt = (po.get("created_at") or "")[:7]
+        if dt:
+            monthly_map[dt] = monthly_map.get(dt, 0) + po.get("grand_total", 0)
+    monthly_spend = [{"month": k, "amount": round(v, 2)} for k, v in sorted(monthly_map.items())]
+
+    # --- Timeline averages ---
+    confirm_days, dispatch_days, deliver_days, delay_days = [], [], [], []
+    for po in pos:
+        pid = po.get("id")
+        logs = audit_map.get(pid, {})
+        sent_at     = po.get("sent_at")     or logs.get("SEND_PO")     or po.get("created_at")
+        confirmed_at= po.get("confirmed_at") or logs.get("CONFIRM_PO")
+        dispatched_at=po.get("dispatched_at") or dispatch_map.get(pid)  or logs.get("CREATE_DISPATCH")
+        delivered_at = po.get("delivered_at")  or po.get("delivery_approved_at") or logs.get("APPROVE_DELIVERY") or logs.get("VENDOR_SUBMIT_DELIVERY")
+
+        tc = days_between(sent_at, confirmed_at)
+        td = days_between(confirmed_at, dispatched_at)
+        tv = days_between(dispatched_at, delivered_at)
+        if tc is not None: confirm_days.append(tc)
+        if td is not None: dispatch_days.append(td)
+        if tv is not None: deliver_days.append(tv)
+
+        if po.get("delivery_date") and delivered_at:
+            try:
+                exp = datetime.fromisoformat(po["delivery_date"] + "T00:00:00+00:00")
+                act = parse_dt(delivered_at)
+                if act:
+                    delay_days.append(round((act - exp).total_seconds() / 86400, 1))
+            except Exception:
+                pass
+
+    def avg(lst):
+        valid = [x for x in lst if x is not None]
+        return round(sum(valid) / len(valid), 1) if valid else None
+
+    # --- Inventory summary ---
+    total_inv_value = sum(i.get("total_value", 0) for i in inventory_items)
+    total_inv_qty   = sum(i.get("quantity", 0) for i in inventory_items)
+    by_category = {}
+    for item in inventory_items:
+        cat = item.get("category") or "Uncategorized"
+        by_category.setdefault(cat, {"item_count": 0, "quantity": 0, "value": 0})
+        by_category[cat]["item_count"] += 1
+        by_category[cat]["quantity"] += item.get("quantity", 0)
+        by_category[cat]["value"] += round(item.get("total_value", 0), 2)
+
+    inventory_items_clean = [
+        {
+            "product_name": i.get("product_name"),
+            "sku": i.get("sku"),
+            "category": i.get("category"),
+            "quantity": i.get("quantity"),
+            "unit_price": i.get("unit_price"),
+            "total_value": i.get("total_value"),
+            "location": i.get("location"),
+        }
+        for i in inventory_items
+    ]
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "po_summary": {
+            "total_pos": total_pos,
+            "total_spend": round(total_spend, 2),
+            "delivered_pos": len(delivered_pos),
+            "status_breakdown": status_counts,
+        },
+        "monthly_spend": monthly_spend,
+        "delivery_timeline": {
+            "avg_time_to_confirm_days": avg(confirm_days),
+            "avg_time_to_dispatch_days": avg(dispatch_days),
+            "avg_time_to_deliver_days": avg(deliver_days),
+            "avg_delivery_delay_days": avg(delay_days),
+        },
+        "inventory": {
+            "total_items": len(inventory_items),
+            "total_quantity": total_inv_qty,
+            "total_value": round(total_inv_value, 2),
+            "by_category": by_category,
+            "items": inventory_items_clean,
+        }
+    }
+
 # ========================
 # SEED DATA
 # ========================

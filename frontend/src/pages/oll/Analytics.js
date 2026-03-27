@@ -80,6 +80,11 @@ const Analytics = () => {
     }
   });
 
+  const [inventory, setInventory] = useState({
+    items: [],
+    stats: { total_items: 0, total_quantity: 0, total_value: 0, by_category: {} }
+  });
+
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -92,14 +97,16 @@ const Analytics = () => {
 
   const fetchAllData = async () => {
     try {
-      const [vendorsRes, productsRes, posRes, issuesRes, invoicesRes, paymentsRes, timelineRes] = await Promise.all([
+      const [vendorsRes, productsRes, posRes, issuesRes, invoicesRes, paymentsRes, timelineRes, inventoryRes, invStatsRes] = await Promise.all([
         apiClient.get("/vendors"),
         apiClient.get("/products"),
         apiClient.get("/purchase-orders"),
         apiClient.get("/issues"),
         apiClient.get("/invoices"),
         apiClient.get("/payments"),
-        apiClient.get("/analytics/delivery-timeline")
+        apiClient.get("/analytics/delivery-timeline"),
+        apiClient.get("/inventory"),
+        apiClient.get("/inventory/summary/stats")
       ]);
       
       setData({
@@ -111,6 +118,7 @@ const Analytics = () => {
         payments: paymentsRes.data
       });
       setTimeline(timelineRes.data);
+      setInventory({ items: inventoryRes.data, stats: invStatsRes.data });
     } catch (error) {
       toast.error("Failed to fetch analytics data");
     } finally {
@@ -404,9 +412,10 @@ const Analytics = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="inventory">Inventory</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="issues">Issues</TabsTrigger>
             <TabsTrigger value="vendors">Vendors</TabsTrigger>
@@ -767,6 +776,152 @@ const Analytics = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Inventory Tab */}
+          <TabsContent value="inventory" className="space-y-6">
+            {/* Inventory KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-indigo-500">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                      <Package className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">{inventory.stats.total_items}</p>
+                      <p className="text-xs text-slate-500">Unique Items</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-blue-500">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                      <BarChart3 className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">{inventory.stats.total_quantity.toLocaleString()}</p>
+                      <p className="text-xs text-slate-500">Total Units in Stock</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-emerald-500">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                      <DollarSign className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">{formatCurrency(inventory.stats.total_value)}</p>
+                      <p className="text-xs text-slate-500">Total Inventory Value</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Category Breakdown + Item Table */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* By Category */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <PieChart className="w-4 h-4" />
+                    By Category
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {Object.keys(inventory.stats.by_category || {}).length > 0 ? (
+                    <div className="space-y-3">
+                      {Object.entries(inventory.stats.by_category).map(([cat, data], idx) => {
+                        const pct = inventory.stats.total_value > 0
+                          ? ((data.value / inventory.stats.total_value) * 100).toFixed(1)
+                          : 0;
+                        const colors = ["bg-indigo-500","bg-blue-500","bg-emerald-500","bg-amber-500","bg-rose-500"];
+                        return (
+                          <div key={idx}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-slate-700 font-medium">{cat}</span>
+                              <span className="text-slate-500">{data.item_count} items · {data.quantity} units</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div className={`h-full ${colors[idx % colors.length]} rounded-full`} style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-xs font-mono text-slate-600 w-16 text-right">{formatCurrency(data.value)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-center text-slate-500 py-6 text-sm">No inventory data</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* All Items Table */}
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Package className="w-4 h-4" />
+                      All Inventory Items
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {inventory.items.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50">
+                            <TableHead>Item</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Unit Price</TableHead>
+                            <TableHead className="text-right">Total Value</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {inventory.items
+                            .slice()
+                            .sort((a, b) => (b.total_value || 0) - (a.total_value || 0))
+                            .map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium text-slate-900">{item.product_name}</p>
+                                  {item.sku && <p className="text-xs text-slate-400">{item.sku}</p>}
+                                  {item.location && <p className="text-xs text-slate-400">{item.location}</p>}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">
+                                  {item.category || "—"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-medium">
+                                {item.quantity?.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-slate-600">
+                                {formatCurrency(item.unit_price || 0)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-semibold text-emerald-700">
+                                {formatCurrency(item.total_value || 0)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p className="text-center text-slate-500 py-8 text-sm">No inventory items found</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Products Tab */}
