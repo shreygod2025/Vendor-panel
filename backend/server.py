@@ -1805,7 +1805,7 @@ async def send_po_to_vendor(po_id: str, current_user: dict = Depends(get_current
     
     await db.purchase_orders.update_one(
         {"id": po_id},
-        {"$set": {"status": "sent", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"status": "sent", "sent_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
     await create_audit_log("SEND_PO", "purchase_order", po_id, current_user)
@@ -1825,7 +1825,7 @@ async def confirm_po(po_id: str, current_user: dict = Depends(get_current_user))
     
     await db.purchase_orders.update_one(
         {"id": po_id},
-        {"$set": {"status": "confirmed", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"status": "confirmed", "confirmed_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
     await create_audit_log("CONFIRM_PO", "purchase_order", po_id, current_user)
@@ -1898,6 +1898,7 @@ async def confirm_delivery(po_id: str, confirmation: DeliveryConfirmation, curre
         {"id": po_id},
         {"$set": {
             "status": "delivered",
+            "delivered_at": datetime.now(timezone.utc).isoformat(),
             "has_delivery_issues": has_issues,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
@@ -2037,6 +2038,7 @@ async def approve_delivery(po_id: str, current_user: dict = Depends(get_current_
         {"id": po_id},
         {"$set": {
             "status": "delivered",
+            "delivered_at": datetime.now(timezone.utc).isoformat(),
             "delivery_approved_at": datetime.now(timezone.utc).isoformat(),
             "delivery_approved_by": current_user["user_id"],
             "updated_at": datetime.now(timezone.utc).isoformat()
@@ -2275,7 +2277,7 @@ async def create_dispatch(dispatch: DispatchCreate, current_user: dict = Depends
     
     await db.purchase_orders.update_one(
         {"id": dispatch.po_id},
-        {"$set": {"status": "dispatched", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"status": "dispatched", "dispatched_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
     await create_audit_log("CREATE_DISPATCH", "dispatch", dispatch_doc["id"], current_user, {"po_id": dispatch.po_id})
@@ -5164,6 +5166,127 @@ async def get_email_status(current_user: dict = Depends(get_current_user)):
         "message": "Email notifications are active" if is_email_configured() else "Email not configured. Add RESEND_API_KEY to .env file."
     }
 
+# ========================
+# ANALYTICS ENDPOINTS
+# ========================
+
+@api_router.get("/analytics/delivery-timeline")
+async def get_delivery_timeline(current_user: dict = Depends(get_current_user)):
+    """Returns per-PO delivery date vs actual delivery and pipeline stage timings."""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can view analytics")
+
+    pos = await db.purchase_orders.find(
+        {"status": {"$in": ["sent", "confirmed", "dispatched", "delivered", "closed", "pending_approval"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+
+    # Build vendor name lookup
+    vendors_raw = await db.vendors.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(500)
+    vendor_map = {v["id"]: v["name"] for v in vendors_raw}
+
+    audit_logs = await db.audit_logs.find(
+        {"action": {"$in": ["SEND_PO", "CONFIRM_PO", "CREATE_DISPATCH", "APPROVE_DELIVERY", "VENDOR_SUBMIT_DELIVERY"]}},
+        {"_id": 0}
+    ).to_list(5000)
+
+    audit_map = {}
+    for log in audit_logs:
+        entity_id = log.get("entity_id")
+        action = log.get("action")
+        ts = log.get("timestamp")
+        if not entity_id or not action or not ts:
+            continue
+        if entity_id not in audit_map:
+            audit_map[entity_id] = {}
+        if action not in audit_map[entity_id]:
+            audit_map[entity_id][action] = ts
+
+    dispatches = await db.dispatches.find({}, {"_id": 0, "po_id": 1, "created_at": 1}).to_list(2000)
+    dispatch_map = {d["po_id"]: d["created_at"] for d in dispatches if d.get("po_id") and d.get("created_at")}
+
+    def parse_dt(val):
+        if not val:
+            return None
+        try:
+            if isinstance(val, datetime):
+                return val
+            val = str(val).replace("Z", "+00:00")
+            return datetime.fromisoformat(val)
+        except Exception:
+            return None
+
+    def days_between(t1, t2):
+        d1, d2 = parse_dt(t1), parse_dt(t2)
+        if d1 and d2:
+            return round((d2 - d1).total_seconds() / 86400, 1)
+        return None
+
+    po_timelines = []
+    pipeline_delays = {"confirm": [], "dispatch": [], "deliver": []}
+    delivery_delays = []
+
+    for po in pos:
+        po_id = po.get("id")
+        po_logs = audit_map.get(po_id, {})
+
+        sent_at      = po.get("sent_at")      or po_logs.get("SEND_PO")     or po.get("created_at")
+        confirmed_at = po.get("confirmed_at") or po_logs.get("CONFIRM_PO")
+        dispatched_at= po.get("dispatched_at") or dispatch_map.get(po_id)   or po_logs.get("CREATE_DISPATCH")
+        delivered_at = po.get("delivered_at")  or po.get("delivery_approved_at") or po_logs.get("APPROVE_DELIVERY") or po_logs.get("VENDOR_SUBMIT_DELIVERY")
+
+        time_to_confirm  = days_between(sent_at, confirmed_at)
+        time_to_dispatch = days_between(confirmed_at, dispatched_at)
+        time_to_deliver  = days_between(dispatched_at, delivered_at)
+
+        if time_to_confirm  is not None: pipeline_delays["confirm"].append(time_to_confirm)
+        if time_to_dispatch is not None: pipeline_delays["dispatch"].append(time_to_dispatch)
+        if time_to_deliver  is not None: pipeline_delays["deliver"].append(time_to_deliver)
+
+        expected_delivery_date = po.get("delivery_date")
+        delivery_delay_days = None
+
+        if expected_delivery_date and delivered_at:
+            try:
+                expected_dt = datetime.fromisoformat(expected_delivery_date + "T00:00:00+00:00")
+                actual_dt   = parse_dt(delivered_at)
+                if actual_dt:
+                    delivery_delay_days = round((actual_dt - expected_dt).total_seconds() / 86400, 1)
+                    delivery_delays.append(delivery_delay_days)
+            except Exception:
+                pass
+
+        po_timelines.append({
+            "po_id": po_id,
+            "po_number": po.get("po_number"),
+            "vendor_name": vendor_map.get(po.get("vendor_id")) or po.get("vendor_name") or "Unknown",
+            "status": po.get("status"),
+            "expected_delivery_date": expected_delivery_date,
+            "actual_delivered_at": delivered_at[:10] if delivered_at else None,
+            "delivery_delay_days": delivery_delay_days,
+            "sent_at": sent_at[:10] if sent_at else None,
+            "confirmed_at": confirmed_at[:10] if confirmed_at else None,
+            "dispatched_at": dispatched_at[:10] if dispatched_at else None,
+            "delivered_at": delivered_at[:10] if delivered_at else None,
+            "time_to_confirm_days": time_to_confirm,
+            "time_to_dispatch_days": time_to_dispatch,
+            "time_to_deliver_days": time_to_deliver,
+        })
+
+    def avg(lst):
+        valid = [x for x in lst if x is not None]
+        return round(sum(valid) / len(valid), 1) if valid else None
+
+    return {
+        "po_timelines": po_timelines,
+        "averages": {
+            "avg_time_to_confirm_days":  avg(pipeline_delays["confirm"]),
+            "avg_time_to_dispatch_days": avg(pipeline_delays["dispatch"]),
+            "avg_time_to_deliver_days":  avg(pipeline_delays["deliver"]),
+            "avg_delivery_delay_days":   avg(delivery_delays),
+        }
+    }
+
 # File upload endpoint - for invoice PDFs, logistics invoices, etc.
 @api_router.post("/upload")
 async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
@@ -5181,7 +5304,6 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
     if len(content) > max_size:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
     
-    # Generate unique filename
     ext = Path(file.filename).suffix if file.filename else ".bin"
     unique_name = f"{uuid.uuid4().hex}{ext}"
     file_path = UPLOADS_DIR / unique_name

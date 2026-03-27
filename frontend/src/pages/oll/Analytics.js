@@ -33,7 +33,10 @@ import {
   CheckCircle,
   PieChart,
   Clock,
-  XCircle
+  XCircle,
+  Timer,
+  CalendarCheck,
+  ArrowRight
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -67,6 +70,16 @@ const Analytics = () => {
     vendorPerformance: []
   });
 
+  const [timeline, setTimeline] = useState({
+    po_timelines: [],
+    averages: {
+      avg_time_to_confirm_days: null,
+      avg_time_to_dispatch_days: null,
+      avg_time_to_deliver_days: null,
+      avg_delivery_delay_days: null,
+    }
+  });
+
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -79,13 +92,14 @@ const Analytics = () => {
 
   const fetchAllData = async () => {
     try {
-      const [vendorsRes, productsRes, posRes, issuesRes, invoicesRes, paymentsRes] = await Promise.all([
+      const [vendorsRes, productsRes, posRes, issuesRes, invoicesRes, paymentsRes, timelineRes] = await Promise.all([
         apiClient.get("/vendors"),
         apiClient.get("/products"),
         apiClient.get("/purchase-orders"),
         apiClient.get("/issues"),
         apiClient.get("/invoices"),
-        apiClient.get("/payments")
+        apiClient.get("/payments"),
+        apiClient.get("/analytics/delivery-timeline")
       ]);
       
       setData({
@@ -96,6 +110,7 @@ const Analytics = () => {
         invoices: invoicesRes.data,
         payments: paymentsRes.data
       });
+      setTimeline(timelineRes.data);
     } catch (error) {
       toast.error("Failed to fetch analytics data");
     } finally {
@@ -389,8 +404,9 @@ const Analytics = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="timeline">Timeline</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="issues">Issues</TabsTrigger>
             <TabsTrigger value="vendors">Vendors</TabsTrigger>
@@ -505,9 +521,256 @@ const Analytics = () => {
             </div>
           </TabsContent>
 
-          {/* Products Tab */}
-          <TabsContent value="products">
+          {/* Timeline Tab */}
+          <TabsContent value="timeline" className="space-y-6">
+            {/* Pipeline KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="border-l-4 border-l-blue-500">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                      <Timer className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {timeline.averages.avg_time_to_confirm_days != null
+                          ? `${timeline.averages.avg_time_to_confirm_days}d`
+                          : "—"}
+                      </p>
+                      <p className="text-xs text-slate-500 leading-tight">Avg. Time to Confirm PO</p>
+                      <p className="text-xs text-slate-400 mt-0.5">from PO raised</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-amber-500">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                      <Truck className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {timeline.averages.avg_time_to_dispatch_days != null
+                          ? `${timeline.averages.avg_time_to_dispatch_days}d`
+                          : "—"}
+                      </p>
+                      <p className="text-xs text-slate-500 leading-tight">Avg. Time to Dispatch</p>
+                      <p className="text-xs text-slate-400 mt-0.5">from confirmation</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-emerald-500">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                      <CheckCircle className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {timeline.averages.avg_time_to_deliver_days != null
+                          ? `${timeline.averages.avg_time_to_deliver_days}d`
+                          : "—"}
+                      </p>
+                      <p className="text-xs text-slate-500 leading-tight">Avg. Time to Deliver</p>
+                      <p className="text-xs text-slate-400 mt-0.5">from dispatch</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={`border-l-4 ${
+                timeline.averages.avg_delivery_delay_days == null ? "border-l-slate-300" :
+                timeline.averages.avg_delivery_delay_days > 0 ? "border-l-red-500" :
+                "border-l-emerald-500"
+              }`}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                      timeline.averages.avg_delivery_delay_days == null ? "bg-slate-100" :
+                      timeline.averages.avg_delivery_delay_days > 0 ? "bg-red-100" : "bg-emerald-100"
+                    }`}>
+                      <CalendarCheck className={`w-5 h-5 ${
+                        timeline.averages.avg_delivery_delay_days == null ? "text-slate-400" :
+                        timeline.averages.avg_delivery_delay_days > 0 ? "text-red-600" : "text-emerald-600"
+                      }`} />
+                    </div>
+                    <div>
+                      <p className={`text-2xl font-bold ${
+                        timeline.averages.avg_delivery_delay_days == null ? "text-slate-400" :
+                        timeline.averages.avg_delivery_delay_days > 0 ? "text-red-700" : "text-emerald-700"
+                      }`}>
+                        {timeline.averages.avg_delivery_delay_days != null
+                          ? `${timeline.averages.avg_delivery_delay_days > 0 ? "+" : ""}${timeline.averages.avg_delivery_delay_days}d`
+                          : "—"}
+                      </p>
+                      <p className="text-xs text-slate-500 leading-tight">Avg. Delivery Delay</p>
+                      <p className="text-xs text-slate-400 mt-0.5">vs expected date on PO</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Pipeline Flow Visual */}
             <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  Fulfillment Pipeline — Average Duration per Stage
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between gap-2 py-4">
+                  {[
+                    { label: "PO Raised", sub: "Start", color: "bg-slate-200 text-slate-600", dot: "bg-slate-400" },
+                    { label: "Confirmed", sub: `${timeline.averages.avg_time_to_confirm_days != null ? timeline.averages.avg_time_to_confirm_days + "d" : "—"}`, color: "bg-blue-100 text-blue-700", dot: "bg-blue-500", arrow: true },
+                    { label: "Dispatched", sub: `${timeline.averages.avg_time_to_dispatch_days != null ? timeline.averages.avg_time_to_dispatch_days + "d" : "—"}`, color: "bg-amber-100 text-amber-700", dot: "bg-amber-500", arrow: true },
+                    { label: "Delivered", sub: `${timeline.averages.avg_time_to_deliver_days != null ? timeline.averages.avg_time_to_deliver_days + "d" : "—"}`, color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", arrow: true },
+                  ].map((stage, idx) => (
+                    <div key={idx} className="flex items-center gap-2 flex-1">
+                      {stage.arrow && <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />}
+                      <div className={`flex-1 rounded-lg p-3 text-center ${stage.color}`}>
+                        <div className={`w-2 h-2 rounded-full ${stage.dot} mx-auto mb-2`} />
+                        <p className="font-semibold text-sm">{stage.label}</p>
+                        <p className="text-xs mt-0.5 opacity-80">{stage.sub}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Per-PO Delivery Date Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarCheck className="w-5 h-5" />
+                  Delivery Date: Expected vs Actual (per PO)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {timeline.po_timelines.filter(p => p.status === "delivered" || p.status === "closed").length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead>PO Number</TableHead>
+                        <TableHead>Vendor</TableHead>
+                        <TableHead>Expected Date</TableHead>
+                        <TableHead>Actual Date</TableHead>
+                        <TableHead className="text-right">Delay (days)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {timeline.po_timelines
+                        .filter(p => p.status === "delivered" || p.status === "closed")
+                        .map((po, idx) => {
+                          const delay = po.delivery_delay_days;
+                          const isLate = delay > 0;
+                          const isEarly = delay < 0;
+                          return (
+                            <TableRow key={idx}>
+                              <TableCell className="font-mono font-medium">{po.po_number}</TableCell>
+                              <TableCell className="text-slate-600">{po.vendor_name}</TableCell>
+                              <TableCell>{po.expected_delivery_date || "—"}</TableCell>
+                              <TableCell>{po.actual_delivered_at || "—"}</TableCell>
+                              <TableCell className="text-right">
+                                {delay == null ? (
+                                  <span className="text-slate-400">—</span>
+                                ) : (
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                    isLate ? "bg-red-100 text-red-700" :
+                                    isEarly ? "bg-emerald-100 text-emerald-700" :
+                                    "bg-slate-100 text-slate-600"
+                                  }`}>
+                                    {isLate ? `+${delay}d late` : isEarly ? `${Math.abs(delay)}d early` : "On time"}
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center text-slate-500 py-8">No delivered POs to show yet</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Full Pipeline Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  PO Pipeline Timing (All Active POs)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                {timeline.po_timelines.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead>PO Number</TableHead>
+                        <TableHead>Vendor</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-center">Sent</TableHead>
+                        <TableHead className="text-center">Confirmed</TableHead>
+                        <TableHead className="text-center">Dispatched</TableHead>
+                        <TableHead className="text-center">Delivered</TableHead>
+                        <TableHead className="text-right">Confirm</TableHead>
+                        <TableHead className="text-right">Dispatch</TableHead>
+                        <TableHead className="text-right">Deliver</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {timeline.po_timelines.map((po, idx) => (
+                        <TableRow key={idx} className="text-sm">
+                          <TableCell className="font-mono font-medium">{po.po_number}</TableCell>
+                          <TableCell className="text-slate-600 max-w-[120px] truncate">{po.vendor_name}</TableCell>
+                          <TableCell>
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                              po.status === "delivered" || po.status === "closed" ? "bg-emerald-100 text-emerald-700" :
+                              po.status === "dispatched" ? "bg-amber-100 text-amber-700" :
+                              po.status === "confirmed" ? "bg-blue-100 text-blue-700" :
+                              "bg-slate-100 text-slate-600"
+                            }`}>{po.status}</span>
+                          </TableCell>
+                          <TableCell className="text-center text-xs text-slate-500">{po.sent_at || "—"}</TableCell>
+                          <TableCell className="text-center text-xs text-slate-500">{po.confirmed_at || "—"}</TableCell>
+                          <TableCell className="text-center text-xs text-slate-500">{po.dispatched_at || "—"}</TableCell>
+                          <TableCell className="text-center text-xs text-slate-500">{po.delivered_at || "—"}</TableCell>
+                          <TableCell className="text-right">
+                            {po.time_to_confirm_days != null ? (
+                              <span className="text-xs font-mono text-blue-700">{po.time_to_confirm_days}d</span>
+                            ) : <span className="text-slate-300">—</span>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {po.time_to_dispatch_days != null ? (
+                              <span className="text-xs font-mono text-amber-700">{po.time_to_dispatch_days}d</span>
+                            ) : <span className="text-slate-300">—</span>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {po.time_to_deliver_days != null ? (
+                              <span className="text-xs font-mono text-emerald-700">{po.time_to_deliver_days}d</span>
+                            ) : <span className="text-slate-300">—</span>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center text-slate-500 py-8">No PO data available</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Products Tab */}
+          <TabsContent value="products">            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="w-5 h-5" />
