@@ -4480,6 +4480,247 @@ async def get_external_analytics(_: bool = Depends(verify_external_api_key)):
     }
 
 # ========================
+# EXTERNAL API — ISSUES
+# ========================
+
+class ExternalIssueCreate(BaseModel):
+    po_number: str
+    subject: str                    # Short subject / title
+    description: str
+    issue_type: str = "other"       # delivery_delay | missing_components | damaged_goods | quality_issue | other
+    priority: str = "medium"        # low | medium | high | critical
+    attachment_url: Optional[str] = None
+    reporter_name: Optional[str] = None   # Name of person raising the issue
+    reporter_email: Optional[str] = None  # Contact email for the reporter
+
+class ExternalReplyCreate(BaseModel):
+    message: str
+    attachment_url: Optional[str] = None
+    sender_name: Optional[str] = None
+
+def _serialize_issue(issue: dict, po: dict = None, vendor: dict = None) -> dict:
+    """Return a clean, serialisable issue dict for external API consumers."""
+    return {
+        "issue_id":    issue["id"],
+        "issue_number": issue.get("issue_number"),
+        "status":      issue.get("status", "open"),
+        "priority":    issue.get("priority", "medium"),
+        "issue_type":  issue.get("issue_type"),
+        "subject":     issue.get("subject") or issue.get("description", "")[:80],
+        "description": issue.get("description"),
+        "attachment_url": issue.get("attachment_url"),
+        "resolution":  issue.get("resolution"),
+        "po_number":   issue.get("po_number") or (po.get("po_number") if po else None),
+        "school_name": (po.get("school_name") if po else None),
+        "vendor_name": (vendor.get("name") if vendor else issue.get("vendor_name")),
+        "reporter_name":  issue.get("reporter_name"),
+        "reporter_email": issue.get("reporter_email"),
+        "created_at":  issue.get("created_at"),
+        "updated_at":  issue.get("updated_at"),
+        "conversation": [
+            {
+                "id":           r.get("id"),
+                "message":      r.get("message"),
+                "sender":       r.get("created_by_name") or r.get("created_by_role", "support"),
+                "sender_role":  r.get("created_by_role"),
+                "attachment_url": r.get("attachment_url"),
+                "sent_at":      r.get("created_at"),
+            }
+            for r in issue.get("replies", [])
+        ],
+    }
+
+@api_router.post("/external/issues")
+async def external_raise_issue(body: ExternalIssueCreate, _: bool = Depends(verify_external_api_key)):
+    """
+    External API: Raise a new issue against a Purchase Order.
+
+    Fields:
+    - po_number (required): e.g. "PO-021"
+    - subject (required): Short title for the issue
+    - description (required): Full details
+    - issue_type: delivery_delay | missing_components | damaged_goods | quality_issue | other
+    - priority: low | medium | high | critical
+    - attachment_url: Link to supporting document / image
+    - reporter_name / reporter_email: Contact details of the person raising the issue
+
+    Authentication: X-API-Key header
+    """
+    po = await db.purchase_orders.find_one({"po_number": body.po_number.upper()}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail=f"Purchase order '{body.po_number}' not found")
+
+    valid_types = {"delivery_delay", "missing_components", "damaged_goods", "quality_issue", "other"}
+    valid_priorities = {"low", "medium", "high", "critical"}
+    if body.issue_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"issue_type must be one of: {', '.join(sorted(valid_types))}")
+    if body.priority not in valid_priorities:
+        raise HTTPException(status_code=400, detail=f"priority must be one of: {', '.join(sorted(valid_priorities))}")
+
+    issue_number = await generate_issue_number_for_po(po["po_number"])
+
+    issue_doc = {
+        "id":           str(uuid.uuid4()),
+        "issue_number": issue_number,
+        "po_id":        po["id"],
+        "po_number":    po["po_number"],
+        "vendor_id":    po["vendor_id"],
+        "subject":      body.subject,
+        "issue_type":   body.issue_type,
+        "description":  body.description,
+        "affected_items": [],
+        "priority":     body.priority,
+        "status":       "open",
+        "resolution":   None,
+        "attachment_url": body.attachment_url,
+        "reporter_name":  body.reporter_name,
+        "reporter_email": body.reporter_email,
+        "replies":      [],
+        "created_by":   "external_api",
+        "created_by_name": body.reporter_name or "External",
+        "created_by_role": "external",
+        "resolved_by":  None,
+        "created_at":   datetime.now(timezone.utc).isoformat(),
+        "updated_at":   datetime.now(timezone.utc).isoformat(),
+    }
+
+    await db.issues.insert_one(issue_doc)
+
+    vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
+    return {"success": True, "issue_id": issue_doc["id"], "issue_number": issue_number, "status": "open",
+            "message": "Issue raised successfully. OLL team will respond soon.",
+            "issue": _serialize_issue(issue_doc, po, vendor)}
+
+
+@api_router.get("/external/issues")
+async def external_list_issues(
+    po_number:    Optional[str] = None,
+    school_name:  Optional[str] = None,
+    status:       Optional[str] = None,
+    issue_type:   Optional[str] = None,
+    priority:     Optional[str] = None,
+    limit:        int = 50,
+    offset:       int = 0,
+    _: bool = Depends(verify_external_api_key)
+):
+    """
+    External API: List issues with optional filters.
+
+    Query parameters (all optional):
+    - po_number: Filter by PO number (e.g. PO-021)
+    - school_name: Partial match on school name
+    - status: open | in_progress | resolved
+    - issue_type: delivery_delay | missing_components | damaged_goods | quality_issue | other
+    - priority: low | medium | high | critical
+    - limit / offset: pagination
+
+    Authentication: X-API-Key header
+    """
+    query: dict = {}
+    if status:     query["status"] = status
+    if issue_type: query["issue_type"] = issue_type
+    if priority:   query["priority"] = priority
+
+    if po_number:
+        po = await db.purchase_orders.find_one({"po_number": po_number.upper()}, {"_id": 0, "id": 1})
+        if po:
+            query["po_id"] = po["id"]
+        else:
+            return {"issues": [], "total": 0}
+
+    if school_name:
+        pos = await db.purchase_orders.find(
+            {"school_name": {"$regex": school_name, "$options": "i"}},
+            {"_id": 0, "id": 1}
+        ).to_list(500)
+        po_ids = [p["id"] for p in pos]
+        existing_filter = query.get("po_id")
+        if existing_filter:
+            query["po_id"] = {"$in": [existing_filter] if isinstance(existing_filter, str) else po_ids}
+        else:
+            query["po_id"] = {"$in": po_ids}
+
+    total = await db.issues.count_documents(query)
+    issues = await db.issues.find(query, {"_id": 0}).sort("created_at", -1).skip(offset).limit(limit).to_list(limit)
+
+    po_ids_all  = list({i["po_id"] for i in issues})
+    vendor_ids  = list({i["vendor_id"] for i in issues})
+    pos_map     = {p["id"]: p for p in await db.purchase_orders.find({"id": {"$in": po_ids_all}}, {"_id": 0}).to_list(500)}
+    vendors_map = {v["id"]: v for v in await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(200)}
+
+    return {
+        "issues": [_serialize_issue(i, pos_map.get(i["po_id"]), vendors_map.get(i["vendor_id"])) for i in issues],
+        "total":  total,
+        "limit":  limit,
+        "offset": offset,
+    }
+
+
+@api_router.get("/external/issues/{issue_id}")
+async def external_get_issue(issue_id: str, _: bool = Depends(verify_external_api_key)):
+    """
+    External API: Get full issue details including complete conversation thread.
+
+    Authentication: X-API-Key header
+    """
+    issue = await db.issues.find_one({"id": issue_id}, {"_id": 0})
+    if not issue:
+        # Also try by issue_number
+        issue = await db.issues.find_one({"issue_number": issue_id}, {"_id": 0})
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    po     = await db.purchase_orders.find_one({"id": issue["po_id"]}, {"_id": 0})
+    vendor = await db.vendors.find_one({"id": issue["vendor_id"]}, {"_id": 0})
+    return _serialize_issue(issue, po, vendor)
+
+
+@api_router.post("/external/issues/{issue_id}/reply")
+async def external_reply_to_issue(issue_id: str, body: ExternalReplyCreate, _: bool = Depends(verify_external_api_key)):
+    """
+    External API: Add a message to an issue conversation thread.
+
+    Fields:
+    - message (required): Your reply / update
+    - attachment_url: Link to a document or image
+    - sender_name: Name of person sending the reply
+
+    Authentication: X-API-Key header
+    """
+    issue = await db.issues.find_one({"id": issue_id}, {"_id": 0})
+    if not issue:
+        issue = await db.issues.find_one({"issue_number": issue_id}, {"_id": 0})
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    if issue.get("status") == "resolved":
+        raise HTTPException(status_code=400, detail="Cannot reply to a resolved issue. Please raise a new issue.")
+
+    reply_doc = {
+        "id":              str(uuid.uuid4()),
+        "message":         body.message,
+        "attachment_url":  body.attachment_url,
+        "created_by":      "external_api",
+        "created_by_name": body.sender_name or "External",
+        "created_by_role": "external",
+        "created_at":      datetime.now(timezone.utc).isoformat(),
+    }
+
+    await db.issues.update_one(
+        {"id": issue["id"]},
+        {
+            "$push": {"replies": reply_doc},
+            "$set":  {"status": "in_progress", "updated_at": datetime.now(timezone.utc).isoformat()},
+        }
+    )
+
+    updated = await db.issues.find_one({"id": issue["id"]}, {"_id": 0})
+    po      = await db.purchase_orders.find_one({"id": issue["po_id"]}, {"_id": 0})
+    vendor  = await db.vendors.find_one({"id": issue["vendor_id"]}, {"_id": 0})
+    return {"success": True, "message": "Reply added successfully.", "issue": _serialize_issue(updated, po, vendor)}
+
+
+# ========================
 # SEED DATA
 # ========================
 
