@@ -443,7 +443,12 @@ const IssuesPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {purchaseOrders.map((po) => (
-                    <SelectItem key={po.id} value={po.id}>{po.po_number}</SelectItem>
+                    <SelectItem key={po.id} value={po.id}>
+                      <span className="font-mono">{po.po_number}</span>
+                      {po.school_name && (
+                        <span className="text-slate-500 ml-2">· {po.school_name}</span>
+                      )}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
