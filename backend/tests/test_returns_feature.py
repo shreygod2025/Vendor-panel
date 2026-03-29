@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime
 
 # Base URL from environment
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://oll-po-system.preview.emergentagent.com')
 
 # Test credentials
 OLL_CREDENTIALS = {"username": "olladmin", "password": "olladmin"}

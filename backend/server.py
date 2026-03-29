@@ -1317,7 +1317,7 @@ async def get_purchase_orders_with_invoice_status(
     vendors_task = db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(100)
     invoices_task = db.invoices.find(
         {"po_id": {"$in": po_ids}}, 
-        {"_id": 0, "po_id": 1, "invoice_number": 1, "amount": 1, "paid_amount": 1, "payment_status": 1}
+        {"_id": 0, "po_id": 1, "invoice_number": 1, "amount": 1, "paid_amount": 1, "payment_status": 1, "logistics_cost": 1}
     ).to_list(200)
     
     vendors, invoices = await asyncio.gather(vendors_task, invoices_task)
@@ -1331,6 +1331,7 @@ async def get_purchase_orders_with_invoice_status(
         inv = invoice_map.get(p["id"])
         p["has_invoice"] = inv is not None
         p["invoice_status"] = inv.get("payment_status") if inv else None
+        p["invoice_logistics_cost"] = inv.get("logistics_cost", 0) if inv else 0
         # Set defaults
         p.setdefault("final_comments", None)
         p.setdefault("delivery_date", "")
@@ -2748,7 +2749,7 @@ async def create_public_po_request(request: PublicPORequest):
     logger.info(f"External PO request created: {po_number} by {request.requester_name} from {request.source_system or 'unknown'}")
     
     # Build tracking URL - use environment variable or default
-    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
+    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{tracking_token}"
     
     return PublicPORequestResponse(
@@ -2798,7 +2799,7 @@ async def get_public_po_status(identifier: str):
         vendor_name = vendor.get("name") if vendor else None
     
     # Build tracking URL
-    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
+    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{po.get('tracking_token', '')}"
     
     # Status descriptions
@@ -5328,7 +5329,7 @@ async def integration_raise_po(
     })
     
     # Build tracking URL (base URL from environment or default)
-    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{tracking_token}"
     
     return IntegrationPOResponse(
@@ -5379,7 +5380,7 @@ async def integration_get_tracking(
     # Get dispatch info if available
     dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
     tracking_url = f"{base_url}/track/{po['tracking_token']}"
     
     return TrackingLinkResponse(
@@ -5417,7 +5418,7 @@ async def integration_get_bulk_tracking(
     results = []
     errors = []
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://vendor-hub-phase2.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
     
     # Search by PO IDs
     if request.po_ids:

@@ -219,18 +219,33 @@ const PurchaseOrdersList = () => {
     }
   };
 
-  const openInvoiceUploadDialog = (order) => {
-    const existingInvoice = getInvoiceForPO(order.id);
+  const openInvoiceUploadDialog = async (order) => {
     setPoForInvoice(order);
     setInvoiceUploadForm({
-      invoice_url: existingInvoice?.invoice_url || existingInvoice?.file_url || "",
-      logistics_invoice_url: existingInvoice?.logistics_bill_url || "",
-      invoice_number: existingInvoice?.invoice_number || "",
-      invoice_date: existingInvoice?.invoice_date || "",
-      invoice_amount: existingInvoice?.amount || "",
-      logistics_cost: existingInvoice?.logistics_cost || ""
+      invoice_url: "",
+      logistics_invoice_url: "",
+      invoice_number: "",
+      invoice_date: "",
+      invoice_amount: "",
+      logistics_cost: ""
     });
     setInvoiceUploadDialog(true);
+    try {
+      const invResponse = await apiClient.get(`/invoices?po_id=${order.id}`);
+      const existingInvoice = invResponse.data?.[0];
+      if (existingInvoice) {
+        setInvoiceUploadForm({
+          invoice_url: existingInvoice.invoice_url || existingInvoice.file_url || "",
+          logistics_invoice_url: existingInvoice.logistics_bill_url || "",
+          invoice_number: existingInvoice.invoice_number || "",
+          invoice_date: existingInvoice.invoice_date || "",
+          invoice_amount: existingInvoice.amount || "",
+          logistics_cost: existingInvoice.logistics_cost || ""
+        });
+      }
+    } catch (e) {
+      // form stays empty for new upload
+    }
   };
 
   const handleFileUpload = async (file, field) => {
@@ -254,13 +269,18 @@ const PurchaseOrdersList = () => {
     return invoices.find(inv => inv.po_id === poId);
   };
 
-  const openViewInvoice = (poId) => {
-    const invoice = getInvoiceForPO(poId);
-    if (invoice) {
-      setSelectedInvoice(invoice);
-      setViewInvoiceDialog(true);
-    } else {
-      toast.error("No invoice found for this PO");
+  const openViewInvoice = async (poId) => {
+    try {
+      const invResponse = await apiClient.get(`/invoices?po_id=${poId}`);
+      const invoice = invResponse.data?.[0];
+      if (invoice) {
+        setSelectedInvoice(invoice);
+        setViewInvoiceDialog(true);
+      } else {
+        toast.error("No invoice found for this PO");
+      }
+    } catch (e) {
+      toast.error("Failed to load invoice");
     }
   };
 
@@ -682,13 +702,18 @@ const PurchaseOrdersList = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
+                  onClick={async () => {
                     setSelectedPO(order);
-                    // Find the invoice for this PO
-                    const poInvoice = invoices.find(inv => inv.po_id === order.id);
-                    setSelectedPOInvoice(poInvoice || null);
+                    setSelectedPOInvoice(null);
                     setApprovalConfirmed(false);
                     setApprovalDialogOpen(true);
+                    // Fetch fresh full invoice details from backend
+                    try {
+                      const invResponse = await apiClient.get(`/invoices?po_id=${order.id}`);
+                      setSelectedPOInvoice(invResponse.data?.[0] || null);
+                    } catch (e) {
+                      // dialog stays open with no invoice data
+                    }
                   }}
                   className="text-emerald-600 hover:bg-emerald-50"
                   title="Approve Delivery"
@@ -809,7 +834,7 @@ const PurchaseOrdersList = () => {
                 <TableCell>{order.line_items?.length || 0} items</TableCell>
                 <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
                 <TableCell className="font-mono text-slate-600">
-                  {invoice?.logistics_cost ? formatCurrency(invoice.logistics_cost) : "-"}
+                  {order.invoice_logistics_cost ? formatCurrency(order.invoice_logistics_cost) : "-"}
                 </TableCell>
                 <TableCell>
                   <span className={`badge ${getStatusColor(order.status)}`}>
