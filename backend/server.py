@@ -448,7 +448,7 @@ class InvoiceResponse(BaseModel):
     delivery_proof_url: Optional[str] = None
     notes: Optional[str] = None
     created_at: str
-    created_by: str
+    created_by: Optional[str] = "system"
 
 # Payment Models
 class PaymentCreate(BaseModel):
@@ -2152,6 +2152,7 @@ async def admin_upload_invoices(po_id: str, data: AdminInvoiceUpload, current_us
             "invoice_url": data.invoice_url,
             "file_url": data.invoice_url,
             "logistics_bill_url": data.logistics_invoice_url,
+            "created_by": current_user.get("username") or current_user.get("user_id") or "admin",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
@@ -2950,6 +2951,8 @@ async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str
             inv["delivery_proof_url"] = None
         if "invoice_url" not in inv:
             inv["invoice_url"] = inv.get("file_url")
+        if "created_by" not in inv or not inv["created_by"]:
+            inv["created_by"] = "system"
         result.append(InvoiceResponse(**inv))
     
     return result
@@ -2969,6 +2972,16 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
         invoice["paid_amount"] = 0
     if "due_date" not in invoice:
         invoice["due_date"] = None
+    if "created_by" not in invoice or not invoice["created_by"]:
+        invoice["created_by"] = "system"
+    if "logistics_cost" not in invoice:
+        invoice["logistics_cost"] = 0
+    if "logistics_bill_url" not in invoice:
+        invoice["logistics_bill_url"] = None
+    if "delivery_proof_url" not in invoice:
+        invoice["delivery_proof_url"] = None
+    if "invoice_url" not in invoice:
+        invoice["invoice_url"] = invoice.get("file_url")
     
     return InvoiceResponse(**invoice)
 
