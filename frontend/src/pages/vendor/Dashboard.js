@@ -32,36 +32,16 @@ const VendorDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [statsRes, posRes, issuesRes, invoicesRes, paymentsRes] = await Promise.all([
-        apiClient.get("/dashboard/stats"),
-        apiClient.get("/purchase-orders"),
-        apiClient.get("/issues"),
-        apiClient.get("/invoices"),
-        apiClient.get("/payments")
-      ]);
-      
-      setStats(statsRes.data);
-      
-      // Filter POs that are sent or confirmed (not draft) for upcoming deliveries
-      const pos = posRes.data.filter(po => po.status !== "draft");
-      const upcoming = pos.filter(po => 
-        po.status === "sent" || po.status === "confirmed"
-      ).slice(0, 5);
-      setUpcomingDeliveries(upcoming);
-      
-      // Filter issues that are open
-      const openIssues = (issuesRes.data || []).filter(i => i.status === "open");
-      setPendingIssues(openIssues.slice(0, 5));
-      
-      // Calculate earnings
-      const invoices = invoicesRes.data || [];
-      const payments = paymentsRes.data || [];
-      const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.amount, 0);
-      const totalPaid = payments.reduce((sum, pay) => sum + pay.amount, 0);
+      const statsRes = await apiClient.get("/dashboard/stats");
+      const data = statsRes.data;
+
+      setStats(data);
+      setUpcomingDeliveries(data.upcoming_deliveries || []);
+      setPendingIssues([]);
       setEarnings({
-        total: totalInvoiced,
-        paid: totalPaid,
-        pending: totalInvoiced - totalPaid
+        total: data.total_invoiced || 0,
+        paid: data.total_paid_amount || 0,
+        pending: data.total_pending_amount || 0
       });
     } catch (error) {
       toast.error("Failed to fetch dashboard stats");

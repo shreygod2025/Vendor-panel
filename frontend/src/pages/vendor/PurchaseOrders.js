@@ -79,14 +79,10 @@ const VendorPurchaseOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      const [ordersRes, invoicesRes] = await Promise.all([
-        apiClient.get("/purchase-orders"),
-        apiClient.get("/invoices")
-      ]);
+      const ordersRes = await apiClient.get("/purchase-orders/list-with-invoices");
       // Filter out draft POs - vendor should not see drafts
-      const filteredOrders = ordersRes.data.filter(order => order.status !== "draft");
+      const filteredOrders = ordersRes.data.orders.filter(order => order.status !== "draft");
       setOrders(filteredOrders);
-      setInvoices(invoicesRes.data);
     } catch (error) {
       toast.error("Failed to fetch purchase orders");
     } finally {
@@ -95,16 +91,23 @@ const VendorPurchaseOrders = () => {
   };
 
   const getInvoiceForPO = (poId) => {
-    return invoices.find(inv => inv.po_id === poId);
+    // For display only — uses lightweight data from list-with-invoices
+    const order = orders.find(o => o.id === poId);
+    return order?.has_invoice ? { po_id: poId, logistics_cost: order.invoice_logistics_cost } : null;
   };
 
-  const openViewInvoice = (poId) => {
-    const invoice = getInvoiceForPO(poId);
-    if (invoice) {
-      setSelectedInvoice(invoice);
-      setViewInvoiceDialog(true);
-    } else {
-      toast.error("No invoice found for this PO");
+  const openViewInvoice = async (poId) => {
+    try {
+      const invResponse = await apiClient.get(`/invoices?po_id=${poId}`);
+      const invoice = invResponse.data?.[0];
+      if (invoice) {
+        setSelectedInvoice(invoice);
+        setViewInvoiceDialog(true);
+      } else {
+        toast.error("No invoice found for this PO");
+      }
+    } catch (e) {
+      toast.error("Failed to load invoice");
     }
   };
 
@@ -452,7 +455,6 @@ const VendorPurchaseOrders = () => {
         </TableHeader>
         <TableBody>
           {ordersList.map(order => {
-            const invoice = getInvoiceForPO(order.id);
             return (
               <TableRow key={order.id}>
                 <TableCell className="font-mono font-medium">{order.po_number}</TableCell>
@@ -461,7 +463,7 @@ const VendorPurchaseOrders = () => {
                 <TableCell>{order.line_items?.length || 0} items</TableCell>
                 <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
                 <TableCell className="font-mono text-slate-600">
-                  {invoice?.logistics_cost ? formatCurrency(invoice.logistics_cost) : "-"}
+                  {order.invoice_logistics_cost ? formatCurrency(order.invoice_logistics_cost) : "-"}
                 </TableCell>
                 <TableCell>
                   <span className={`badge ${getStatusColor(order.status)}`}>
@@ -475,7 +477,7 @@ const VendorPurchaseOrders = () => {
                         <Eye className="w-4 h-4" />
                       </Button>
                     </Link>
-                    {invoice ? (
+                    {order.has_invoice ? (
                       <Button 
                         variant="ghost" 
                         size="sm" 

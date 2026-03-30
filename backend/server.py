@@ -3715,26 +3715,27 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     elif current_user.get("role") == "distributor":
         # Distributor dashboard - filtered to their POs only
         distributor_id = current_user["user_id"]
-        total_pos = await db.purchase_orders.count_documents({"distributor_id": distributor_id})
-        
-        po_by_status = {}
-        for status in ["sent", "confirmed", "dispatched", "delivered", "closed"]:
-            po_by_status[status] = await db.purchase_orders.count_documents({"distributor_id": distributor_id, "status": status})
-        
-        # Upcoming deliveries
-        upcoming_deliveries = await db.purchase_orders.find(
-            {"distributor_id": distributor_id, "status": {"$in": ["confirmed", "dispatched"]}},
-            {"_id": 0, "grand_total": 0, "subtotal": 0, "total_tax": 0, "total_discount": 0}  # Hide pricing
-        ).sort("delivery_date", 1).to_list(5)
-        
-        # Pending issues (for distributor's POs)
-        distributor_pos = await db.purchase_orders.find(
-            {"distributor_id": distributor_id},
-            {"id": 1, "_id": 0}
-        ).to_list(1000)
-        distributor_po_ids = [p["id"] for p in distributor_pos]
-        pending_issues = await db.issues.count_documents({"po_id": {"$in": distributor_po_ids}, "status": "open"})
-        
+
+        total_pos, status_agg, upcoming_deliveries, distributor_po_ids = await asyncio.gather(
+            db.purchase_orders.count_documents({"distributor_id": distributor_id}),
+            db.purchase_orders.aggregate([
+                {"$match": {"distributor_id": distributor_id}},
+                {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+            ]).to_list(20),
+            db.purchase_orders.find(
+                {"distributor_id": distributor_id, "status": {"$in": ["confirmed", "dispatched"]}},
+                {"_id": 0, "id": 1, "po_number": 1, "delivery_date": 1, "status": 1, "school_name": 1}
+            ).sort("delivery_date", 1).to_list(5),
+            db.purchase_orders.find(
+                {"distributor_id": distributor_id},
+                {"id": 1, "_id": 0}
+            ).to_list(500),
+        )
+
+        po_by_status = {s["_id"]: s["count"] for s in status_agg if s["_id"]}
+        po_ids = [p["id"] for p in distributor_po_ids]
+        pending_issues = await db.issues.count_documents({"po_id": {"$in": po_ids}, "status": "open"}) if po_ids else 0
+
         return {
             "total_pos": total_pos,
             "po_by_status": po_by_status,
@@ -3743,35 +3744,47 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         }
     else:
         vendor_id = current_user.get("vendor_id")
-        total_pos = await db.purchase_orders.count_documents({"vendor_id": vendor_id})
-        
-        po_by_status = {}
-        for status in ["sent", "confirmed", "dispatched", "delivered", "closed"]:
-            po_by_status[status] = await db.purchase_orders.count_documents({"vendor_id": vendor_id, "status": status})
-        
-        pending_pos = await db.purchase_orders.count_documents({"vendor_id": vendor_id, "status": "sent"})
-        
-        upcoming_deliveries = await db.purchase_orders.find(
-            {"vendor_id": vendor_id, "status": {"$in": ["confirmed", "dispatched"]}},
-            {"_id": 0}
-        ).sort("delivery_date", 1).to_list(5)
-        
-        pending_issues = await db.issues.count_documents({"vendor_id": vendor_id, "status": "open"})
-        
-        pending_invoices = await db.invoices.find(
-            {"vendor_id": vendor_id, "payment_status": {"$in": ["pending", "partially_paid"]}},
-            {"_id": 0}
-        ).to_list(100)
-        total_pending_amount = sum(inv["amount"] - inv.get("paid_amount", 0) for inv in pending_invoices)
-        
+
+        # Run all queries in parallel using asyncio.gather
+        counts, status_agg, upcoming_deliveries, pending_issues_count, inv_pipeline_result, total_inv_result = await asyncio.gather(
+            db.purchase_orders.count_documents({"vendor_id": vendor_id}),
+            db.purchase_orders.aggregate([
+                {"$match": {"vendor_id": vendor_id}},
+                {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+            ]).to_list(20),
+            db.purchase_orders.find(
+                {"vendor_id": vendor_id, "status": {"$in": ["confirmed", "dispatched"]}},
+                {"_id": 0, "id": 1, "po_number": 1, "delivery_date": 1, "vendor_id": 1, "status": 1, "school_name": 1, "grand_total": 1}
+            ).sort("delivery_date", 1).to_list(5),
+            db.issues.count_documents({"vendor_id": vendor_id, "status": "open"}),
+            db.invoices.aggregate([
+                {"$match": {"vendor_id": vendor_id, "payment_status": {"$in": ["pending", "partially_paid"]}}},
+                {"$group": {"_id": None, "count": {"$sum": 1}, "total_amount": {"$sum": "$amount"}, "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
+            ]).to_list(1),
+            db.invoices.aggregate([
+                {"$match": {"vendor_id": vendor_id}},
+                {"$group": {"_id": None, "total_invoiced": {"$sum": "$amount"}, "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
+            ]).to_list(1),
+        )
+
+        po_by_status = {s["_id"]: s["count"] for s in status_agg if s["_id"]}
+        pending_pos = po_by_status.get("sent", 0)
+
+        inv_data = inv_pipeline_result[0] if inv_pipeline_result else {"count": 0, "total_amount": 0, "total_paid": 0}
+        total_pending_amount = inv_data.get("total_amount", 0) - inv_data.get("total_paid", 0)
+
+        total_inv_data = total_inv_result[0] if total_inv_result else {"total_invoiced": 0, "total_paid": 0}
+
         return {
-            "total_pos": total_pos,
+            "total_pos": counts,
             "po_by_status": po_by_status,
             "pending_pos": pending_pos,
             "upcoming_deliveries": upcoming_deliveries,
-            "pending_issues": pending_issues,
-            "pending_payment_count": len(pending_invoices),
-            "total_pending_amount": total_pending_amount
+            "pending_issues": pending_issues_count,
+            "pending_payment_count": inv_data.get("count", 0),
+            "total_pending_amount": total_pending_amount,
+            "total_invoiced": total_inv_data.get("total_invoiced", 0),
+            "total_paid_amount": total_inv_data.get("total_paid", 0),
         }
 
 # ========================
