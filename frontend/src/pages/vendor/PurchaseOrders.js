@@ -203,6 +203,12 @@ const VendorPurchaseOrders = () => {
       return;
     }
 
+    const logisticsCost = parseFloat(deliveryForm.logistics_cost) || 0;
+    if (logisticsCost > 0 && !deliveryForm.logistics_bill_file) {
+      toast.error("Logistics bill is required when delivery cost is greater than 0");
+      return;
+    }
+
     if (!deliveryForm.delivery_proof_file) {
       toast.error("Please upload delivery proof image");
       return;
@@ -718,7 +724,9 @@ const VendorPurchaseOrders = () => {
             </div>
 
             <div>
-              <Label className="form-label">Upload Logistics Bill</Label>
+              <Label className="form-label">
+                Upload Logistics Bill {parseFloat(deliveryForm.logistics_cost) > 0 ? <span className="text-red-500">*</span> : <span className="text-slate-400">(optional)</span>}
+              </Label>
               <div className="mt-1 flex items-center gap-3">
                 <Input
                   type="file"
@@ -730,6 +738,9 @@ const VendorPurchaseOrders = () => {
                   <span className="text-xs text-emerald-600">✓ {deliveryForm.logistics_bill_file.name}</span>
                 )}
               </div>
+              {parseFloat(deliveryForm.logistics_cost) > 0 && !deliveryForm.logistics_bill_file && (
+                <p className="text-xs text-red-500 mt-1">Required when logistics cost is entered</p>
+              )}
             </div>
 
             <div>
