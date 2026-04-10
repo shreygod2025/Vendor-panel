@@ -3064,10 +3064,20 @@ async def create_payment(payment: PaymentCreate, current_user: dict = Depends(ge
     
     await db.payments.insert_one(payment_doc)
     
-    # Update invoice
+    # Recompute paid_amount from all actual payment records (bulletproof for batch payments)
+    agg = await db.payments.aggregate([
+        {"$match": {"invoice_id": payment.invoice_id}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+    ]).to_list(1)
+    actual_total_paid = agg[0]["total"] if agg else payment.amount
+    
+    total_invoice_amount = invoice["amount"] + invoice.get("logistics_cost", 0)
+    final_status = "fully_paid" if actual_total_paid >= total_invoice_amount else "partially_paid"
+    
+    # Update invoice with authoritative values
     await db.invoices.update_one(
         {"id": payment.invoice_id},
-        {"$set": {"paid_amount": total_paid, "payment_status": payment_status}}
+        {"$set": {"paid_amount": actual_total_paid, "payment_status": final_status}}
     )
     
     await create_audit_log("CREATE_PAYMENT", "payment", payment_doc["id"], current_user, {"invoice_id": payment.invoice_id})
@@ -3162,24 +3172,58 @@ async def delete_payment(payment_id: str, current_user: dict = Depends(get_curre
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
     
-    # Update invoice
-    invoice = await db.invoices.find_one({"id": payment["invoice_id"]}, {"_id": 0})
+    # Recompute from remaining payments after deletion
+    await db.payments.delete_one({"id": payment_id})
+    
     if invoice:
-        new_paid = invoice.get("paid_amount", 0) - payment["amount"]
-        new_status = "pending" if new_paid <= 0 else "partially_paid"
+        remaining = await db.payments.aggregate([
+            {"$match": {"invoice_id": payment["invoice_id"]}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+        ]).to_list(1)
+        new_paid = remaining[0]["total"] if remaining else 0
+        total_amount = invoice.get("amount", 0) + invoice.get("logistics_cost", 0)
+        new_status = "fully_paid" if new_paid >= total_amount and total_amount > 0 else ("partially_paid" if new_paid > 0 else "pending")
         await db.invoices.update_one(
             {"id": payment["invoice_id"]},
-            {"$set": {"paid_amount": max(0, new_paid), "payment_status": new_status}}
+            {"$set": {"paid_amount": new_paid, "payment_status": new_status}}
         )
-    
-    await db.payments.delete_one({"id": payment_id})
     await create_audit_log("DELETE_PAYMENT", "payment", payment_id, current_user)
     
     return {"message": "Payment deleted successfully"}
 
-# ========================
-# RETURNS WITH CREDIT NOTES
-# ========================
+@api_router.post("/payments/repair-invoice-statuses")
+async def repair_invoice_payment_statuses(current_user: dict = Depends(get_current_user)):
+    """Recompute paid_amount and payment_status for ALL invoices from actual payment records.
+    Use this to fix invoices stuck as 'pending' after payments were already recorded."""
+    if current_user.get("role") != "oll":
+        raise HTTPException(status_code=403, detail="Only OLL can run repair")
+    
+    # Get all invoice IDs that have payments
+    payment_agg = await db.payments.aggregate([
+        {"$group": {"_id": "$invoice_id", "total_paid": {"$sum": "$amount"}}}
+    ]).to_list(10000)
+    
+    updated = 0
+    for entry in payment_agg:
+        invoice_id = entry["_id"]
+        total_paid = entry["total_paid"]
+        
+        invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+        if not invoice:
+            continue
+        
+        total_amount = invoice.get("amount", 0) + invoice.get("logistics_cost", 0)
+        new_status = "fully_paid" if total_paid >= total_amount and total_amount > 0 else ("partially_paid" if total_paid > 0 else "pending")
+        
+        await db.invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {"paid_amount": total_paid, "payment_status": new_status}}
+        )
+        updated += 1
+    
+    return {"message": f"Repaired {updated} invoice(s)", "updated": updated}
+
+
 
 @api_router.post("/returns", response_model=ReturnResponse)
 async def create_return(return_req: ReturnCreate, current_user: dict = Depends(get_current_user)):

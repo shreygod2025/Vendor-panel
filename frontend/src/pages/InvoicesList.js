@@ -216,23 +216,33 @@ const InvoicesList = () => {
 
   // Calculate invoice status and overdue
   const getInvoiceStatus = (invoice) => {
+    // Primary: use payment_status from DB (set by backend when payment is recorded)
+    if (invoice.payment_status === "fully_paid") {
+      return { status: "cleared", label: "Cleared", color: "bg-emerald-100 text-emerald-700" };
+    }
+    if (invoice.payment_status === "partially_paid") {
+      return { status: "partial", label: "Partially Paid", color: "bg-amber-100 text-amber-700" };
+    }
+
+    // Fallback: compute from paid_amount vs total (including logistics)
+    const paidAmount = invoice.paid_amount || 0;
+    const totalAmount = invoice.amount + (invoice.logistics_cost || 0);
+
+    if (paidAmount >= totalAmount && totalAmount > 0) {
+      return { status: "cleared", label: "Cleared", color: "bg-emerald-100 text-emerald-700" };
+    }
+    if (paidAmount > 0) {
+      return { status: "partial", label: "Partially Paid", color: "bg-amber-100 text-amber-700" };
+    }
+
     const invoiceDate = new Date(invoice.invoice_date);
     const dueDate = new Date(invoiceDate);
-    dueDate.setDate(dueDate.getDate() + 7); // 7 days to clear
+    dueDate.setDate(dueDate.getDate() + 7);
     const today = new Date();
-    
-    const paidAmount = invoice.paid_amount || 0;
-    const totalAmount = invoice.amount;
-    
-    if (paidAmount >= totalAmount) {
-      return { status: "cleared", label: "Cleared", color: "bg-emerald-100 text-emerald-700" };
-    } else if (today > dueDate) {
+    if (today > dueDate) {
       return { status: "overdue", label: "Overdue", color: "bg-red-100 text-red-700" };
-    } else if (paidAmount > 0) {
-      return { status: "partial", label: "Partially Paid", color: "bg-amber-100 text-amber-700" };
-    } else {
-      return { status: "pending", label: "Pending", color: "bg-blue-100 text-blue-700" };
     }
+    return { status: "pending", label: "Pending", color: "bg-blue-100 text-blue-700" };
   };
 
   const getDaysRemaining = (invoice) => {
