@@ -5712,25 +5712,28 @@ async def get_delivery_timeline(current_user: dict = Depends(get_current_user)):
         return None
 
     po_timelines = []
-    pipeline_delays = {"confirm": [], "dispatch": [], "deliver": []}
+    pipeline_delays = {"confirm": [], "dispatch": [], "deliver": [], "approve": []}
     delivery_delays = []
 
     for po in pos:
         po_id = po.get("id")
         po_logs = audit_map.get(po_id, {})
 
-        sent_at      = po.get("sent_at")      or po_logs.get("SEND_PO")     or po.get("created_at")
-        confirmed_at = po.get("confirmed_at") or po_logs.get("CONFIRM_PO")
-        dispatched_at= po.get("dispatched_at") or dispatch_map.get(po_id)   or po_logs.get("CREATE_DISPATCH")
-        delivered_at = po.get("delivered_at")  or po.get("delivery_approved_at") or po_logs.get("APPROVE_DELIVERY") or po_logs.get("VENDOR_SUBMIT_DELIVERY")
+        sent_at              = po.get("sent_at")                or po_logs.get("SEND_PO")              or po.get("created_at")
+        confirmed_at         = po.get("confirmed_at")           or po_logs.get("CONFIRM_PO")
+        dispatched_at        = po.get("dispatched_at")          or dispatch_map.get(po_id)             or po_logs.get("CREATE_DISPATCH")
+        delivery_submitted_at= po.get("delivery_submitted_at")  or po_logs.get("VENDOR_SUBMIT_DELIVERY")
+        delivered_at         = po.get("delivered_at")           or po.get("delivery_approved_at")      or po_logs.get("APPROVE_DELIVERY")
 
         time_to_confirm  = days_between(sent_at, confirmed_at)
         time_to_dispatch = days_between(confirmed_at, dispatched_at)
-        time_to_deliver  = days_between(dispatched_at, delivered_at)
+        time_to_deliver  = days_between(dispatched_at, delivery_submitted_at or delivered_at)
+        time_to_approve  = days_between(delivery_submitted_at, delivered_at)
 
         if time_to_confirm  is not None: pipeline_delays["confirm"].append(time_to_confirm)
         if time_to_dispatch is not None: pipeline_delays["dispatch"].append(time_to_dispatch)
         if time_to_deliver  is not None: pipeline_delays["deliver"].append(time_to_deliver)
+        if time_to_approve  is not None: pipeline_delays["approve"].append(time_to_approve)
 
         expected_delivery_date = po.get("delivery_date")
         delivery_delay_days = None
@@ -5756,10 +5759,12 @@ async def get_delivery_timeline(current_user: dict = Depends(get_current_user)):
             "sent_at": sent_at[:10] if sent_at else None,
             "confirmed_at": confirmed_at[:10] if confirmed_at else None,
             "dispatched_at": dispatched_at[:10] if dispatched_at else None,
+            "delivery_submitted_at": delivery_submitted_at[:10] if delivery_submitted_at else None,
             "delivered_at": delivered_at[:10] if delivered_at else None,
             "time_to_confirm_days": time_to_confirm,
             "time_to_dispatch_days": time_to_dispatch,
             "time_to_deliver_days": time_to_deliver,
+            "time_to_approve_days": time_to_approve,
         })
 
     def avg(lst):
@@ -5772,6 +5777,7 @@ async def get_delivery_timeline(current_user: dict = Depends(get_current_user)):
             "avg_time_to_confirm_days":  avg(pipeline_delays["confirm"]),
             "avg_time_to_dispatch_days": avg(pipeline_delays["dispatch"]),
             "avg_time_to_deliver_days":  avg(pipeline_delays["deliver"]),
+            "avg_time_to_approve_days":  avg(pipeline_delays["approve"]),
             "avg_delivery_delay_days":   avg(delivery_delays),
         }
     }

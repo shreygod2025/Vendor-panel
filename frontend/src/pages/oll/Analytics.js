@@ -76,6 +76,7 @@ const Analytics = () => {
       avg_time_to_confirm_days: null,
       avg_time_to_dispatch_days: null,
       avg_time_to_deliver_days: null,
+      avg_time_to_approve_days: null,
       avg_delivery_delay_days: null,
     }
   });
@@ -564,7 +565,7 @@ const Analytics = () => {
           {/* Timeline Tab */}
           <TabsContent value="timeline" className="space-y-6">
             {/* Pipeline KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <Card className="border-l-4 border-l-blue-500">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
@@ -622,6 +623,25 @@ const Analytics = () => {
                 </CardContent>
               </Card>
 
+              <Card className="border-l-4 border-l-purple-500">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                      <CalendarCheck className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {timeline.averages.avg_time_to_approve_days != null
+                          ? `${timeline.averages.avg_time_to_approve_days}d`
+                          : "—"}
+                      </p>
+                      <p className="text-xs text-slate-500 leading-tight">Avg. Approval Time</p>
+                      <p className="text-xs text-slate-400 mt-0.5">vendor submit → OLL approve</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className={`border-l-4 ${
                 timeline.averages.avg_delivery_delay_days == null ? "border-l-slate-300" :
                 timeline.averages.avg_delivery_delay_days > 0 ? "border-l-red-500" :
@@ -670,8 +690,9 @@ const Analytics = () => {
                     { label: "Confirmed", sub: `${timeline.averages.avg_time_to_confirm_days != null ? timeline.averages.avg_time_to_confirm_days + "d" : "—"}`, color: "bg-blue-100 text-blue-700", dot: "bg-blue-500", arrow: true },
                     { label: "Dispatched", sub: `${timeline.averages.avg_time_to_dispatch_days != null ? timeline.averages.avg_time_to_dispatch_days + "d" : "—"}`, color: "bg-amber-100 text-amber-700", dot: "bg-amber-500", arrow: true },
                     { label: "Delivered", sub: `${timeline.averages.avg_time_to_deliver_days != null ? timeline.averages.avg_time_to_deliver_days + "d" : "—"}`, color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", arrow: true },
+                    { label: "Approved", sub: `${timeline.averages.avg_time_to_approve_days != null ? timeline.averages.avg_time_to_approve_days + "d" : "—"}`, color: "bg-purple-100 text-purple-700", dot: "bg-purple-500", arrow: true },
                   ].map((stage, idx) => (
-                    <div key={idx} className="flex items-center gap-2 flex-1">
+                    <div key={idx} className="flex items-center gap-1 flex-1">
                       {stage.arrow && <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />}
                       <div className={`flex-1 rounded-lg p-3 text-center ${stage.color}`}>
                         <div className={`w-2 h-2 rounded-full ${stage.dot} mx-auto mb-2`} />
@@ -700,7 +721,9 @@ const Analytics = () => {
                         <TableHead>PO Number</TableHead>
                         <TableHead>Vendor</TableHead>
                         <TableHead>Expected Date</TableHead>
-                        <TableHead>Actual Date</TableHead>
+                        <TableHead>Submitted Date</TableHead>
+                        <TableHead>Approved Date</TableHead>
+                        <TableHead className="text-center">Approval Time</TableHead>
                         <TableHead className="text-right">Delay (days)</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -716,7 +739,13 @@ const Analytics = () => {
                               <TableCell className="font-mono font-medium">{po.po_number}</TableCell>
                               <TableCell className="text-slate-600">{po.vendor_name}</TableCell>
                               <TableCell>{po.expected_delivery_date || "—"}</TableCell>
-                              <TableCell>{po.actual_delivered_at || "—"}</TableCell>
+                              <TableCell className="text-slate-600">{po.delivery_submitted_at || "—"}</TableCell>
+                              <TableCell className="text-slate-600">{po.actual_delivered_at || "—"}</TableCell>
+                              <TableCell className="text-center">
+                                {po.time_to_approve_days != null ? (
+                                  <span className="text-xs font-mono text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">{po.time_to_approve_days}d</span>
+                                ) : <span className="text-slate-400">—</span>}
+                              </TableCell>
                               <TableCell className="text-right">
                                 {delay == null ? (
                                   <span className="text-slate-400">—</span>
@@ -760,10 +789,12 @@ const Analytics = () => {
                         <TableHead className="text-center">Sent</TableHead>
                         <TableHead className="text-center">Confirmed</TableHead>
                         <TableHead className="text-center">Dispatched</TableHead>
-                        <TableHead className="text-center">Delivered</TableHead>
+                        <TableHead className="text-center">Submitted</TableHead>
+                        <TableHead className="text-center">Approved</TableHead>
                         <TableHead className="text-right">Confirm</TableHead>
                         <TableHead className="text-right">Dispatch</TableHead>
                         <TableHead className="text-right">Deliver</TableHead>
+                        <TableHead className="text-right">Approval</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -774,6 +805,7 @@ const Analytics = () => {
                           <TableCell>
                             <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
                               po.status === "delivered" || po.status === "closed" ? "bg-emerald-100 text-emerald-700" :
+                              po.status === "pending_approval" ? "bg-purple-100 text-purple-700" :
                               po.status === "dispatched" ? "bg-amber-100 text-amber-700" :
                               po.status === "confirmed" ? "bg-blue-100 text-blue-700" :
                               "bg-slate-100 text-slate-600"
@@ -782,6 +814,7 @@ const Analytics = () => {
                           <TableCell className="text-center text-xs text-slate-500">{po.sent_at || "—"}</TableCell>
                           <TableCell className="text-center text-xs text-slate-500">{po.confirmed_at || "—"}</TableCell>
                           <TableCell className="text-center text-xs text-slate-500">{po.dispatched_at || "—"}</TableCell>
+                          <TableCell className="text-center text-xs text-slate-500">{po.delivery_submitted_at || "—"}</TableCell>
                           <TableCell className="text-center text-xs text-slate-500">{po.delivered_at || "—"}</TableCell>
                           <TableCell className="text-right">
                             {po.time_to_confirm_days != null ? (
@@ -796,6 +829,11 @@ const Analytics = () => {
                           <TableCell className="text-right">
                             {po.time_to_deliver_days != null ? (
                               <span className="text-xs font-mono text-emerald-700">{po.time_to_deliver_days}d</span>
+                            ) : <span className="text-slate-300">—</span>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {po.time_to_approve_days != null ? (
+                              <span className="text-xs font-mono text-purple-700">{po.time_to_approve_days}d</span>
                             ) : <span className="text-slate-300">—</span>}
                           </TableCell>
                         </TableRow>
