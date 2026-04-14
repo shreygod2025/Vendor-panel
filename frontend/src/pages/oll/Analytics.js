@@ -686,11 +686,11 @@ const Analytics = () => {
               <CardContent>
                 <div className="flex items-center justify-between gap-2 py-4">
                   {[
-                    { label: "PO Raised", sub: "Start", color: "bg-slate-200 text-slate-600", dot: "bg-slate-400" },
-                    { label: "Confirmed", sub: `${timeline.averages.avg_time_to_confirm_days != null ? timeline.averages.avg_time_to_confirm_days + "d" : "—"}`, color: "bg-blue-100 text-blue-700", dot: "bg-blue-500", arrow: true },
-                    { label: "Dispatched", sub: `${timeline.averages.avg_time_to_dispatch_days != null ? timeline.averages.avg_time_to_dispatch_days + "d" : "—"}`, color: "bg-amber-100 text-amber-700", dot: "bg-amber-500", arrow: true },
-                    { label: "Delivered", sub: `${timeline.averages.avg_time_to_deliver_days != null ? timeline.averages.avg_time_to_deliver_days + "d" : "—"}`, color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", arrow: true },
-                    { label: "Approved", sub: `${timeline.averages.avg_time_to_approve_days != null ? timeline.averages.avg_time_to_approve_days + "d" : "—"}`, color: "bg-purple-100 text-purple-700", dot: "bg-purple-500", arrow: true },
+                    { label: "PO Raised",  sub: "Start",     color: "bg-slate-200 text-slate-600",   dot: "bg-slate-400" },
+                    { label: "Confirmed",  sub: timeline.averages.avg_time_to_confirm_days  != null ? `${timeline.averages.avg_time_to_confirm_days}d`  : "—", color: "bg-blue-100 text-blue-700",    dot: "bg-blue-500",    arrow: true },
+                    { label: "Dispatched", sub: timeline.averages.avg_time_to_dispatch_days != null ? `${timeline.averages.avg_time_to_dispatch_days}d` : "—", color: "bg-amber-100 text-amber-700",   dot: "bg-amber-500",   arrow: true },
+                    { label: "Approval",   sub: timeline.averages.avg_time_to_approve_days  != null ? `${timeline.averages.avg_time_to_approve_days}d`  : "—", color: "bg-purple-100 text-purple-700", dot: "bg-purple-500",  arrow: true },
+                    { label: "Delivered",  sub: timeline.averages.avg_time_to_deliver_days  != null ? `${timeline.averages.avg_time_to_deliver_days}d`  : "—", color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", arrow: true },
                   ].map((stage, idx) => (
                     <div key={idx} className="flex items-center gap-1 flex-1">
                       {stage.arrow && <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />}
