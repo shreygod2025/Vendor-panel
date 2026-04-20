@@ -1287,7 +1287,7 @@ async def get_purchase_orders_count(
 @api_router.get("/purchase-orders/list-with-invoices")
 async def get_purchase_orders_with_invoice_status(
     page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(500, ge=1, le=1000),
     current_user: dict = Depends(get_current_user)
 ):
     """Optimized endpoint for PO list page - includes invoice status"""
@@ -3790,7 +3790,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         vendor_id = current_user.get("vendor_id")
 
         # Run all queries in parallel using asyncio.gather
-        counts, status_agg, upcoming_deliveries, pending_issues_count, inv_pipeline_result, total_inv_result = await asyncio.gather(
+        counts, status_agg, upcoming_deliveries, pending_issues_count, approved_po_docs, inv_pending_result = await asyncio.gather(
             db.purchase_orders.count_documents({"vendor_id": vendor_id}),
             db.purchase_orders.aggregate([
                 {"$match": {"vendor_id": vendor_id}},
@@ -3801,20 +3801,28 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
                 {"_id": 0, "id": 1, "po_number": 1, "delivery_date": 1, "vendor_id": 1, "status": 1, "school_name": 1, "grand_total": 1}
             ).sort("delivery_date", 1).to_list(5),
             db.issues.count_documents({"vendor_id": vendor_id, "status": "open"}),
+            # Only count invoices from admin-approved (delivered/closed) POs
+            db.purchase_orders.find(
+                {"vendor_id": vendor_id, "status": {"$in": ["delivered", "closed"]}},
+                {"_id": 0, "id": 1}
+            ).to_list(10000),
             db.invoices.aggregate([
                 {"$match": {"vendor_id": vendor_id, "payment_status": {"$in": ["pending", "partially_paid"]}}},
                 {"$group": {"_id": None, "count": {"$sum": 1}, "total_amount": {"$sum": "$amount"}, "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
-            ]).to_list(1),
-            db.invoices.aggregate([
-                {"$match": {"vendor_id": vendor_id}},
-                {"$group": {"_id": None, "total_invoiced": {"$sum": "$amount"}, "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
             ]).to_list(1),
         )
 
         po_by_status = {s["_id"]: s["count"] for s in status_agg if s["_id"]}
         pending_pos = po_by_status.get("sent", 0)
 
-        inv_data = inv_pipeline_result[0] if inv_pipeline_result else {"count": 0, "total_amount": 0, "total_paid": 0}
+        # Earnings: only from admin-approved POs (delivered/closed)
+        approved_po_ids = [p["id"] for p in approved_po_docs]
+        total_inv_result = await db.invoices.aggregate([
+            {"$match": {"vendor_id": vendor_id, "po_id": {"$in": approved_po_ids}}},
+            {"$group": {"_id": None, "total_invoiced": {"$sum": "$amount"}, "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
+        ]).to_list(1)
+
+        inv_data = inv_pending_result[0] if inv_pending_result else {"count": 0, "total_amount": 0, "total_paid": 0}
         total_pending_amount = inv_data.get("total_amount", 0) - inv_data.get("total_paid", 0)
 
         total_inv_data = total_inv_result[0] if total_inv_result else {"total_invoiced": 0, "total_paid": 0}

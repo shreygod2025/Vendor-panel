@@ -36,7 +36,7 @@ import {
 } from "../../components/ui/select";
 import { 
   Eye, FileText, Truck, Check, X, Package, Loader2, Clock, 
-  ChevronDown, ChevronRight, Circle, Receipt, Download
+  ChevronDown, ChevronRight, Circle, Receipt, Download, Search
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,6 +44,7 @@ const VendorPurchaseOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("confirmation");
+  const [searchQuery, setSearchQuery] = useState("");
   const [expandedSections, setExpandedSections] = useState({
     pending: true,
     confirmed: true,
@@ -79,7 +80,7 @@ const VendorPurchaseOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      const ordersRes = await apiClient.get("/purchase-orders/list-with-invoices");
+      const ordersRes = await apiClient.get("/purchase-orders/list-with-invoices?limit=500");
       // Filter out draft POs - vendor should not see drafts
       const filteredOrders = ordersRes.data.orders.filter(order => order.status !== "draft");
       setOrders(filteredOrders);
@@ -308,17 +309,27 @@ const VendorPurchaseOrders = () => {
     }
   };
 
-  // Categorize orders by status
+  // Categorize orders by status (after search filter)
+  const filteredOrders = searchQuery.trim()
+    ? orders.filter(o => {
+        const q = searchQuery.toLowerCase();
+        return (
+          o.po_number?.toLowerCase().includes(q) ||
+          o.school_name?.toLowerCase().includes(q) ||
+          o.receiver_name?.toLowerCase().includes(q) ||
+          o.contact_person?.toLowerCase().includes(q) ||
+          o.city?.toLowerCase().includes(q)
+        );
+      })
+    : orders;
+
   const categorizedOrders = {
-    // PO Confirmation section
-    pending: orders.filter(o => o.status === "sent"),
-    confirmed: orders.filter(o => o.status === "confirmed"),
-    rejected: orders.filter(o => o.status === "rejected"),
-    // Dispatched section
-    dispatched: orders.filter(o => o.status === "dispatched"),
-    pending_approval: orders.filter(o => o.status === "pending_approval"),
-    // Delivered section
-    delivered: orders.filter(o => o.status === "delivered" || o.status === "closed")
+    pending: filteredOrders.filter(o => o.status === "sent"),
+    confirmed: filteredOrders.filter(o => o.status === "confirmed"),
+    rejected: filteredOrders.filter(o => o.status === "rejected"),
+    dispatched: filteredOrders.filter(o => o.status === "dispatched"),
+    pending_approval: filteredOrders.filter(o => o.status === "pending_approval"),
+    delivered: filteredOrders.filter(o => o.status === "delivered" || o.status === "closed")
   };
 
   const renderOrderRow = (order) => {
@@ -335,7 +346,12 @@ const VendorPurchaseOrders = () => {
           </div>
         </TableCell>
         <TableCell className="text-slate-600">{order.city || '-'}</TableCell>
-        <TableCell>{order.contact_person || "-"}</TableCell>
+        <TableCell>
+          <div className="flex flex-col">
+            {order.school_name && <span className="text-xs font-medium text-blue-700">{order.school_name}</span>}
+            <span className="text-sm">{order.contact_person || "-"}</span>
+          </div>
+        </TableCell>
         <TableCell>{order.line_items?.length || 0} items</TableCell>
         <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
         <TableCell>
@@ -465,7 +481,12 @@ const VendorPurchaseOrders = () => {
               <TableRow key={order.id}>
                 <TableCell className="font-mono font-medium">{order.po_number}</TableCell>
                 <TableCell className="text-slate-600">{order.city || '-'}</TableCell>
-                <TableCell>{order.receiver_name || order.contact_person || "-"}</TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    {order.school_name && <span className="text-xs font-medium text-blue-700">{order.school_name}</span>}
+                    <span className="text-sm">{order.receiver_name || order.contact_person || "-"}</span>
+                  </div>
+                </TableCell>
                 <TableCell>{order.line_items?.length || 0} items</TableCell>
                 <TableCell className="font-mono font-medium">{formatCurrency(order.grand_total)}</TableCell>
                 <TableCell className="font-mono text-slate-600">
@@ -553,6 +574,18 @@ const VendorPurchaseOrders = () => {
       </div>
 
       <div className="page-container">
+        {/* Search bar */}
+        <div className="relative mb-4 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Search by PO, school, receiver, city..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="po-search-input"
+          />
+        </div>
+
         {orders.length === 0 ? (
           <div className="empty-state py-12">
             <FileText className="empty-state-icon" />
