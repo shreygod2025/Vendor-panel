@@ -140,7 +140,7 @@ const DeliveriesPage = () => {
                 <TableHeader>
                   <TableRow className="bg-slate-50">
                     <TableHead>PO Number</TableHead>
-                    <TableHead>Vendor</TableHead>
+                    <TableHead>School</TableHead>
                     <TableHead>Delivery Date</TableHead>
                     <TableHead>Delivery Address</TableHead>
                     <TableHead>Status</TableHead>
@@ -157,7 +157,7 @@ const DeliveriesPage = () => {
                           <span className="font-mono font-medium">{delivery.po_number}</span>
                           <p className="text-xs text-slate-500">{delivery.items_count} items</p>
                         </TableCell>
-                        <TableCell>{delivery.vendor_name}</TableCell>
+                        <TableCell>{delivery.school_name || delivery.vendor_name || "—"}</TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium">{formatDate(delivery.delivery_date)}</p>

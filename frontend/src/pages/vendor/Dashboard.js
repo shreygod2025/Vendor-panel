@@ -37,7 +37,7 @@ const VendorDashboard = () => {
 
       setStats(data);
       setUpcomingDeliveries(data.upcoming_deliveries || []);
-      setPendingIssues([]);
+      setPendingIssues(data.open_issues || []);
       setEarnings({
         total: data.total_invoiced || 0,
         paid: data.total_paid_amount || 0,
@@ -168,9 +168,12 @@ const VendorDashboard = () => {
                           {po.status}
                         </span>
                       </div>
+                      {po.school_name && (
+                        <p className="text-xs font-medium text-blue-700 mb-1">{po.school_name}</p>
+                      )}
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-slate-500">
-                          {po.status === "sent" ? "Awaiting Confirmation" : "Ready to Dispatch"}
+                          {po.delivery_date ? `Due: ${po.delivery_date}` : (po.status === "sent" ? "Awaiting Confirmation" : "Ready to Dispatch")}
                         </span>
                         <span className="text-sm font-mono">{formatCurrency(po.grand_total)}</span>
                       </div>
@@ -218,6 +221,7 @@ const VendorDashboard = () => {
                           {issue.priority}
                         </span>
                       </div>
+                      {issue.school_name && <p className="text-xs font-medium text-blue-700">{issue.school_name}</p>}
                       <p className="text-sm text-slate-600 truncate">{issue.description}</p>
                       <p className="text-xs text-slate-400 mt-1 capitalize">{issue.issue_type?.replace('_', ' ')}</p>
                     </div>

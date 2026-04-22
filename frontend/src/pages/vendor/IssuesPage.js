@@ -214,7 +214,7 @@ const VendorIssuesPage = () => {
                 <TableHeader>
                   <TableRow className="bg-slate-50">
                     <TableHead>Issue #</TableHead>
-                    <TableHead>PO Number</TableHead>
+                    <TableHead>PO / School</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Priority</TableHead>
@@ -228,13 +228,18 @@ const VendorIssuesPage = () => {
                     <TableRow key={issue.id}>
                       <TableCell className="font-mono font-medium">{issue.issue_number}</TableCell>
                       <TableCell className="font-mono text-sm">
-                        <Link 
-                          to={`/vendor/orders/${issue.po_number}`}
-                          className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
-                        >
-                          {issue.po_number}
-                          <ExternalLink className="w-3 h-3" />
-                        </Link>
+                        <div className="flex flex-col gap-0.5">
+                          <Link 
+                            to={`/vendor/orders/${issue.po_number}`}
+                            className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                          >
+                            {issue.po_number}
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
+                          {issue.school_name && (
+                            <span className="text-xs text-slate-500 font-sans">{issue.school_name}</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="capitalize">{issue.issue_type?.replace('_', ' ')}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{issue.description}</TableCell>

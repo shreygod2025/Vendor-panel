@@ -3790,7 +3790,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         vendor_id = current_user.get("vendor_id")
 
         # Run all queries in parallel using asyncio.gather
-        counts, status_agg, upcoming_deliveries, pending_issues_count, approved_po_docs, inv_pending_result = await asyncio.gather(
+        counts, status_agg, upcoming_deliveries, pending_issues_count, approved_po_docs, inv_pending_result, open_issues = await asyncio.gather(
             db.purchase_orders.count_documents({"vendor_id": vendor_id}),
             db.purchase_orders.aggregate([
                 {"$match": {"vendor_id": vendor_id}},
@@ -3808,8 +3808,12 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
             ).to_list(10000),
             db.invoices.aggregate([
                 {"$match": {"vendor_id": vendor_id, "payment_status": {"$in": ["pending", "partially_paid"]}}},
-                {"$group": {"_id": None, "count": {"$sum": 1}, "total_amount": {"$sum": "$amount"}, "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
+                {"$group": {"_id": None, "count": {"$sum": 1}, "total_amount": {"$sum": {"$add": ["$amount", {"$ifNull": ["$logistics_cost", 0]}]}}, "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
             ]).to_list(1),
+            db.issues.find(
+                {"vendor_id": vendor_id, "status": "open"},
+                {"_id": 0, "id": 1, "issue_number": 1, "po_number": 1, "school_name": 1, "issue_type": 1, "description": 1, "priority": 1, "status": 1, "created_at": 1}
+            ).sort("created_at", -1).to_list(5),
         )
 
         po_by_status = {s["_id"]: s["count"] for s in status_agg if s["_id"]}
@@ -3819,7 +3823,9 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         approved_po_ids = [p["id"] for p in approved_po_docs]
         total_inv_result = await db.invoices.aggregate([
             {"$match": {"vendor_id": vendor_id, "po_id": {"$in": approved_po_ids}}},
-            {"$group": {"_id": None, "total_invoiced": {"$sum": "$amount"}, "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
+            {"$group": {"_id": None,
+                "total_invoiced": {"$sum": {"$add": ["$amount", {"$ifNull": ["$logistics_cost", 0]}]}},
+                "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}}}
         ]).to_list(1)
 
         inv_data = inv_pending_result[0] if inv_pending_result else {"count": 0, "total_amount": 0, "total_paid": 0}
@@ -3833,6 +3839,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
             "pending_pos": pending_pos,
             "upcoming_deliveries": upcoming_deliveries,
             "pending_issues": pending_issues_count,
+            "open_issues": open_issues,
             "pending_payment_count": inv_data.get("count", 0),
             "total_pending_amount": total_pending_amount,
             "total_invoiced": total_inv_data.get("total_invoiced", 0),
