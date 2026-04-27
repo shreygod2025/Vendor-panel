@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Resend configuration
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'OLL VMS <noreply@oll.co>')
-APP_BASE_URL = os.environ.get('APP_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
+APP_BASE_URL = os.environ.get('APP_BASE_URL', '')
 
 # Flag to enable/disable email sending
 EMAIL_ENABLED = bool(RESEND_API_KEY)

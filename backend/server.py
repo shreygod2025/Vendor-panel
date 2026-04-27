@@ -67,6 +67,10 @@ api_router = APIRouter(prefix="/api")
 
 security = HTTPBearer()
 
+@api_router.get("/health")
+async def health():
+    return {"status": "healthy"}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -2750,7 +2754,7 @@ async def create_public_po_request(request: PublicPORequest):
     logger.info(f"External PO request created: {po_number} by {request.requester_name} from {request.source_system or 'unknown'}")
     
     # Build tracking URL - use environment variable or default
-    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
+    base_url = os.environ.get('PUBLIC_BASE_URL', '')
     tracking_url = f"{base_url}/track/{tracking_token}"
     
     return PublicPORequestResponse(
@@ -2800,7 +2804,7 @@ async def get_public_po_status(identifier: str):
         vendor_name = vendor.get("name") if vendor else None
     
     # Build tracking URL
-    base_url = os.environ.get('PUBLIC_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
+    base_url = os.environ.get('PUBLIC_BASE_URL', '')
     tracking_url = f"{base_url}/track/{po.get('tracking_token', '')}"
     
     # Status descriptions
@@ -5414,7 +5418,7 @@ async def integration_raise_po(
     })
     
     # Build tracking URL (base URL from environment or default)
-    base_url = os.environ.get('APP_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', '')
     tracking_url = f"{base_url}/track/{tracking_token}"
     
     return IntegrationPOResponse(
@@ -5465,7 +5469,7 @@ async def integration_get_tracking(
     # Get dispatch info if available
     dispatch = await db.dispatches.find_one({"po_id": po["id"]}, {"_id": 0})
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', '')
     tracking_url = f"{base_url}/track/{po['tracking_token']}"
     
     return TrackingLinkResponse(
@@ -5503,7 +5507,7 @@ async def integration_get_bulk_tracking(
     results = []
     errors = []
     
-    base_url = os.environ.get('APP_BASE_URL', 'https://oll-po-system.preview.emergentagent.com')
+    base_url = os.environ.get('APP_BASE_URL', '')
     
     # Search by PO IDs
     if request.po_ids:
