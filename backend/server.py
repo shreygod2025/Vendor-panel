@@ -18,6 +18,23 @@ import asyncio
 from io import BytesIO
 import httpx
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+# Define your allowed frontend origins
+origins = [
+    "https://vendor-panel-1rt3.vercel.app",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,     # Set to True if you need to support cookies/sessions
+    allow_methods=["*"],         # Allows all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],         # Allows all headers
+)
+
 # Email notification service
 from email_service import (
     notify_vendor_po_raised,
