@@ -31,12 +31,32 @@ const OLLDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const statsRes = await apiClient.get("/dashboard/stats");
+      const [statsRes, pendingRes] = await Promise.all([
+        apiClient.get("/dashboard/stats"),
+        apiClient.get("/payments/pending")
+      ]);
       setStats(statsRes.data);
       
-      // Pending invoices info is now in stats
-      // No need to fetch all invoices separately
-      setPendingInvoices([]);
+      const today = new Date();
+      const mappedPending = (pendingRes.data || []).map((inv) => {
+        let dueDateObj;
+        if (inv.due_date) {
+          dueDateObj = new Date(inv.due_date);
+        } else if (inv.invoice_date) {
+          dueDateObj = new Date(inv.invoice_date);
+          dueDateObj.setDate(dueDateObj.getDate() + 7);
+        } else {
+          dueDateObj = new Date();
+        }
+        const daysRemaining = Math.ceil((dueDateObj - today) / (1000 * 60 * 60 * 24));
+        return {
+          ...inv,
+          pendingAmount: inv.pending_amount ?? (inv.amount - (inv.paid_amount || 0)),
+          dueDate: dueDateObj.toISOString(),
+          daysRemaining
+        };
+      });
+      setPendingInvoices(mappedPending);
     } catch (error) {
       toast.error("Failed to fetch dashboard stats");
     } finally {
@@ -282,8 +302,17 @@ const OLLDashboard = () => {
               <div className="mb-4 p-3 bg-emerald-50 rounded-lg">
                 <p className="text-sm text-emerald-600">Total Pending</p>
                 <p className="text-2xl font-bold text-emerald-700 font-mono">
-                  {formatCurrency(pendingInvoices.reduce((sum, inv) => sum + inv.pendingAmount, 0))}
+                  {formatCurrency(
+                    pendingInvoices.length > 0
+                      ? pendingInvoices.reduce((sum, inv) => sum + inv.pendingAmount, 0)
+                      : (stats?.total_pending_amount || 0)
+                  )}
                 </p>
+                {(pendingInvoices.length > 0 || stats?.pending_payment_count > 0) && (
+                  <p className="text-xs text-emerald-600 mt-1">
+                    Across {pendingInvoices.length || stats?.pending_payment_count} invoices
+                  </p>
+                )}
               </div>
               
               {/* Payment Breakdown */}

@@ -2944,32 +2944,52 @@ async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str
         distributor_po_ids = [p["id"] for p in distributor_pos]
         query["po_id"] = {"$in": distributor_po_ids}
     
-    invoices = await db.invoices.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    # Exclude multi-MB Base64 document fields when listing all invoices to prevent 512MB RAM OOM on Render.
+    # Full document URLs are returned when querying by po_id or via GET /api/invoices/{invoice_id}.
+    projection = {"_id": 0}
+    if not po_id:
+        projection = {
+            "_id": 0,
+            "file_url": 0,
+            "invoice_url": 0,
+            "logistics_bill_url": 0,
+            "delivery_proof_url": 0
+        }
     
-    # Get PO and vendor info
-    po_ids = list(set(i["po_id"] for i in invoices))
+    invoices = await db.invoices.find(query, projection).sort("created_at", -1).to_list(1000)
+    
+    # Get PO and vendor info (project only required fields to save memory)
+    po_ids = list(set(i.get("po_id") for i in invoices if i.get("po_id")))
     vendor_ids = list(set(i.get("vendor_id") for i in invoices if i.get("vendor_id")))
     
-    pos = await db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0}).to_list(1000)
-    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
+    pos, vendors = await asyncio.gather(
+        db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0, "id": 1, "po_number": 1}).to_list(1000),
+        db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    )
     
-    po_map = {p["id"]: p["po_number"] for p in pos}
-    vendor_map = {v["id"]: v["name"] for v in vendors}
+    po_map = {p["id"]: p.get("po_number") for p in pos}
+    vendor_map = {v["id"]: v.get("name") for v in vendors}
     
     result = []
     for inv in invoices:
-        inv["po_number"] = po_map.get(inv["po_id"])
+        inv["po_number"] = po_map.get(inv.get("po_id"))
         inv["vendor_name"] = vendor_map.get(inv.get("vendor_id"))
-        if "paid_amount" not in inv:
+        inv.setdefault("po_id", "")
+        inv.setdefault("invoice_number", "")
+        inv.setdefault("invoice_date", "")
+        inv.setdefault("amount", 0)
+        if "paid_amount" not in inv or inv["paid_amount"] is None:
             inv["paid_amount"] = 0
         if "due_date" not in inv:
             inv["due_date"] = None
-        if "logistics_cost" not in inv:
+        if "logistics_cost" not in inv or inv["logistics_cost"] is None:
             inv["logistics_cost"] = 0
         if "logistics_bill_url" not in inv:
             inv["logistics_bill_url"] = None
         if "delivery_proof_url" not in inv:
             inv["delivery_proof_url"] = None
+        if "file_url" not in inv:
+            inv["file_url"] = None
         if "invoice_url" not in inv:
             inv["invoice_url"] = inv.get("file_url")
         if "created_by" not in inv or not inv["created_by"]:
@@ -2984,18 +3004,18 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    po = await db.purchase_orders.find_one({"id": invoice["po_id"]}, {"_id": 0})
-    vendor = await db.vendors.find_one({"id": invoice.get("vendor_id")}, {"_id": 0})
+    po = await db.purchase_orders.find_one({"id": invoice.get("po_id")}, {"_id": 0, "id": 1, "po_number": 1})
+    vendor = await db.vendors.find_one({"id": invoice.get("vendor_id")}, {"_id": 0, "id": 1, "name": 1})
     
     invoice["po_number"] = po.get("po_number") if po else None
     invoice["vendor_name"] = vendor.get("name") if vendor else None
-    if "paid_amount" not in invoice:
+    if "paid_amount" not in invoice or invoice["paid_amount"] is None:
         invoice["paid_amount"] = 0
     if "due_date" not in invoice:
         invoice["due_date"] = None
     if "created_by" not in invoice or not invoice["created_by"]:
         invoice["created_by"] = "system"
-    if "logistics_cost" not in invoice:
+    if "logistics_cost" not in invoice or invoice["logistics_cost"] is None:
         invoice["logistics_cost"] = 0
     if "logistics_bill_url" not in invoice:
         invoice["logistics_bill_url"] = None
@@ -3003,6 +3023,8 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
         invoice["delivery_proof_url"] = None
     if "invoice_url" not in invoice:
         invoice["invoice_url"] = invoice.get("file_url")
+    if not invoice.get("file_url") and invoice.get("invoice_url"):
+        invoice["file_url"] = invoice.get("invoice_url")
     
     return InvoiceResponse(**invoice)
 
@@ -3142,7 +3164,7 @@ async def get_payments(invoice_id: Optional[str] = None, po_id: Optional[str] = 
 
 @api_router.get("/payments/pending")
 async def get_pending_payments(current_user: dict = Depends(get_current_user)):
-    query = {"payment_status": {"$in": ["pending", "partially_paid"]}}
+    query = {"payment_status": {"$in": ["pending", "partial", "partially_paid"]}}
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
@@ -3156,28 +3178,40 @@ async def get_pending_payments(current_user: dict = Depends(get_current_user)):
         distributor_po_ids = [p["id"] for p in distributor_pos]
         query["po_id"] = {"$in": distributor_po_ids}
     
-    invoices = await db.invoices.find(query, {"_id": 0}).sort("due_date", 1).to_list(100)
+    # Exclude heavy Base64 fields from pending payments query
+    invoices = await db.invoices.find(
+        query,
+        {"_id": 0, "file_url": 0, "invoice_url": 0, "logistics_bill_url": 0, "delivery_proof_url": 0}
+    ).sort("due_date", 1).to_list(100)
     
     # Get PO and vendor info
-    po_ids = list(set(i["po_id"] for i in invoices))
+    po_ids = list(set(i.get("po_id") for i in invoices if i.get("po_id")))
     vendor_ids = list(set(i.get("vendor_id") for i in invoices if i.get("vendor_id")))
     
-    pos = await db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0}).to_list(1000)
-    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
+    pos, vendors = await asyncio.gather(
+        db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0, "id": 1, "po_number": 1}).to_list(1000),
+        db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    )
     
-    po_map = {p["id"]: p["po_number"] for p in pos}
-    vendor_map = {v["id"]: v["name"] for v in vendors}
+    po_map = {p["id"]: p.get("po_number") for p in pos}
+    vendor_map = {v["id"]: v.get("name") for v in vendors}
     
     result = []
     for inv in invoices:
+        total_amount = (inv.get("amount") or 0) + (inv.get("logistics_cost") or 0)
+        paid_amount = inv.get("paid_amount") or 0
+        pending_amount = total_amount - paid_amount
+        if pending_amount <= 0:
+            continue
         result.append({
             "id": inv["id"],
-            "invoice_number": inv["invoice_number"],
-            "po_number": po_map.get(inv["po_id"]),
+            "invoice_number": inv.get("invoice_number", ""),
+            "invoice_date": inv.get("invoice_date"),
+            "po_number": po_map.get(inv.get("po_id")),
             "vendor_name": vendor_map.get(inv.get("vendor_id")),
-            "amount": inv["amount"],
-            "paid_amount": inv.get("paid_amount", 0),
-            "pending_amount": inv["amount"] - inv.get("paid_amount", 0),
+            "amount": total_amount,
+            "paid_amount": paid_amount,
+            "pending_amount": pending_amount,
             "due_date": inv.get("due_date"),
             "payment_status": inv.get("payment_status", "pending")
         })
@@ -3383,17 +3417,19 @@ async def get_credit_notes(current_user: dict = Depends(get_current_user)):
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
     
-    returns = await db.returns.find(query, {"_id": 0}).sort("credit_note_date", -1).to_list(1000)
+    returns = await db.returns.find(query, {"_id": 0, "return_proof_url": 0}).sort("credit_note_date", -1).to_list(1000)
     
     # Get vendor and PO info
-    vendor_ids = list(set(r["vendor_id"] for r in returns))
-    po_ids = list(set(r["po_id"] for r in returns))
+    vendor_ids = list(set(r.get("vendor_id") for r in returns if r.get("vendor_id")))
+    po_ids = list(set(r.get("po_id") for r in returns if r.get("po_id")))
     
-    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
-    pos = await db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0}).to_list(1000)
+    vendors, pos = await asyncio.gather(
+        db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000),
+        db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0, "id": 1, "po_number": 1}).to_list(1000)
+    )
     
-    vendor_map = {v["id"]: v["name"] for v in vendors}
-    po_map = {p["id"]: p["po_number"] for p in pos}
+    vendor_map = {v["id"]: v.get("name") for v in vendors}
+    po_map = {p["id"]: p.get("po_number") for p in pos}
     
     result = []
     for r in returns:
@@ -3402,9 +3438,9 @@ async def get_credit_notes(current_user: dict = Depends(get_current_user)):
             "credit_note_number": r.get("credit_note_number"),
             "credit_note_date": r.get("credit_note_date"),
             "credit_note_url": r.get("credit_note_url"),
-            "return_number": r["return_number"],
-            "po_number": po_map.get(r["po_id"]),
-            "vendor_name": vendor_map.get(r["vendor_id"]),
+            "return_number": r.get("return_number", ""),
+            "po_number": po_map.get(r.get("po_id")),
+            "vendor_name": vendor_map.get(r.get("vendor_id")),
             "credit_amount": r.get("credit_amount", r.get("total_value", 0)),
             "items_count": len(r.get("items", []))
         })
@@ -3433,19 +3469,21 @@ async def get_returns(vendor_id: Optional[str] = None, status: Optional[str] = N
     
     returns = await db.returns.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
-    vendor_ids = list(set(r["vendor_id"] for r in returns))
-    po_ids = list(set(r["po_id"] for r in returns))
+    vendor_ids = list(set(r.get("vendor_id") for r in returns if r.get("vendor_id")))
+    po_ids = list(set(r.get("po_id") for r in returns if r.get("po_id")))
     
-    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
-    pos = await db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0}).to_list(1000)
+    vendors, pos = await asyncio.gather(
+        db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000),
+        db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0, "id": 1, "po_number": 1}).to_list(1000)
+    )
     
-    vendor_map = {v["id"]: v["name"] for v in vendors}
-    po_map = {p["id"]: p["po_number"] for p in pos}
+    vendor_map = {v["id"]: v.get("name") for v in vendors}
+    po_map = {p["id"]: p.get("po_number") for p in pos}
     
     result = []
     for r in returns:
-        r["vendor_name"] = vendor_map.get(r["vendor_id"])
-        r["po_number"] = po_map.get(r["po_id"])
+        r["vendor_name"] = vendor_map.get(r.get("vendor_id"))
+        r["po_number"] = po_map.get(r.get("po_id"))
         if "total_value" not in r:
             r["total_value"] = 0
         if "credit_note_number" not in r:
@@ -3491,7 +3529,7 @@ async def delete_return(return_id: str, current_user: dict = Depends(get_current
 @api_router.get("/vendors/{vendor_id}/credit")
 async def get_vendor_credit(vendor_id: str, current_user: dict = Depends(get_current_user)):
     """Get available credit for a vendor based on approved returns minus used credits"""
-    vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
+    vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0, "id": 1, "name": 1})
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
     
@@ -3499,7 +3537,7 @@ async def get_vendor_credit(vendor_id: str, current_user: dict = Depends(get_cur
     returns = await db.returns.find({
         "vendor_id": vendor_id,
         "status": "credit_issued"
-    }, {"_id": 0}).to_list(1000)
+    }, {"_id": 0, "id": 1, "credit_note_number": 1, "credit_amount": 1, "total_value": 1}).to_list(1000)
     
     total_credit = sum(r.get("credit_amount") or r.get("total_value", 0) for r in returns)
     
@@ -3507,7 +3545,7 @@ async def get_vendor_credit(vendor_id: str, current_user: dict = Depends(get_cur
     payments = await db.payments.find({
         "payment_mode": "credit",
         "vendor_id": vendor_id
-    }, {"_id": 0}).to_list(1000)
+    }, {"_id": 0, "amount": 1}).to_list(1000)
     
     used_credit = sum(p.get("amount", 0) for p in payments)
     
@@ -3528,13 +3566,11 @@ async def get_all_vendors_credit(current_user: dict = Depends(get_current_user))
     if current_user.get("role") != "oll":
         raise HTTPException(status_code=403, detail="Only OLL can view all vendor credits")
     
-    vendors = await db.vendors.find({}, {"_id": 0}).to_list(1000)
-    
-    # Get all credit_issued returns
-    returns = await db.returns.find({"status": "credit_issued"}, {"_id": 0}).to_list(1000)
-    
-    # Get all credit payments
-    payments = await db.payments.find({"payment_mode": "credit"}, {"_id": 0}).to_list(1000)
+    vendors, returns, payments = await asyncio.gather(
+        db.vendors.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000),
+        db.returns.find({"status": "credit_issued"}, {"_id": 0, "vendor_id": 1, "credit_amount": 1, "total_value": 1}).to_list(1000),
+        db.payments.find({"payment_mode": "credit"}, {"_id": 0, "vendor_id": 1, "amount": 1}).to_list(1000)
+    )
     
     # Calculate credit per vendor
     vendor_credits = {}
@@ -3748,16 +3784,16 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         # Open issues (just 5)
         open_issues = await db.issues.find(
             {"status": "open"}, 
-            {"_id": 0, "id": 1, "issue_number": 1, "issue_type": 1, "priority": 1, "po_id": 1, "created_at": 1}
+            {"_id": 0, "id": 1, "issue_number": 1, "issue_type": 1, "priority": 1, "po_id": 1, "created_at": 1, "description": 1}
         ).sort("created_at", -1).limit(5).to_list(5)
         
         # Pending payments summary
         pending_pipeline = [
-            {"$match": {"payment_status": {"$in": ["pending", "partial"]}}},
+            {"$match": {"payment_status": {"$in": ["pending", "partial", "partially_paid"]}}},
             {"$group": {
                 "_id": None,
                 "count": {"$sum": 1},
-                "total_amount": {"$sum": "$amount"},
+                "total_amount": {"$sum": {"$add": ["$amount", {"$ifNull": ["$logistics_cost", 0]}]}},
                 "total_paid": {"$sum": {"$ifNull": ["$paid_amount", 0]}}
             }}
         ]
@@ -5853,10 +5889,18 @@ app.include_router(api_router)
 # Mount static files for uploaded documents
 app.mount("/api/files", StaticFiles(directory=str(UPLOADS_DIR)), name="uploaded_files")
 
+_raw_cors_origins = [
+    o.strip().rstrip("/")
+    for o in os.environ.get("CORS_ORIGINS", "*").split(",")
+    if o.strip()
+]
+_allow_all_origins = "*" in _raw_cors_origins or not _raw_cors_origins
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"] if _allow_all_origins else _raw_cors_origins,
+    allow_origin_regex=r"https?://.*" if _allow_all_origins else r"https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )

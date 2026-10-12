@@ -99,13 +99,11 @@ const Analytics = () => {
 
   const fetchAllData = async () => {
     try {
-      const [vendorsRes, productsRes, posRes, issuesRes, invoicesRes, paymentsRes, timelineRes, inventoryRes, invStatsRes] = await Promise.all([
+      const [vendorsRes, productsRes, posRes, issuesRes, timelineRes, inventoryRes, invStatsRes] = await Promise.all([
         apiClient.get("/vendors"),
         apiClient.get("/products"),
         apiClient.get("/purchase-orders"),
         apiClient.get("/issues"),
-        apiClient.get("/invoices"),
-        apiClient.get("/payments"),
         apiClient.get("/analytics/delivery-timeline"),
         apiClient.get("/inventory"),
         apiClient.get("/inventory/summary/stats")
@@ -116,8 +114,8 @@ const Analytics = () => {
         products: productsRes.data,
         purchaseOrders: posRes.data,
         issues: issuesRes.data,
-        invoices: invoicesRes.data,
-        payments: paymentsRes.data
+        invoices: [],
+        payments: []
       });
       setTimeline(timelineRes.data);
       setInventory({ items: inventoryRes.data, stats: invStatsRes.data });

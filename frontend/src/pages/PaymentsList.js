@@ -179,11 +179,19 @@ const PaymentsList = () => {
     return vendorCredits[vendorId];
   };
 
-  const openViewPayment = (payment) => {
+  const openViewPayment = async (payment) => {
     const invoice = payment.invoice_id ? invoices.find(inv => inv.id === payment.invoice_id) : null;
     setViewingPayment(payment);
     setViewingInvoice(invoice);
     setViewDialog(true);
+    if (payment.invoice_id) {
+      try {
+        const res = await apiClient.get(`/invoices/${payment.invoice_id}`);
+        setViewingInvoice(res.data);
+      } catch (e) {
+        // Keep summary invoice data if detail fetch fails
+      }
+    }
   };
 
   const formatCurrency = (amount) => {

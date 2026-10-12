@@ -347,7 +347,14 @@ const PurchaseOrdersList = () => {
 
   // Filter orders by search and vendor
   const filteredOrders = orders.filter((order) => {
-    const matchesSearch = order.po_number.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase().trim();
+    const matchesSearch = !q ||
+      (order.po_number && order.po_number.toLowerCase().includes(q)) ||
+      (order.school_name && order.school_name.toLowerCase().includes(q)) ||
+      (order.vendor_name && order.vendor_name.toLowerCase().includes(q)) ||
+      (order.receiver_name && order.receiver_name.toLowerCase().includes(q)) ||
+      (order.contact_person && order.contact_person.toLowerCase().includes(q)) ||
+      (order.city && order.city.toLowerCase().includes(q));
     const matchesVendor = vendorFilter === "all" || order.vendor_id === vendorFilter;
     return matchesSearch && matchesVendor;
   });
@@ -960,7 +967,7 @@ const PurchaseOrdersList = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
-              placeholder="Search by PO number..."
+              placeholder="Search by PO number, school, vendor, receiver, city..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10"

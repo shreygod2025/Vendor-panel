@@ -159,9 +159,33 @@ const InvoicesList = () => {
     }
   };
 
-  const openViewInvoice = (invoice) => {
+  const openViewInvoice = async (invoice) => {
     setViewingInvoice(invoice);
     setViewInvoiceDialog(true);
+    try {
+      const res = await apiClient.get(`/invoices/${invoice.id}`);
+      setViewingInvoice(res.data);
+    } catch (error) {
+      // Keep summary invoice data if detail fetch fails
+    }
+  };
+
+  const handleDownloadInvoice = async (invoice) => {
+    try {
+      const fileUrl = invoice.file_url || invoice.invoice_url || (await apiClient.get(`/invoices/${invoice.id}`)).data?.file_url;
+      if (!fileUrl) {
+        toast.error("No document attached to this invoice");
+        return;
+      }
+      const link = document.createElement("a");
+      link.href = fileUrl;
+      link.download = `Invoice-${invoice.invoice_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      toast.error("Failed to download invoice document");
+    }
   };
 
   const openIssueDialog = (invoice) => {
@@ -437,21 +461,15 @@ const InvoicesList = () => {
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          {invoice.file_url ? (
-                            <a
-                              href={invoice.file_url}
-                              download={`Invoice-${invoice.invoice_number}.pdf`}
-                              title="Download Invoice"
-                            >
-                              <Button variant="ghost" size="sm" className="text-emerald-600">
-                                <Download className="w-4 h-4" />
-                              </Button>
-                            </a>
-                          ) : (
-                            <Button variant="ghost" size="sm" disabled title="No document attached">
-                              <Download className="w-4 h-4 opacity-30" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-emerald-600"
+                            onClick={() => handleDownloadInvoice(invoice)}
+                            title="Download Invoice"
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
                           {isOLL && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
