@@ -94,6 +94,7 @@ const Analytics = () => {
     if (data.purchaseOrders.length > 0) {
       calculateAnalytics();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, monthFilter, vendorFilter, timeline]);
 
   const fetchAllData = async () => {

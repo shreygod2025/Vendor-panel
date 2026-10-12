@@ -29,6 +29,7 @@ const VendorDispatch = () => {
 
   useEffect(() => {
     fetchOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poId]);
 
   const fetchOrder = async () => {

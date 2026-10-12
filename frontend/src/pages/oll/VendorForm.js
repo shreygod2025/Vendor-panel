@@ -50,6 +50,7 @@ const VendorForm = () => {
     if (isEdit) {
       fetchVendor();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchVendor = async () => {

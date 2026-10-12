@@ -118,6 +118,7 @@ const PurchaseOrdersList = () => {
   useEffect(() => {
     document.title = "OLL - Purchase Orders";
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async (loadMore = false) => {

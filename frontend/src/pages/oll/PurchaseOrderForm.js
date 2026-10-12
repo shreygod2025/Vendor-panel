@@ -164,10 +164,12 @@ const PurchaseOrderForm = () => {
 
   useEffect(() => {
     fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     calculateTotals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.line_items, formData.order_discount_amount, formData.order_discount_percent]);
 
   const fetchInitialData = async () => {

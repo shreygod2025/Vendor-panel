@@ -36,6 +36,7 @@ const PublicTracking = () => {
   useEffect(() => {
     document.title = "OLL - Order Tracking";
     fetchTrackingData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackingToken]);
 
   const fetchTrackingData = async () => {
