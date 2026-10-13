@@ -1,11 +1,14 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Query, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Query, Header, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import Binary
 import os
+import base64
+import mimetypes
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
@@ -193,6 +196,15 @@ class ProductCreate(BaseModel):
     description: Optional[str] = None
     unit: str = "pcs"
     is_active: bool = True
+    image_url: Optional[str] = None
+    show_on_shop: bool = False
+    mrp: Optional[float] = None
+    shop_images: List[str] = []
+    shop_videos: List[str] = []
+    youtube_url: Optional[str] = None
+    kit_includes: List[Dict[str, Any]] = []
+    dimensions: Optional[Dict[str, Any]] = None
+    additional_info: Optional[str] = None
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -203,6 +215,15 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     unit: Optional[str] = None
     is_active: Optional[bool] = None
+    image_url: Optional[str] = None
+    show_on_shop: Optional[bool] = None
+    mrp: Optional[float] = None
+    shop_images: Optional[List[str]] = None
+    shop_videos: Optional[List[str]] = None
+    youtube_url: Optional[str] = None
+    kit_includes: Optional[List[Dict[str, Any]]] = None
+    dimensions: Optional[Dict[str, Any]] = None
+    additional_info: Optional[str] = None
 
 class ProductResponse(BaseModel):
     id: str
@@ -212,9 +233,18 @@ class ProductResponse(BaseModel):
     vendor_name: Optional[str] = None
     unit_price: float
     tax_rate: float
-    description: Optional[str]
-    unit: str
-    is_active: bool
+    description: Optional[str] = None
+    unit: str = "pcs"
+    is_active: bool = True
+    image_url: Optional[str] = None
+    show_on_shop: bool = False
+    mrp: Optional[float] = None
+    shop_images: List[str] = []
+    shop_videos: List[str] = []
+    youtube_url: Optional[str] = None
+    kit_includes: List[Dict[str, Any]] = []
+    dimensions: Optional[Dict[str, Any]] = None
+    additional_info: Optional[str] = None
     created_at: str
     updated_at: str
 
@@ -1060,13 +1090,32 @@ async def import_products(import_data: ProductImportRequest, current_user: dict 
         "imported": imported_products
     }
 
+def _normalize_product_doc(p: dict) -> dict:
+    if not p.get("unit"):
+        p["unit"] = "pcs"
+    p["show_on_shop"] = bool(p.get("show_on_shop", False))
+    if not isinstance(p.get("shop_images"), list):
+        p["shop_images"] = []
+    if not isinstance(p.get("shop_videos"), list):
+        p["shop_videos"] = []
+    if not isinstance(p.get("kit_includes"), list):
+        p["kit_includes"] = []
+    return p
+
 @api_router.get("/products", response_model=List[ProductResponse])
-async def get_products(vendor_id: Optional[str] = None, is_active: Optional[bool] = None, current_user: dict = Depends(get_current_user)):
+async def get_products(
+    vendor_id: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    show_on_shop: Optional[bool] = None,
+    current_user: dict = Depends(get_current_user)
+):
     query = {}
     if vendor_id:
         query["vendor_id"] = vendor_id
     if is_active is not None:
         query["is_active"] = is_active
+    if show_on_shop is not None:
+        query["show_on_shop"] = show_on_shop
     
     if current_user.get("role") == "vendor" and current_user.get("vendor_id"):
         query["vendor_id"] = current_user["vendor_id"]
@@ -1084,9 +1133,7 @@ async def get_products(vendor_id: Optional[str] = None, is_active: Optional[bool
     result = []
     for p in products:
         p["vendor_name"] = vendor_map.get(p["vendor_id"])
-        # Ensure unit field exists
-        if "unit" not in p:
-            p["unit"] = "pcs"
+        _normalize_product_doc(p)
         # Hide pricing for distributors
         if current_user.get("role") == "distributor":
             p["unit_price"] = 0
@@ -1106,9 +1153,7 @@ async def get_product(product_id: str, current_user: dict = Depends(get_current_
     
     vendor = await db.vendors.find_one({"id": product["vendor_id"]}, {"_id": 0})
     product["vendor_name"] = vendor.get("name") if vendor else None
-    # Ensure unit field exists
-    if "unit" not in product:
-        product["unit"] = "pcs"
+    _normalize_product_doc(product)
     
     return ProductResponse(**product)
 
@@ -1117,7 +1162,7 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
     if current_user.get("role") != "oll":
         raise HTTPException(status_code=403, detail="Only OLL can update products")
     
-    update_data = {k: v for k, v in product.model_dump().items() if v is not None}
+    update_data = product.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     result = await db.products.update_one({"id": product_id}, {"$set": update_data})
@@ -1129,6 +1174,7 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
     updated = await db.products.find_one({"id": product_id}, {"_id": 0})
     vendor = await db.vendors.find_one({"id": updated["vendor_id"]}, {"_id": 0})
     updated["vendor_name"] = vendor.get("name") if vendor else None
+    _normalize_product_doc(updated)
     
     return ProductResponse(**updated)
 
@@ -2643,16 +2689,19 @@ async def track_order(tracking_token: str):
 # ========================
 
 @api_router.get("/public/products")
-async def get_public_products():
-    """Get list of products for public PO request form (no authentication required)"""
-    products = await db.products.find({"is_active": True}, {"_id": 0}).to_list(1000)
+async def get_public_products(show_on_shop: Optional[bool] = None):
+    """Get list of products for public PO request form or public shop (no authentication required)"""
+    query: Dict[str, Any] = {"is_active": True}
+    if show_on_shop is not None:
+        query["show_on_shop"] = show_on_shop
+    products = await db.products.find(query, {"_id": 0}).to_list(1000)
     
     # Get vendor names for display
     vendor_ids = list(set(p["vendor_id"] for p in products))
     vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
     vendor_map = {v["id"]: v["name"] for v in vendors}
     
-    # Return products with vendor names but without sensitive pricing info for external users
+    # Return products with vendor names and shop details but without sensitive vendor unit_price
     result = []
     for p in products:
         result.append({
@@ -2662,10 +2711,24 @@ async def get_public_products():
             "vendor_id": p["vendor_id"],
             "vendor_name": vendor_map.get(p["vendor_id"], ""),
             "unit": p.get("unit", "pcs"),
-            "description": p.get("description", "")
+            "description": p.get("description", ""),
+            "image_url": p.get("image_url"),
+            "show_on_shop": bool(p.get("show_on_shop", False)),
+            "mrp": p.get("mrp"),
+            "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
+            "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
+            "youtube_url": p.get("youtube_url"),
+            "kit_includes": p.get("kit_includes") if isinstance(p.get("kit_includes"), list) else [],
+            "dimensions": p.get("dimensions"),
+            "additional_info": p.get("additional_info"),
         })
     
     return result
+
+@api_router.get("/public/shop/products")
+async def get_public_shop_products():
+    """Get active products marked as show_on_shop=True for the public shop (no authentication required)"""
+    return await get_public_products(show_on_shop=True)
 
 @api_router.post("/public/po-request", response_model=PublicPORequestResponse)
 async def create_public_po_request(request: PublicPORequest):
@@ -2924,8 +2987,193 @@ async def create_invoice(invoice: InvoiceCreate, current_user: dict = Depends(ge
     
     return InvoiceResponse(**invoice_doc)
 
+def _get_backend_base_url(request: Request) -> str:
+    """Resolve the backend's own public base URL (e.g., https://vendor-panel-6kjc.onrender.com)."""
+    env_url = os.environ.get("BACKEND_BASE_URL", "").strip().rstrip("/")
+    if env_url:
+        return env_url
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{proto}://{host}".rstrip("/")
+
+
+def generate_invoice_pdf(invoice_data: dict, po_data: dict, vendor_data: dict) -> BytesIO:
+    """Generate a PDF document for an Invoice when no uploaded file is present."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm, topMargin=12*mm, bottomMargin=12*mm)
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='InvTitle', fontSize=16, fontName='Helvetica-Bold', alignment=TA_CENTER, spaceAfter=2*mm))
+    styles.add(ParagraphStyle(name='InvSub', fontSize=11, fontName='Helvetica-Bold', alignment=TA_LEFT))
+    styles.add(ParagraphStyle(name='InvSmall', fontSize=9, fontName='Helvetica', alignment=TA_LEFT, leading=12))
+    styles.add(ParagraphStyle(name='InvRight', fontSize=10, fontName='Helvetica', alignment=TA_RIGHT))
+
+    elements = []
+    inv_no = invoice_data.get("invoice_number", "N/A")
+    inv_date = (invoice_data.get("invoice_date") or invoice_data.get("created_at") or "")[:10]
+    po_no = po_data.get("po_number", "N/A") if po_data else (invoice_data.get("po_number") or "N/A")
+
+    header_data = [
+        [Paragraph('<b>TAX INVOICE</b>', styles['InvTitle'])],
+        [Paragraph(f'<b>Invoice No:</b> {inv_no} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Date:</b> {inv_date} &nbsp;&nbsp;|&nbsp;&nbsp; <b>PO No:</b> {po_no}', styles['InvRight'])]
+    ]
+    header_table = Table(header_data, colWidths=[180*mm])
+    elements.append(header_table)
+    elements.append(Spacer(1, 4*mm))
+
+    v_name = vendor_data.get("name", invoice_data.get("vendor_name", "Vendor")) if vendor_data else (invoice_data.get("vendor_name") or "Vendor")
+    v_addr = vendor_data.get("address", "") if vendor_data else ""
+    v_gst = vendor_data.get("gst_number", "N/A") if vendor_data else "N/A"
+    v_phone = vendor_data.get("phone", "") if vendor_data else ""
+
+    bill_from = f"<b>FROM (VENDOR):</b><br/><b>{v_name}</b><br/>{v_addr}<br/><b>GST:</b> {v_gst}<br/><b>Phone:</b> {v_phone}"
+    bill_to = """<b>BILL TO:</b><br/><b>Clonefutura Live Solutions Pvt Ltd. (OLL)</b><br/>103 1st floor - Kshitij building, Veera Desai Rd,<br/>Andheri West, Mumbai, Maharashtra 400053<br/><b>GST No:</b> 27AAKCC1113B1ZC"""
+
+    party_table = Table([[Paragraph(bill_from, styles['InvSmall']), Paragraph(bill_to, styles['InvSmall'])]], colWidths=[90*mm, 90*mm])
+    party_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(party_table)
+    elements.append(Spacer(1, 6*mm))
+
+    item_rows = [['#', 'Item / Description', 'SKU', 'Qty', 'Unit Price (INR)', 'Tax %', 'Amount (INR)']]
+    line_items = po_data.get("line_items", []) if po_data else []
+    if line_items:
+        for idx, item in enumerate(line_items, 1):
+            qty = item.get("quantity", 0)
+            price = item.get("unit_price", 0)
+            tax = item.get("tax_rate", 18)
+            line_total = qty * price * (1 + tax / 100.0)
+            item_rows.append([
+                str(idx),
+                Paragraph(str(item.get("product_name", "")), styles['InvSmall']),
+                str(item.get("sku", "-")),
+                str(qty),
+                f"{price:,.2f}",
+                f"{tax}%",
+                f"{line_total:,.2f}"
+            ])
+    else:
+        item_rows.append([
+            '1',
+            Paragraph(f"Invoice against Purchase Order {po_no}", styles['InvSmall']),
+            '-',
+            '1',
+            f"{invoice_data.get('amount', 0):,.2f}",
+            '-',
+            f"{invoice_data.get('amount', 0):,.2f}"
+        ])
+
+    items_table = Table(item_rows, colWidths=[10*mm, 65*mm, 25*mm, 15*mm, 25*mm, 15*mm, 25*mm])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 5*mm))
+
+    inv_amt = float(invoice_data.get("amount") or 0)
+    log_cost = float(invoice_data.get("logistics_cost") or 0)
+    total_amt = inv_amt + log_cost
+    paid_amt = float(invoice_data.get("paid_amount") or 0)
+    balance = max(0.0, total_amt - paid_amt)
+
+    summary_rows = [
+        ['', 'Invoice Amount:', f"INR {inv_amt:,.2f}"],
+        ['', 'Logistics Cost:', f"INR {log_cost:,.2f}"],
+        ['', 'Total Payable:', f"INR {total_amt:,.2f}"],
+        ['', 'Amount Paid:', f"INR {paid_amt:,.2f}"],
+        ['', 'Balance Due:', f"INR {balance:,.2f}"],
+    ]
+    summary_table = Table(summary_rows, colWidths=[100*mm, 45*mm, 35*mm])
+    summary_table.setStyle(TableStyle([
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('FONTNAME', (1, 2), (-1, 2), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 4), (-1, 4), 'Helvetica-Bold'),
+        ('LINEABOVE', (1, 2), (-1, 2), 0.5, colors.black),
+    ]))
+    elements.append(summary_table)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+
+@api_router.get("/invoices/{invoice_id}/download")
+async def download_invoice_document(invoice_id: str, doc_type: str = Query("invoice")):
+    """Download or view an invoice document (decodes Base64 data URLs, serves local files, or generates a PDF fallback)."""
+    invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if doc_type == "logistics":
+        raw_url = invoice.get("logistics_bill_url")
+        prefix = f"Logistics-{invoice.get('invoice_number', invoice_id)}"
+    elif doc_type == "delivery_proof":
+        raw_url = invoice.get("delivery_proof_url")
+        prefix = f"DeliveryProof-{invoice.get('invoice_number', invoice_id)}"
+    else:
+        raw_url = invoice.get("file_url") or invoice.get("invoice_url")
+        prefix = f"Invoice-{invoice.get('invoice_number', invoice_id)}"
+
+    if raw_url and isinstance(raw_url, str):
+        raw_url = raw_url.strip()
+        if raw_url.startswith("data:"):
+            try:
+                header, b64_data = raw_url.split(",", 1)
+                mime_type = header.split(";")[0].replace("data:", "") or "application/pdf"
+                file_bytes = base64.b64decode(b64_data)
+                ext_map = {
+                    "application/pdf": ".pdf",
+                    "image/jpeg": ".jpg",
+                    "image/jpg": ".jpg",
+                    "image/png": ".png",
+                    "image/webp": ".webp",
+                }
+                ext = ext_map.get(mime_type.lower(), ".pdf")
+                filename = f"{prefix}{ext}"
+                return Response(
+                    content=file_bytes,
+                    media_type=mime_type,
+                    headers={"Content-Disposition": f'inline; filename="{filename}"'}
+                )
+            except Exception as e:
+                logger.error(f"Failed to decode data URL for invoice {invoice_id}: {e}")
+        elif "/api/files/" in raw_url:
+            fname = raw_url.split("/api/files/")[-1].split("?")[0]
+            fpath = UPLOADS_DIR / fname
+            if fpath.exists():
+                return FileResponse(fpath, filename=fname)
+            stored_file = await db.uploaded_files.find_one({"filename": fname})
+            if stored_file and stored_file.get("data"):
+                return Response(
+                    content=bytes(stored_file["data"]),
+                    media_type=stored_file.get("content_type", "application/octet-stream"),
+                    headers={"Content-Disposition": f'inline; filename="{fname}"'}
+                )
+        elif raw_url.startswith("http://") or raw_url.startswith("https://"):
+            return RedirectResponse(url=raw_url)
+
+    po = await db.purchase_orders.find_one({"id": invoice.get("po_id")}, {"_id": 0})
+    vendor = await db.vendors.find_one({"id": invoice.get("vendor_id")}, {"_id": 0})
+    pdf_buffer = generate_invoice_pdf(invoice, po or {}, vendor or {})
+    filename = f"{prefix}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'}
+    )
+
+
 @api_router.get("/invoices", response_model=List[InvoiceResponse])
-async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+async def get_invoices(request: Request, po_id: Optional[str] = None, payment_status: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     query = {}
     if po_id:
         query["po_id"] = po_id
@@ -2944,21 +3192,32 @@ async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str
         distributor_po_ids = [p["id"] for p in distributor_pos]
         query["po_id"] = {"$in": distributor_po_ids}
     
-    # Exclude multi-MB Base64 document fields when listing all invoices to prevent 512MB RAM OOM on Render.
-    # Full document URLs are returned when querying by po_id or via GET /api/invoices/{invoice_id}.
-    projection = {"_id": 0}
-    if not po_id:
-        projection = {
+    # Use aggregation projection to check boolean flags without loading multi-MB Base64 strings into RAM
+    pipeline = [
+        {"$match": query},
+        {"$sort": {"created_at": -1}},
+        {"$limit": 1000},
+        {"$project": {
             "_id": 0,
-            "file_url": 0,
-            "invoice_url": 0,
-            "logistics_bill_url": 0,
-            "delivery_proof_url": 0
-        }
+            "id": 1,
+            "po_id": 1,
+            "vendor_id": 1,
+            "invoice_number": 1,
+            "invoice_date": 1,
+            "due_date": 1,
+            "amount": 1,
+            "paid_amount": 1,
+            "payment_status": 1,
+            "logistics_cost": 1,
+            "notes": 1,
+            "created_at": 1,
+            "created_by": 1,
+            "has_logistics_bill": {"$gt": [{"$strLenCP": {"$ifNull": ["$logistics_bill_url", ""]}}, 0]},
+            "has_delivery_proof": {"$gt": [{"$strLenCP": {"$ifNull": ["$delivery_proof_url", ""]}}, 0]},
+        }}
+    ]
+    invoices = await db.invoices.aggregate(pipeline).to_list(1000)
     
-    invoices = await db.invoices.find(query, projection).sort("created_at", -1).to_list(1000)
-    
-    # Get PO and vendor info (project only required fields to save memory)
     po_ids = list(set(i.get("po_id") for i in invoices if i.get("po_id")))
     vendor_ids = list(set(i.get("vendor_id") for i in invoices if i.get("vendor_id")))
     
@@ -2969,9 +3228,11 @@ async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str
     
     po_map = {p["id"]: p.get("po_number") for p in pos}
     vendor_map = {v["id"]: v.get("name") for v in vendors}
+    backend_base = _get_backend_base_url(request)
     
     result = []
     for inv in invoices:
+        inv_id = inv.get("id")
         inv["po_number"] = po_map.get(inv.get("po_id"))
         inv["vendor_name"] = vendor_map.get(inv.get("vendor_id"))
         inv.setdefault("po_id", "")
@@ -2984,14 +3245,11 @@ async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str
             inv["due_date"] = None
         if "logistics_cost" not in inv or inv["logistics_cost"] is None:
             inv["logistics_cost"] = 0
-        if "logistics_bill_url" not in inv:
-            inv["logistics_bill_url"] = None
-        if "delivery_proof_url" not in inv:
-            inv["delivery_proof_url"] = None
-        if "file_url" not in inv:
-            inv["file_url"] = None
-        if "invoice_url" not in inv:
-            inv["invoice_url"] = inv.get("file_url")
+        download_url = f"{backend_base}/api/invoices/{inv_id}/download"
+        inv["file_url"] = download_url
+        inv["invoice_url"] = download_url
+        inv["logistics_bill_url"] = f"{download_url}?doc_type=logistics" if inv.pop("has_logistics_bill", False) else None
+        inv["delivery_proof_url"] = f"{download_url}?doc_type=delivery_proof" if inv.pop("has_delivery_proof", False) else None
         if "created_by" not in inv or not inv["created_by"]:
             inv["created_by"] = "system"
         result.append(InvoiceResponse(**inv))
@@ -2999,13 +3257,38 @@ async def get_invoices(po_id: Optional[str] = None, payment_status: Optional[str
     return result
 
 @api_router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
-async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
-    invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
-    if not invoice:
+async def get_invoice(invoice_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    pipeline = [
+        {"$match": {"id": invoice_id}},
+        {"$project": {
+            "_id": 0,
+            "id": 1,
+            "po_id": 1,
+            "vendor_id": 1,
+            "invoice_number": 1,
+            "invoice_date": 1,
+            "due_date": 1,
+            "amount": 1,
+            "paid_amount": 1,
+            "payment_status": 1,
+            "logistics_cost": 1,
+            "notes": 1,
+            "created_at": 1,
+            "created_by": 1,
+            "has_logistics_bill": {"$gt": [{"$strLenCP": {"$ifNull": ["$logistics_bill_url", ""]}}, 0]},
+            "has_delivery_proof": {"$gt": [{"$strLenCP": {"$ifNull": ["$delivery_proof_url", ""]}}, 0]},
+        }}
+    ]
+    docs = await db.invoices.aggregate(pipeline).to_list(1)
+    if not docs:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    invoice = docs[0]
     
     po = await db.purchase_orders.find_one({"id": invoice.get("po_id")}, {"_id": 0, "id": 1, "po_number": 1})
     vendor = await db.vendors.find_one({"id": invoice.get("vendor_id")}, {"_id": 0, "id": 1, "name": 1})
+    
+    backend_base = _get_backend_base_url(request)
+    download_url = f"{backend_base}/api/invoices/{invoice_id}/download"
     
     invoice["po_number"] = po.get("po_number") if po else None
     invoice["vendor_name"] = vendor.get("name") if vendor else None
@@ -3017,14 +3300,10 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
         invoice["created_by"] = "system"
     if "logistics_cost" not in invoice or invoice["logistics_cost"] is None:
         invoice["logistics_cost"] = 0
-    if "logistics_bill_url" not in invoice:
-        invoice["logistics_bill_url"] = None
-    if "delivery_proof_url" not in invoice:
-        invoice["delivery_proof_url"] = None
-    if "invoice_url" not in invoice:
-        invoice["invoice_url"] = invoice.get("file_url")
-    if not invoice.get("file_url") and invoice.get("invoice_url"):
-        invoice["file_url"] = invoice.get("invoice_url")
+    invoice["file_url"] = download_url
+    invoice["invoice_url"] = download_url
+    invoice["logistics_bill_url"] = f"{download_url}?doc_type=logistics" if invoice.pop("has_logistics_bill", False) else None
+    invoice["delivery_proof_url"] = f"{download_url}?doc_type=delivery_proof" if invoice.pop("has_delivery_proof", False) else None
     
     return InvoiceResponse(**invoice)
 
@@ -5668,17 +5947,20 @@ async def integration_list_vendors(
 async def integration_list_products(
     vendor_id: Optional[str] = None,
     vendor_name: Optional[str] = None,
+    show_on_shop: Optional[bool] = None,
     api_key_valid: bool = Depends(verify_integration_api_key)
 ):
     """
     External Integration Endpoint: List Available Products
     
-    Returns a list of active products, optionally filtered by vendor.
-    Useful for external apps to get product SKUs and prices.
+    Returns a list of active products, optionally filtered by vendor or show_on_shop.
+    Useful for external apps to get product SKUs, prices, and shop details.
     
     Authentication: Requires X-API-Key header
     """
-    query = {"is_active": True}
+    query: Dict[str, Any] = {"is_active": True}
+    if show_on_shop is not None:
+        query["show_on_shop"] = show_on_shop
     
     if vendor_id:
         query["vendor_id"] = vendor_id
@@ -5709,7 +5991,64 @@ async def integration_list_products(
                 "unit_price": p["unit_price"],
                 "tax_rate": p["tax_rate"],
                 "unit": p.get("unit", "pcs"),
-                "description": p.get("description")
+                "description": p.get("description"),
+                "image_url": p.get("image_url"),
+                "show_on_shop": bool(p.get("show_on_shop", False)),
+                "mrp": p.get("mrp"),
+                "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
+                "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
+                "youtube_url": p.get("youtube_url"),
+                "kit_includes": p.get("kit_includes") if isinstance(p.get("kit_includes"), list) else [],
+                "dimensions": p.get("dimensions"),
+                "additional_info": p.get("additional_info"),
+            }
+            for p in products
+        ]
+    }
+
+
+@api_router.get("/external/products")
+async def external_list_products(
+    show_on_shop: Optional[bool] = None,
+    vendor_id: Optional[str] = None,
+    _: bool = Depends(verify_external_api_key)
+):
+    """
+    External API: List active products with shop details (images, MRP, kit includes, dimensions, videos).
+    Authentication: Requires X-API-Key header
+    """
+    query: Dict[str, Any] = {"is_active": True}
+    if show_on_shop is not None:
+        query["show_on_shop"] = show_on_shop
+    if vendor_id:
+        query["vendor_id"] = vendor_id
+
+    products = await db.products.find(query, {"_id": 0}).to_list(1000)
+    vendor_ids = list(set(p["vendor_id"] for p in products))
+    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(200)
+    vendor_map = {v["id"]: v["name"] for v in vendors}
+
+    return {
+        "products": [
+            {
+                "id": p["id"],
+                "name": p["name"],
+                "sku": p.get("sku"),
+                "vendor_id": p["vendor_id"],
+                "vendor_name": vendor_map.get(p["vendor_id"]),
+                "unit_price": p.get("unit_price"),
+                "tax_rate": p.get("tax_rate"),
+                "unit": p.get("unit", "pcs"),
+                "description": p.get("description"),
+                "image_url": p.get("image_url"),
+                "show_on_shop": bool(p.get("show_on_shop", False)),
+                "mrp": p.get("mrp"),
+                "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
+                "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
+                "youtube_url": p.get("youtube_url"),
+                "kit_includes": p.get("kit_includes") if isinstance(p.get("kit_includes"), list) else [],
+                "dimensions": p.get("dimensions"),
+                "additional_info": p.get("additional_info"),
             }
             for p in products
         ]
@@ -5854,12 +6193,17 @@ async def get_delivery_timeline(current_user: dict = Depends(get_current_user)):
         }
     }
 
-# File upload endpoint - for invoice PDFs, logistics invoices, etc.
+# File upload endpoint - for product images, invoice PDFs, logistics invoices, etc.
 @api_router.post("/upload")
-async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    """Upload a file and return its URL. Accepts PDF, images, and Excel files."""
+async def upload_file(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload a file and return its URL. Accepts PDF, images, and Excel files.
+    Stores the file both on local disk and in MongoDB (uploaded_files collection) so files survive Render restarts."""
     allowed_types = {
-        "application/pdf", "image/jpeg", "image/png", "image/webp",
+        "application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.ms-excel", "text/csv"
     }
@@ -5878,15 +6222,61 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
     with open(file_path, "wb") as f:
         f.write(content)
     
-    base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
-    file_url = f"{base_url}/api/files/{unique_name}"
+    # Persist in MongoDB so uploaded product images and documents are never lost on Render redeploys
+    await db.uploaded_files.update_one(
+        {"filename": unique_name},
+        {"$set": {
+            "filename": unique_name,
+            "original_filename": file.filename,
+            "content_type": file.content_type,
+            "size": len(content),
+            "data": Binary(content),
+            "uploaded_by": current_user.get("user_id"),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    backend_base = _get_backend_base_url(request)
+    file_url = f"{backend_base}/api/files/{unique_name}"
     
     return {"url": file_url, "filename": file.filename, "size": len(content)}
+
+
+@api_router.get("/files/{filename}")
+async def serve_uploaded_file(filename: str):
+    """Serve an uploaded file from local disk cache or MongoDB uploaded_files collection."""
+    safe_name = Path(filename).name
+    file_path = UPLOADS_DIR / safe_name
+    if file_path.exists():
+        media_type, _ = mimetypes.guess_type(str(file_path))
+        return FileResponse(
+            file_path,
+            media_type=media_type or "application/octet-stream",
+            headers={"Cache-Control": "public, max-age=31536000"}
+        )
+
+    stored = await db.uploaded_files.find_one({"filename": safe_name})
+    if stored and stored.get("data"):
+        raw_bytes = bytes(stored["data"])
+        try:
+            with open(file_path, "wb") as f:
+                f.write(raw_bytes)
+        except Exception:
+            pass
+        media_type = stored.get("content_type") or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
+        return Response(
+            content=raw_bytes,
+            media_type=media_type,
+            headers={"Cache-Control": "public, max-age=31536000"}
+        )
+
+    raise HTTPException(status_code=404, detail="File not found")
 
 # Include the router
 app.include_router(api_router)
 
-# Mount static files for uploaded documents
+# Mount static files as fallback
 app.mount("/api/files", StaticFiles(directory=str(UPLOADS_DIR)), name="uploaded_files")
 
 _raw_cors_origins = [
@@ -5926,6 +6316,10 @@ async def create_indexes():
         # Product indexes
         await db.products.create_index([("vendor_id", 1)])
         await db.products.create_index([("is_active", 1)])
+        await db.products.create_index([("show_on_shop", 1)])
+        
+        # Uploaded files index
+        await db.uploaded_files.create_index([("filename", 1)], unique=True)
         
         # Vendor indexes
         await db.vendors.create_index([("is_active", 1)])
@@ -5937,3 +6331,4 @@ async def create_indexes():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+

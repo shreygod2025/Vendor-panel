@@ -337,11 +337,28 @@ const ProductsList = () => {
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id} data-testid={`product-row-${product.id}`}>
                     <TableCell>
-                      <div>
-                        <p className="font-medium text-slate-900">{product.name}</p>
-                        {product.description && (
-                          <p className="text-xs text-slate-500 truncate max-w-[200px]">{product.description}</p>
+                      <div className="flex items-center gap-3">
+                        {product.image_url && (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-10 h-10 object-cover rounded border border-slate-200 flex-shrink-0"
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
+                          />
                         )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-slate-900">{product.name}</p>
+                            {product.show_on_shop && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                Shop{product.mrp ? ` • ₹${product.mrp}` : ""}
+                              </span>
+                            )}
+                          </div>
+                          {product.description && (
+                            <p className="text-xs text-slate-500 truncate max-w-[200px]">{product.description}</p>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
