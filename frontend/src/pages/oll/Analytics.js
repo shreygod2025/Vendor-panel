@@ -58,6 +58,8 @@ const Analytics = () => {
 
   const [analytics, setAnalytics] = useState({
     totalSpend: 0,
+    totalSubtotal: 0,
+    totalTax: 0,
     totalOrders: 0,
     deliveredOrders: 0,
     onTimeDeliveries: 0,
@@ -72,6 +74,8 @@ const Analytics = () => {
       shopListedProducts: 0,
       orderedProductsCount: 0,
       totalUnitsOrdered: 0,
+      totalBaseSpend: 0,
+      totalTaxSpend: 0,
       totalProductSpend: 0
     },
     issueTypes: [],
@@ -237,6 +241,13 @@ const Analytics = () => {
     const excludedStatuses = new Set(["draft", "request", "rejected", "cancelled"]);
     const nonDraftPOs = filteredPOs.filter(po => !excludedStatuses.has(po.status));
     const totalSpend = nonDraftPOs.reduce((sum, po) => sum + (Number(po.grand_total) || 0), 0);
+    const totalTax = nonDraftPOs.reduce((sum, po) => sum + (Number(po.total_tax) || 0), 0);
+    const totalSubtotal = nonDraftPOs.reduce((sum, po) => {
+      if (po.subtotal != null) {
+        return sum + Math.max(0, (Number(po.subtotal) || 0) - (Number(po.total_discount) || 0));
+      }
+      return sum + Math.max(0, (Number(po.grand_total) || 0) - (Number(po.total_tax) || 0));
+    }, 0);
     const totalOrders = nonDraftPOs.length;
 
     // Delivery metrics
@@ -324,6 +335,7 @@ const Analytics = () => {
         vendor_name: p.vendor_name || vendorMap[p.vendor_id] || "Unknown",
         unit: p.unit || "pcs",
         unit_price: Number(p.unit_price) || 0,
+        tax_rate: p.tax_rate != null ? Number(p.tax_rate) : null,
         mrp: p.mrp != null ? Number(p.mrp) : null,
         image_url: p.image_url || "",
         show_on_shop: Boolean(p.show_on_shop),
@@ -331,6 +343,7 @@ const Analytics = () => {
         count: 0,
         ordersCount: 0,
         baseSpend: 0,
+        taxSpend: 0,
         totalSpend: 0,
         poIds: new Set(),
         lastOrderedAt: null
@@ -359,23 +372,24 @@ const Analytics = () => {
             ? Number(item.unit_price) || 0
             : Number(matchedProduct?.unit_price) || 0;
 
+        // Tax rate fetched from MongoDB (Product record or PO line_item record)
+        const dbTaxRate =
+          matchedProduct?.tax_rate != null
+            ? Number(matchedProduct.tax_rate)
+            : item.tax_rate != null
+            ? Number(item.tax_rate)
+            : 0;
+
         const baseAmount = qty * unitPrice;
         const discountAmt =
           Number(item.discount_amount) ||
           (baseAmount * (Number(item.discount_percent) || 0)) / 100;
         const lineBaseSpend = Math.max(0, baseAmount - discountAmt);
-
-        let lineSpend = 0;
-        if (item.line_total != null && item.line_total !== "") {
-          lineSpend = Number(item.line_total) || 0;
-        } else {
-          const taxRate =
-            item.tax_rate != null
-              ? Number(item.tax_rate)
-              : Number(matchedProduct?.tax_rate ?? 18);
-          const taxAmt = (lineBaseSpend * taxRate) / 100;
-          lineSpend = lineBaseSpend + taxAmt;
-        }
+        const lineTaxSpend = (lineBaseSpend * dbTaxRate) / 100;
+        const lineSpend =
+          item.line_total != null && item.line_total !== ""
+            ? Number(item.line_total) || 0
+            : lineBaseSpend + lineTaxSpend;
 
         if (!productStatsMap[key]) {
           const vId = matchedProduct?.vendor_id || po.vendor_id || "";
@@ -388,6 +402,7 @@ const Analytics = () => {
             vendor_name: matchedProduct?.vendor_name || vendorMap[vId] || po.vendor_name || "Unknown",
             unit: matchedProduct?.unit || item.unit || "pcs",
             unit_price: unitPrice,
+            tax_rate: matchedProduct?.tax_rate != null ? Number(matchedProduct.tax_rate) : (item.tax_rate != null ? Number(item.tax_rate) : null),
             mrp: matchedProduct?.mrp != null ? Number(matchedProduct.mrp) : null,
             image_url: matchedProduct?.image_url || "",
             show_on_shop: Boolean(matchedProduct?.show_on_shop),
@@ -395,6 +410,7 @@ const Analytics = () => {
             count: 0,
             ordersCount: 0,
             baseSpend: 0,
+            taxSpend: 0,
             totalSpend: 0,
             poIds: new Set(),
             lastOrderedAt: null
@@ -402,8 +418,12 @@ const Analytics = () => {
         }
 
         const entry = productStatsMap[key];
+        if (entry.tax_rate == null && item.tax_rate != null) {
+          entry.tax_rate = Number(item.tax_rate);
+        }
         entry.count += qty;
         entry.baseSpend += lineBaseSpend;
+        entry.taxSpend += lineTaxSpend;
         entry.totalSpend += lineSpend;
         if (po.id && !entry.poIds.has(po.id)) {
           entry.poIds.add(po.id);
@@ -426,6 +446,8 @@ const Analytics = () => {
     const popularProducts = allProductAnalytics.filter(p => p.count > 0);
 
     const totalUnitsOrdered = popularProducts.reduce((sum, p) => sum + p.count, 0);
+    const totalBaseSpend = popularProducts.reduce((sum, p) => sum + p.baseSpend, 0);
+    const totalTaxSpend = popularProducts.reduce((sum, p) => sum + p.taxSpend, 0);
     const totalProductSpend = popularProducts.reduce((sum, p) => sum + p.totalSpend, 0);
 
     const productSummary = {
@@ -434,6 +456,8 @@ const Analytics = () => {
       shopListedProducts: filteredCatalogProducts.filter(p => Boolean(p.show_on_shop)).length,
       orderedProductsCount: popularProducts.length,
       totalUnitsOrdered,
+      totalBaseSpend,
+      totalTaxSpend,
       totalProductSpend
     };
 
@@ -492,6 +516,8 @@ const Analytics = () => {
 
     setAnalytics({
       totalSpend,
+      totalSubtotal,
+      totalTax,
       totalOrders,
       deliveredOrders,
       onTimeDeliveries,
@@ -602,12 +628,15 @@ const Analytics = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
                   <DollarSign className="w-6 h-6 text-blue-600" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-2xl font-bold text-slate-900">{formatCurrency(analytics.totalSpend)}</p>
-                  <p className="text-xs text-slate-500">Total Spend</p>
+                  <p className="text-xs text-slate-500">Total Spend (With GST)</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                    Without GST: {formatCurrency(analytics.totalSubtotal || 0)} · GST: {formatCurrency(analytics.totalTax || 0)}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -1206,7 +1235,7 @@ const Analytics = () => {
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-6">
             {/* Product Summary KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <Card className="border-l-4 border-l-indigo-500">
                 <CardContent className="p-4">
                   <p className="text-2xl font-bold text-slate-900">
@@ -1219,31 +1248,42 @@ const Analytics = () => {
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-l-4 border-l-emerald-500">
-                <CardContent className="p-4">
-                  <p className="text-2xl font-bold text-slate-900">
-                    {analytics.productSummary?.orderedProductsCount || 0}
-                  </p>
-                  <p className="text-xs text-slate-500">Products Ordered</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Distinct products in POs</p>
-                </CardContent>
-              </Card>
               <Card className="border-l-4 border-l-blue-500">
                 <CardContent className="p-4">
                   <p className="text-2xl font-bold text-slate-900">
                     {(analytics.productSummary?.totalUnitsOrdered || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-slate-500">Total Units Ordered</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Across {analytics.totalOrders} orders</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {analytics.productSummary?.orderedProductsCount || 0} products · {analytics.totalOrders} POs
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-slate-500">
+                <CardContent className="p-4">
+                  <p className="text-2xl font-bold text-slate-900">
+                    {formatCurrency(analytics.productSummary?.totalBaseSpend || 0)}
+                  </p>
+                  <p className="text-xs text-slate-500">Spend (Without GST)</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Units × Unit Price</p>
                 </CardContent>
               </Card>
               <Card className="border-l-4 border-l-amber-500">
                 <CardContent className="p-4">
-                  <p className="text-2xl font-bold text-slate-900">
+                  <p className="text-2xl font-bold text-amber-700">
+                    {formatCurrency(analytics.productSummary?.totalTaxSpend || 0)}
+                  </p>
+                  <p className="text-xs text-slate-500">Total GST Amount</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Calculated from DB tax rate</p>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-emerald-500">
+                <CardContent className="p-4">
+                  <p className="text-2xl font-bold text-emerald-700">
                     {formatCurrency(analytics.productSummary?.totalProductSpend || 0)}
                   </p>
-                  <p className="text-xs text-slate-500">Total Product Spend</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Line-item value incl. tax</p>
+                  <p className="text-xs text-slate-500">Total Spend (With GST)</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Without GST + GST</p>
                 </CardContent>
               </Card>
             </div>
@@ -1322,9 +1362,11 @@ const Analytics = () => {
                           <TableHead className="text-right">POs</TableHead>
                           <TableHead className="text-right">Units Ordered</TableHead>
                           <TableHead className="text-right">Unit Price</TableHead>
-                          <TableHead className="text-right">Base Amount</TableHead>
-                          <TableHead className="text-right">Total Spend (incl. GST)</TableHead>
-                          <TableHead className="w-[160px]">Popularity</TableHead>
+                          <TableHead className="text-right">Tax Rate</TableHead>
+                          <TableHead className="text-right">Spend (Without GST)</TableHead>
+                          <TableHead className="text-right">GST Amount</TableHead>
+                          <TableHead className="text-right">Total Spend (With GST)</TableHead>
+                          <TableHead className="w-[150px]">Popularity</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1388,8 +1430,20 @@ const Analytics = () => {
                               <TableCell className="text-right font-mono text-slate-600">
                                 {formatCurrency(product.unit_price || 0)}
                               </TableCell>
-                              <TableCell className="text-right font-mono text-slate-700">
+                              <TableCell className="text-right">
+                                {product.tax_rate != null ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                                    {product.tax_rate}%
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-medium text-slate-800">
                                 {formatCurrency(product.baseSpend || 0)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-amber-700">
+                                {formatCurrency(product.taxSpend || 0)}
                               </TableCell>
                               <TableCell className="text-right font-mono font-semibold text-emerald-700">
                                 {formatCurrency(product.totalSpend || 0)}
