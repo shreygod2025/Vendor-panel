@@ -45,6 +45,7 @@ const Analytics = () => {
   const [monthFilter, setMonthFilter] = useState("all");
   const [vendorFilter, setVendorFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
+  const [productViewMode, setProductViewMode] = useState("ordered"); // "ordered" | "all"
   
   const [data, setData] = useState({
     vendors: [],
@@ -64,6 +65,15 @@ const Analytics = () => {
     issueFreePOs: 0,
     posWithIssues: 0,
     popularProducts: [],
+    allProductAnalytics: [],
+    productSummary: {
+      totalCatalogProducts: 0,
+      activeCatalogProducts: 0,
+      shopListedProducts: 0,
+      orderedProductsCount: 0,
+      totalUnitsOrdered: 0,
+      totalProductSpend: 0
+    },
     issueTypes: [],
     vendorSpend: [],
     monthlySpend: [],
@@ -91,34 +101,95 @@ const Analytics = () => {
   }, []);
 
   useEffect(() => {
-    if (data.purchaseOrders.length > 0) {
+    if (!loading) {
       calculateAnalytics();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, monthFilter, vendorFilter, timeline]);
+  }, [data, monthFilter, vendorFilter, timeline, loading]);
 
   const fetchAllData = async () => {
     try {
-      const [vendorsRes, productsRes, posRes, issuesRes, timelineRes, inventoryRes, invStatsRes] = await Promise.all([
+      const [
+        vendorsRes,
+        productsRes,
+        posRes,
+        issuesRes,
+        timelineRes,
+        inventoryRes,
+        invStatsRes
+      ] = await Promise.allSettled([
         apiClient.get("/vendors"),
         apiClient.get("/products"),
-        apiClient.get("/purchase-orders"),
+        apiClient.get("/purchase-orders?limit=1000"),
         apiClient.get("/issues"),
         apiClient.get("/analytics/delivery-timeline"),
         apiClient.get("/inventory"),
         apiClient.get("/inventory/summary/stats")
       ]);
-      
+
+      const vendorsData =
+        vendorsRes.status === "fulfilled" && Array.isArray(vendorsRes.value?.data)
+          ? vendorsRes.value.data
+          : [];
+
+      const productsData =
+        productsRes.status === "fulfilled" && Array.isArray(productsRes.value?.data)
+          ? productsRes.value.data
+          : [];
+
+      let posData =
+        posRes.status === "fulfilled" && Array.isArray(posRes.value?.data)
+          ? posRes.value.data
+          : [];
+
+      // Fallback to list-with-invoices if /purchase-orders failed
+      if (posRes.status === "rejected") {
+        try {
+          const fallbackPos = await apiClient.get("/purchase-orders/list-with-invoices?page=1&limit=500");
+          if (Array.isArray(fallbackPos.data)) {
+            posData = fallbackPos.data;
+          }
+        } catch (fallbackErr) {
+          console.error("Fallback PO fetch failed:", fallbackErr);
+        }
+      }
+
+      const issuesData =
+        issuesRes.status === "fulfilled" && Array.isArray(issuesRes.value?.data)
+          ? issuesRes.value.data
+          : [];
+
       setData({
-        vendors: vendorsRes.data,
-        products: productsRes.data,
-        purchaseOrders: posRes.data,
-        issues: issuesRes.data,
+        vendors: vendorsData,
+        products: productsData,
+        purchaseOrders: posData,
+        issues: issuesData,
         invoices: [],
         payments: []
       });
-      setTimeline(timelineRes.data);
-      setInventory({ items: inventoryRes.data, stats: invStatsRes.data });
+
+      if (timelineRes.status === "fulfilled" && timelineRes.value?.data) {
+        setTimeline(timelineRes.value.data);
+      }
+
+      setInventory({
+        items:
+          inventoryRes.status === "fulfilled" && Array.isArray(inventoryRes.value?.data)
+            ? inventoryRes.value.data
+            : [],
+        stats:
+          invStatsRes.status === "fulfilled" && invStatsRes.value?.data
+            ? invStatsRes.value.data
+            : { total_items: 0, total_quantity: 0, total_value: 0, by_category: {} }
+      });
+
+      if (
+        vendorsRes.status === "rejected" &&
+        productsRes.status === "rejected" &&
+        posRes.status === "rejected"
+      ) {
+        toast.error("Failed to fetch analytics data");
+      }
     } catch (error) {
       toast.error("Failed to fetch analytics data");
     } finally {
@@ -127,17 +198,26 @@ const Analytics = () => {
   };
 
   const calculateAnalytics = () => {
-    let filteredPOs = [...data.purchaseOrders];
-    let filteredIssues = [...data.issues];
+    let filteredPOs = [...(data.purchaseOrders || [])];
+    let filteredIssues = [...(data.issues || [])];
+    const allVendors = data.vendors || [];
+    const allProducts = data.products || [];
+
+    const vendorMap = {};
+    allVendors.forEach(v => {
+      if (v && v.id) vendorMap[v.id] = v.name;
+    });
     
     // Apply month filter
     if (monthFilter !== "all") {
       const [year, month] = monthFilter.split("-").map(Number);
       filteredPOs = filteredPOs.filter(po => {
+        if (!po.created_at) return false;
         const poDate = new Date(po.created_at);
         return poDate.getFullYear() === year && poDate.getMonth() + 1 === month;
       });
       filteredIssues = filteredIssues.filter(issue => {
+        if (!issue.created_at) return false;
         const issueDate = new Date(issue.created_at);
         return issueDate.getFullYear() === year && issueDate.getMonth() + 1 === month;
       });
@@ -147,14 +227,16 @@ const Analytics = () => {
     if (vendorFilter !== "all") {
       filteredPOs = filteredPOs.filter(po => po.vendor_id === vendorFilter);
       filteredIssues = filteredIssues.filter(issue => {
+        if (issue.vendor_id) return issue.vendor_id === vendorFilter;
         const po = data.purchaseOrders.find(p => p.id === issue.po_id);
         return po && po.vendor_id === vendorFilter;
       });
     }
 
-    // Total spend (excluding drafts)
-    const nonDraftPOs = filteredPOs.filter(po => po.status !== "draft");
-    const totalSpend = nonDraftPOs.reduce((sum, po) => sum + (po.grand_total || 0), 0);
+    // Active / confirmed / non-draft POs (exclude draft, unapproved request, rejected, cancelled)
+    const excludedStatuses = new Set(["draft", "request", "rejected", "cancelled"]);
+    const nonDraftPOs = filteredPOs.filter(po => !excludedStatuses.has(po.status));
+    const totalSpend = nonDraftPOs.reduce((sum, po) => sum + (Number(po.grand_total) || 0), 0);
     const totalOrders = nonDraftPOs.length;
 
     // Delivery metrics
@@ -162,7 +244,6 @@ const Analytics = () => {
     const deliveredOrders = deliveredPOs.length;
 
     // On-time deliveries — use timeline delivery_delay_days if available, fallback to issue check
-    // Build a quick lookup: po_id -> delivery_delay_days from timeline
     const timelineDelayMap = {};
     (timeline.po_timelines || []).forEach(t => {
       if (t.po_id && t.delivery_delay_days != null) {
@@ -176,20 +257,17 @@ const Analytics = () => {
     deliveredPOs.forEach(po => {
       const delayDays = timelineDelayMap[po.id];
       if (delayDays != null) {
-        // Use actual date comparison: positive = late, 0 or negative = on time
         if (delayDays > 0) {
           lateDeliveries++;
         } else {
           onTimeDeliveries++;
         }
       } else if (po.delivery_date) {
-        // Fallback: compare expected delivery date with today
         const expected = new Date(po.delivery_date);
         const delivered = po.delivered_at ? new Date(po.delivered_at) : null;
         if (delivered) {
           if (delivered > expected) lateDeliveries++; else onTimeDeliveries++;
         } else {
-          // Check if there's a delay issue as last resort
           const hasDelayIssue = filteredIssues.some(issue =>
             issue.po_id === po.id &&
             (issue.issue_type === "delay" || issue.issue_type === "delivery_delay")
@@ -197,7 +275,6 @@ const Analytics = () => {
           if (hasDelayIssue) lateDeliveries++; else onTimeDeliveries++;
         }
       } else {
-        // No date info — count as on-time only if no delay issue
         const hasDelayIssue = filteredIssues.some(issue =>
           issue.po_id === po.id &&
           (issue.issue_type === "delay" || issue.issue_type === "delivery_delay")
@@ -215,19 +292,141 @@ const Analytics = () => {
       posWithIssueIds.has(po.id) || po.has_delivery_issues
     ).length;
 
-    // Popular products
-    const productCount = {};
-    filteredPOs.forEach(po => {
-      if (po.status === "draft") return; // Exclude draft POs
-      (po.line_items || []).forEach(item => {
-        const productName = item.product_name || "Unknown";
-        productCount[productName] = (productCount[productName] || 0) + (item.quantity || 1);
+    // ==========================
+    // PRODUCT ANALYTICS SECTION
+    // ==========================
+    const filteredCatalogProducts = vendorFilter !== "all"
+      ? allProducts.filter(p => p.vendor_id === vendorFilter)
+      : allProducts;
+
+    const productById = {};
+    const productBySku = {};
+    const productByName = {};
+
+    allProducts.forEach(p => {
+      if (!p) return;
+      if (p.id) productById[p.id] = p;
+      if (p.sku) productBySku[String(p.sku).trim().toLowerCase()] = p;
+      if (p.name) productByName[String(p.name).trim().toLowerCase()] = p;
+    });
+
+    const productStatsMap = {};
+
+    // Seed map with catalog products so we can also view catalog-wide analytics
+    filteredCatalogProducts.forEach(p => {
+      const key = p.id || `name:${String(p.name || "").trim().toLowerCase()}`;
+      productStatsMap[key] = {
+        key,
+        id: p.id || null,
+        name: p.name || "Unknown Product",
+        sku: p.sku || "—",
+        vendor_id: p.vendor_id || "",
+        vendor_name: p.vendor_name || vendorMap[p.vendor_id] || "Unknown",
+        unit: p.unit || "pcs",
+        unit_price: Number(p.unit_price) || 0,
+        mrp: p.mrp != null ? Number(p.mrp) : null,
+        image_url: p.image_url || "",
+        show_on_shop: Boolean(p.show_on_shop),
+        is_active: p.is_active !== false,
+        count: 0,
+        ordersCount: 0,
+        totalSpend: 0,
+        poIds: new Set(),
+        lastOrderedAt: null
+      };
+    });
+
+    nonDraftPOs.forEach(po => {
+      const lineItems = Array.isArray(po.line_items) ? po.line_items : [];
+      lineItems.forEach(item => {
+        if (!item) return;
+        const rawName = String(item.product_name || item.name || "").trim();
+        const rawSku = String(item.sku || "").trim().toLowerCase();
+        const matchedProduct =
+          (item.product_id && productById[item.product_id]) ||
+          (rawSku && productBySku[rawSku]) ||
+          (rawName && productByName[rawName.toLowerCase()]) ||
+          null;
+
+        const key = matchedProduct?.id
+          ? matchedProduct.id
+          : `name:${(rawName || "unknown").toLowerCase()}`;
+
+        const qty = Number(item.quantity) || 0;
+        const unitPrice =
+          item.unit_price != null && item.unit_price !== ""
+            ? Number(item.unit_price) || 0
+            : Number(matchedProduct?.unit_price) || 0;
+
+        let lineSpend = 0;
+        if (item.line_total != null && item.line_total !== "") {
+          lineSpend = Number(item.line_total) || 0;
+        } else {
+          const baseAmount = qty * unitPrice;
+          const discountAmt = Number(item.discount_amount) || (baseAmount * (Number(item.discount_percent) || 0)) / 100;
+          const taxable = Math.max(0, baseAmount - discountAmt);
+          const taxRate = item.tax_rate != null ? Number(item.tax_rate) : (Number(matchedProduct?.tax_rate) || 0);
+          const taxAmt = (taxable * taxRate) / 100;
+          lineSpend = taxable + taxAmt;
+        }
+
+        if (!productStatsMap[key]) {
+          const vId = matchedProduct?.vendor_id || po.vendor_id || "";
+          productStatsMap[key] = {
+            key,
+            id: matchedProduct?.id || item.product_id || null,
+            name: matchedProduct?.name || rawName || "Unknown Product",
+            sku: matchedProduct?.sku || item.sku || "—",
+            vendor_id: vId,
+            vendor_name: matchedProduct?.vendor_name || vendorMap[vId] || po.vendor_name || "Unknown",
+            unit: matchedProduct?.unit || item.unit || "pcs",
+            unit_price: unitPrice,
+            mrp: matchedProduct?.mrp != null ? Number(matchedProduct.mrp) : null,
+            image_url: matchedProduct?.image_url || "",
+            show_on_shop: Boolean(matchedProduct?.show_on_shop),
+            is_active: matchedProduct ? matchedProduct.is_active !== false : true,
+            count: 0,
+            ordersCount: 0,
+            totalSpend: 0,
+            poIds: new Set(),
+            lastOrderedAt: null
+          };
+        }
+
+        const entry = productStatsMap[key];
+        entry.count += qty;
+        entry.totalSpend += lineSpend;
+        if (po.id && !entry.poIds.has(po.id)) {
+          entry.poIds.add(po.id);
+          entry.ordersCount = entry.poIds.size;
+        }
+        if (po.created_at && (!entry.lastOrderedAt || po.created_at > entry.lastOrderedAt)) {
+          entry.lastOrderedAt = po.created_at;
+        }
       });
     });
-    const popularProducts = Object.entries(productCount)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+
+    const allProductAnalytics = Object.values(productStatsMap)
+      .map(({ poIds, ...rest }) => rest)
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        if (b.totalSpend !== a.totalSpend) return b.totalSpend - a.totalSpend;
+        return a.name.localeCompare(b.name);
+      });
+
+    const popularProducts = allProductAnalytics.filter(p => p.count > 0);
+
+    const totalUnitsOrdered = popularProducts.reduce((sum, p) => sum + p.count, 0);
+    const totalProductSpend = popularProducts.reduce((sum, p) => sum + p.totalSpend, 0);
+
+    const productSummary = {
+      totalCatalogProducts: filteredCatalogProducts.length,
+      activeCatalogProducts: filteredCatalogProducts.filter(p => p.is_active !== false).length,
+      shopListedProducts: filteredCatalogProducts.filter(p => Boolean(p.show_on_shop)).length,
+      orderedProductsCount: popularProducts.length,
+      totalUnitsOrdered,
+      totalProductSpend
+    };
 
     // Issue types
     const issueTypeCount = {};
@@ -246,17 +445,16 @@ const Analytics = () => {
     
     nonDraftPOs.forEach(po => {
       const vendorId = po.vendor_id;
-      const vendor = data.vendors.find(v => v.id === vendorId);
-      const vendorName = vendor?.name || "Unknown";
-      vendorSpendMap[vendorName] = (vendorSpendMap[vendorName] || 0) + (po.grand_total || 0);
+      const vendorName = vendorMap[vendorId] || po.vendor_name || "Unknown";
+      vendorSpendMap[vendorName] = (vendorSpendMap[vendorName] || 0) + (Number(po.grand_total) || 0);
       vendorOrderCount[vendorName] = (vendorOrderCount[vendorName] || 0) + 1;
     });
     
     filteredIssues.forEach(issue => {
       const po = data.purchaseOrders.find(p => p.id === issue.po_id);
-      if (po) {
-        const vendor = data.vendors.find(v => v.id === po.vendor_id);
-        const vendorName = vendor?.name || "Unknown";
+      const vendorId = issue.vendor_id || po?.vendor_id;
+      if (vendorId || po) {
+        const vendorName = vendorMap[vendorId] || issue.vendor_name || po?.vendor_name || "Unknown";
         vendorIssueCount[vendorName] = (vendorIssueCount[vendorName] || 0) + 1;
       }
     });
@@ -273,9 +471,11 @@ const Analytics = () => {
     // Monthly spend
     const monthlySpendMap = {};
     nonDraftPOs.forEach(po => {
+      if (!po.created_at) return;
       const date = new Date(po.created_at);
+      if (isNaN(date.getTime())) return;
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      monthlySpendMap[monthKey] = (monthlySpendMap[monthKey] || 0) + (po.grand_total || 0);
+      monthlySpendMap[monthKey] = (monthlySpendMap[monthKey] || 0) + (Number(po.grand_total) || 0);
     });
     const monthlySpend = Object.entries(monthlySpendMap)
       .map(([month, amount]) => ({ month, amount }))
@@ -290,6 +490,8 @@ const Analytics = () => {
       issueFreePOs,
       posWithIssues,
       popularProducts,
+      allProductAnalytics,
+      productSummary,
       issueTypes,
       vendorSpend,
       monthlySpend
@@ -993,49 +1195,212 @@ const Analytics = () => {
           </TabsContent>
 
           {/* Products Tab */}
-          <TabsContent value="products">            <Card>
-              <CardHeader>
+          <TabsContent value="products" className="space-y-6">
+            {/* Product Summary KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="border-l-4 border-l-indigo-500">
+                <CardContent className="p-4">
+                  <p className="text-2xl font-bold text-slate-900">
+                    {analytics.productSummary?.totalCatalogProducts || 0}
+                  </p>
+                  <p className="text-xs text-slate-500">Catalog Products</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {analytics.productSummary?.activeCatalogProducts || 0} active ·{" "}
+                    {analytics.productSummary?.shopListedProducts || 0} on shop
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-emerald-500">
+                <CardContent className="p-4">
+                  <p className="text-2xl font-bold text-slate-900">
+                    {analytics.productSummary?.orderedProductsCount || 0}
+                  </p>
+                  <p className="text-xs text-slate-500">Products Ordered</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Distinct products in POs</p>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-blue-500">
+                <CardContent className="p-4">
+                  <p className="text-2xl font-bold text-slate-900">
+                    {(analytics.productSummary?.totalUnitsOrdered || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-slate-500">Total Units Ordered</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Across {analytics.totalOrders} orders</p>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-amber-500">
+                <CardContent className="p-4">
+                  <p className="text-2xl font-bold text-slate-900">
+                    {formatCurrency(analytics.productSummary?.totalProductSpend || 0)}
+                  </p>
+                  <p className="text-xs text-slate-500">Total Product Spend</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Line-item value incl. tax</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle className="flex items-center gap-2">
                   <Package className="w-5 h-5" />
-                  Most Popular Products
+                  {productViewMode === "ordered"
+                    ? "Most Popular & Ordered Products"
+                    : "All Catalog Products Performance"}
                 </CardTitle>
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setProductViewMode("ordered")}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      productViewMode === "ordered"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Ordered ({analytics.popularProducts.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductViewMode("all")}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      productViewMode === "all"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    All Products ({analytics.allProductAnalytics.length})
+                  </button>
+                </div>
               </CardHeader>
               <CardContent>
-                {analytics.popularProducts.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>#</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Units Ordered</TableHead>
-                        <TableHead className="w-[200px]">Popularity</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {analytics.popularProducts.map((product, idx) => {
-                        const maxCount = analytics.popularProducts[0]?.count || 1;
-                        const percentage = (product.count / maxCount) * 100;
-                        return (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{idx + 1}</TableCell>
-                            <TableCell>{product.name}</TableCell>
-                            <TableCell className="text-right font-mono">{product.count}</TableCell>
-                            <TableCell>
-                              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-emerald-500 rounded-full" 
-                                  style={{ width: `${percentage}%` }}
-                                />
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-center text-slate-500 py-8">No product data available</p>
-                )}
+                {(() => {
+                  const displayedProducts =
+                    productViewMode === "ordered"
+                      ? analytics.popularProducts
+                      : analytics.allProductAnalytics;
+
+                  if (displayedProducts.length === 0) {
+                    return (
+                      <div className="text-center py-8 space-y-2">
+                        <p className="text-slate-500">
+                          {productViewMode === "ordered"
+                            ? "No ordered products found for the selected filter."
+                            : "No products available in catalog."}
+                        </p>
+                        {productViewMode === "ordered" && analytics.allProductAnalytics.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setProductViewMode("all")}
+                            className="text-xs text-blue-600 hover:underline font-medium"
+                          >
+                            View all {analytics.allProductAnalytics.length} catalog products →
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  const maxCount = Math.max(...displayedProducts.map(p => p.count || 0), 1);
+                  const totalUnits = analytics.productSummary?.totalUnitsOrdered || 0;
+
+                  return (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50">
+                          <TableHead className="w-12">#</TableHead>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Vendor</TableHead>
+                          <TableHead className="text-right">POs</TableHead>
+                          <TableHead className="text-right">Units Ordered</TableHead>
+                          <TableHead className="text-right">Unit Price</TableHead>
+                          <TableHead className="text-right">Total Spend</TableHead>
+                          <TableHead className="w-[180px]">Popularity</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {displayedProducts.map((product, idx) => {
+                          const barPct = product.count > 0 ? (product.count / maxCount) * 100 : 0;
+                          const unitSharePct =
+                            totalUnits > 0 && product.count > 0
+                              ? ((product.count / totalUnits) * 100).toFixed(1)
+                              : "0.0";
+                          return (
+                            <TableRow key={product.key || idx}>
+                              <TableCell className="font-medium text-slate-500">{idx + 1}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  {product.image_url ? (
+                                    <img
+                                      src={product.image_url}
+                                      alt={product.name}
+                                      className="w-9 h-9 rounded object-cover border border-slate-200 shrink-0"
+                                      onError={(e) => {
+                                        e.target.style.display = "none";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-9 h-9 rounded bg-slate-100 flex items-center justify-center shrink-0">
+                                      <Package className="w-4 h-4 text-slate-400" />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-slate-900">{product.name}</span>
+                                      {product.show_on_shop && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                          Shop
+                                        </span>
+                                      )}
+                                      {!product.is_active && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                                          Inactive
+                                        </span>
+                                      )}
+                                    </div>
+                                    {product.sku && product.sku !== "—" && (
+                                      <p className="text-xs text-slate-400 font-mono">SKU: {product.sku}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm text-slate-600">
+                                {product.vendor_name || "—"}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-slate-700">
+                                {product.ordersCount || 0}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-semibold text-slate-900">
+                                {(product.count || 0).toLocaleString()}{" "}
+                                <span className="text-xs font-normal text-slate-400">
+                                  {product.unit || "pcs"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-slate-600">
+                                {formatCurrency(product.unit_price || 0)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-semibold text-emerald-700">
+                                {formatCurrency(product.totalSpend || 0)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-emerald-500 rounded-full transition-all"
+                                      style={{ width: `${barPct}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs font-mono text-slate-500 w-11 text-right">
+                                    {unitSharePct}%
+                                  </span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>

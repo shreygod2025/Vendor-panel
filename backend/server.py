@@ -313,25 +313,28 @@ class POResponse(BaseModel):
     vendor_name: Optional[str] = None
     school_name: Optional[str] = None
     city: Optional[str] = None  # City for delivery
-    delivery_address: str
+    delivery_address: Optional[str] = ""
     receiver_name: Optional[str] = None
-    contact_person: str
-    contact_number: str
-    delivery_date: str
-    line_items: List[Dict]
-    subtotal: float
-    total_discount: float
-    total_tax: float
-    grand_total: float
-    order_discount_amount: float
-    order_discount_percent: float
+    contact_person: Optional[str] = ""
+    contact_number: Optional[str] = ""
+    delivery_date: Optional[str] = ""
+    line_items: List[Dict] = []
+    subtotal: float = 0.0
+    total_discount: float = 0.0
+    total_tax: float = 0.0
+    grand_total: float = 0.0
+    order_discount_amount: float = 0.0
+    order_discount_percent: float = 0.0
     status: str
-    notes: Optional[str]
-    final_comments: Optional[str]
-    tracking_token: str
-    created_at: str
-    updated_at: str
-    created_by: str
+    notes: Optional[str] = None
+    final_comments: Optional[str] = None
+    tracking_token: Optional[str] = None
+    created_at: str = ""
+    updated_at: str = ""
+    created_by: str = "system"
+    # Delivery & analytics fields
+    delivered_at: Optional[str] = None
+    has_delivery_issues: Optional[bool] = False
     # Distributor tracking fields
     created_by_role: Optional[str] = None
     created_by_name: Optional[str] = None
@@ -1275,7 +1278,7 @@ async def get_purchase_orders(
     status: Optional[str] = None, 
     vendor_id: Optional[str] = None,
     page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(500, ge=1, le=2000),
     current_user: dict = Depends(get_current_user)
 ):
     query = {}
@@ -1299,20 +1302,32 @@ async def get_purchase_orders(
     
     # Batch fetch vendors
     vendor_ids = list(set(p.get("vendor_id") for p in pos if p.get("vendor_id")))
-    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(100)
+    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
     vendor_map = {v["id"]: v["name"] for v in vendors}
     
     result = []
     for p in pos:
-        p["vendor_name"] = vendor_map.get(p.get("vendor_id"))
+        p["vendor_name"] = vendor_map.get(p.get("vendor_id")) or p.get("vendor_name")
         # Set defaults for missing fields
-        p.setdefault("final_comments", None)
+        p.setdefault("delivery_address", "")
+        p.setdefault("contact_person", "")
+        p.setdefault("contact_number", "")
         p.setdefault("delivery_date", "")
+        p.setdefault("subtotal", 0.0)
+        p.setdefault("total_discount", 0.0)
+        p.setdefault("total_tax", 0.0)
+        p.setdefault("grand_total", 0.0)
+        p.setdefault("notes", None)
+        p.setdefault("final_comments", None)
         p.setdefault("receiver_name", None)
         p.setdefault("school_name", None)
         p.setdefault("created_by_role", "oll")
         p.setdefault("created_by_name", None)
         p.setdefault("created_by", "system")
+        p.setdefault("created_at", "")
+        p.setdefault("updated_at", p.get("created_at", ""))
+        p.setdefault("delivered_at", p.get("delivery_approved_at"))
+        p.setdefault("has_delivery_issues", False)
         p.setdefault("distributor_id", None)
         p.setdefault("rejection_reason", None)
         p.setdefault("city", None)
@@ -1320,8 +1335,8 @@ async def get_purchase_orders(
         p.setdefault("is_external_request", False)
         p.setdefault("source_system", None)
         p.setdefault("line_items", [])
-        p.setdefault("order_discount_amount", 0)
-        p.setdefault("order_discount_percent", 0)
+        p.setdefault("order_discount_amount", 0.0)
+        p.setdefault("order_discount_percent", 0.0)
         p.setdefault("tracking_token", None)
         p.setdefault("custom_po_number", None)
         result.append(POResponse(**p))
@@ -2444,28 +2459,29 @@ async def get_issues(status: Optional[str] = None, priority: Optional[str] = Non
     issues = await db.issues.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
     # Get vendor and PO info
-    vendor_ids = list(set(i["vendor_id"] for i in issues))
-    po_ids = list(set(i["po_id"] for i in issues))
+    vendor_ids = list(set(i.get("vendor_id") for i in issues if i.get("vendor_id")))
+    po_ids = list(set(i.get("po_id") for i in issues if i.get("po_id")))
     
-    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
-    pos = await db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0}).to_list(1000)
+    vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    pos = await db.purchase_orders.find({"id": {"$in": po_ids}}, {"_id": 0, "id": 1, "po_number": 1}).to_list(1000)
     
     vendor_map = {v["id"]: v["name"] for v in vendors}
     po_map = {p["id"]: p["po_number"] for p in pos}
     
     result = []
     for i in issues:
+        i["vendor_id"] = i.get("vendor_id") or ""
+        i["po_id"] = i.get("po_id") or ""
         i["vendor_name"] = vendor_map.get(i["vendor_id"])
         i["po_number"] = po_map.get(i["po_id"])
         # Ensure new fields have defaults
-        if "attachment_url" not in i:
-            i["attachment_url"] = None
-        if "replies" not in i:
-            i["replies"] = []
-        if "created_by_name" not in i:
-            i["created_by_name"] = None
-        if "created_by_role" not in i:
-            i["created_by_role"] = "oll"
+        i.setdefault("attachment_url", None)
+        i.setdefault("replies", [])
+        i.setdefault("created_by_name", None)
+        i.setdefault("created_by_role", "oll")
+        i.setdefault("affected_items", [])
+        i.setdefault("resolution", None)
+        i.setdefault("resolved_by", None)
         result.append(IssueResponse(**i))
     
     return result
