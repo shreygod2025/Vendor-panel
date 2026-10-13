@@ -46,6 +46,7 @@ const Analytics = () => {
   const [vendorFilter, setVendorFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
   const [productViewMode, setProductViewMode] = useState("ordered"); // "ordered" | "all"
+  const [issueViewMode, setIssueViewMode] = useState("resolved"); // "resolved" | "open" | "all"
   
   const [data, setData] = useState({
     vendors: [],
@@ -471,18 +472,40 @@ const Analytics = () => {
       .map(([type, count]) => ({ type, count }))
       .sort((a, b) => b.count - a.count);
 
+    // Enrich issues with vendor_name and po_number for display
+    const poById = {};
+    (data.purchaseOrders || []).forEach(p => {
+      if (p && p.id) poById[p.id] = p;
+    });
+
+    const enrichedIssues = filteredIssues.map(issue => {
+      const po = poById[issue.po_id];
+      const vId = issue.vendor_id || po?.vendor_id;
+      const vendorName = vendorMap[vId] || issue.vendor_name || po?.vendor_name || "Unknown";
+      const poNumber = issue.po_number || po?.po_number || "—";
+      const isResolved = issue.status === "resolved" || issue.status === "closed";
+      return {
+        ...issue,
+        vendor_name: vendorName,
+        po_number: poNumber,
+        isResolved
+      };
+    });
+
     const issueSummary = {
-      openIssues: filteredIssues.filter(i => i.status === "open" || i.status === "in_progress").length,
-      resolvedIssues: filteredIssues.filter(i => i.status === "resolved" || i.status === "closed").length,
-      totalIssues: filteredIssues.length
+      openIssues: enrichedIssues.filter(i => !i.isResolved).length,
+      resolvedIssues: enrichedIssues.filter(i => i.isResolved).length,
+      totalIssues: enrichedIssues.length
     };
 
-    // Vendor spend (with & without GST)
+    // Vendor spend (with & without GST) + Open vs Resolved issues per vendor
     const vendorSpendMap = {};
     const vendorBaseSpendMap = {};
     const vendorTaxSpendMap = {};
     const vendorOrderCount = {};
     const vendorIssueCount = {};
+    const vendorOpenIssueCount = {};
+    const vendorResolvedIssueCount = {};
     
     nonDraftPOs.forEach(po => {
       const vendorId = po.vendor_id;
@@ -500,12 +523,16 @@ const Analytics = () => {
       vendorOrderCount[vendorName] = (vendorOrderCount[vendorName] || 0) + 1;
     });
     
-    filteredIssues.forEach(issue => {
-      const po = data.purchaseOrders.find(p => p.id === issue.po_id);
-      const vendorId = issue.vendor_id || po?.vendor_id;
-      if (vendorId || po) {
-        const vendorName = vendorMap[vendorId] || issue.vendor_name || po?.vendor_name || "Unknown";
-        vendorIssueCount[vendorName] = (vendorIssueCount[vendorName] || 0) + 1;
+    enrichedIssues.forEach(issue => {
+      const vendorName = issue.vendor_name || "Unknown";
+      vendorIssueCount[vendorName] = (vendorIssueCount[vendorName] || 0) + 1;
+      if (issue.isResolved) {
+        vendorResolvedIssueCount[vendorName] = (vendorResolvedIssueCount[vendorName] || 0) + 1;
+      } else {
+        vendorOpenIssueCount[vendorName] = (vendorOpenIssueCount[vendorName] || 0) + 1;
+      }
+      if (!(vendorName in vendorSpendMap)) {
+        vendorSpendMap[vendorName] = 0;
       }
     });
     
@@ -516,7 +543,9 @@ const Analytics = () => {
         baseAmount: vendorBaseSpendMap[name] || 0,
         taxAmount: vendorTaxSpendMap[name] || 0,
         orders: vendorOrderCount[name] || 0,
-        issues: vendorIssueCount[name] || 0
+        issues: vendorIssueCount[name] || 0,
+        openIssues: vendorOpenIssueCount[name] || 0,
+        resolvedIssues: vendorResolvedIssueCount[name] || 0
       }))
       .sort((a, b) => b.amount - a.amount);
 
@@ -560,6 +589,7 @@ const Analytics = () => {
       productSummary,
       issueTypes,
       issueSummary,
+      enrichedIssues,
       vendorSpend,
       monthlySpend
     });
@@ -1508,7 +1538,7 @@ const Analytics = () => {
           </TabsContent>
 
           {/* Issues Tab */}
-          <TabsContent value="issues">
+          <TabsContent value="issues" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -1547,35 +1577,189 @@ const Analytics = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5" />
-                    Issue Summary
+                    Issue Summary & Vendor Breakdown
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-red-50 rounded-lg text-center">
-                        <p className="text-3xl font-bold text-red-700">{analytics.issueSummary?.openIssues ?? 0}</p>
-                        <p className="text-sm text-red-600">Open Issues</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="p-3 bg-amber-50 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-amber-700">{analytics.issueSummary?.totalIssues ?? 0}</p>
+                        <p className="text-xs text-amber-600">Total Issues</p>
                       </div>
-                      <div className="p-4 bg-emerald-50 rounded-lg text-center">
-                        <p className="text-3xl font-bold text-emerald-700">{analytics.issueSummary?.resolvedIssues ?? 0}</p>
-                        <p className="text-sm text-emerald-600">Resolved</p>
+                      <div className="p-3 bg-red-50 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-red-700">{analytics.issueSummary?.openIssues ?? 0}</p>
+                        <p className="text-xs text-red-600">Open Issues</p>
+                      </div>
+                      <div className="p-3 bg-emerald-50 rounded-lg text-center">
+                        <p className="text-2xl font-bold text-emerald-700">{analytics.issueSummary?.resolvedIssues ?? 0}</p>
+                        <p className="text-xs text-emerald-600">Resolved</p>
                       </div>
                     </div>
-                    <div className="p-4 bg-slate-50 rounded-lg">
-                      <p className="text-sm text-slate-600 mb-2">Most Common Issue</p>
-                      <p className="text-lg font-medium capitalize">
+
+                    {/* Vendor-wise Issue Breakdown */}
+                    {analytics.vendorSpend.filter(v => v.issues > 0).length > 0 && (
+                      <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Issues by Vendor (Open vs Resolved)
+                        </p>
+                        {analytics.vendorSpend
+                          .filter(v => v.issues > 0)
+                          .map((v, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-sm py-1 border-b border-slate-200/60 last:border-0">
+                              <span className="font-medium text-slate-800">{v.name}</span>
+                              <div className="flex items-center gap-2 font-mono text-xs">
+                                <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700">
+                                  Total: {v.issues}
+                                </span>
+                                <span className="px-2 py-0.5 rounded bg-red-100 text-red-700">
+                                  Open: {v.openIssues}
+                                </span>
+                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold">
+                                  Resolved: {v.resolvedIssues}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-slate-50 rounded-lg flex items-center justify-between">
+                      <span className="text-sm text-slate-600">Most Common Issue</span>
+                      <span className="text-sm font-semibold capitalize text-slate-900">
                         {analytics.issueTypes[0]?.type.replace(/_/g, ' ') || "None"}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-amber-50 rounded-lg">
-                      <p className="text-sm text-amber-600 mb-2">Total Issues</p>
-                      <p className="text-lg font-medium">{analytics.issueSummary?.totalIssues ?? 0} issues reported</p>
+                      </span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Detailed Issues Table (Resolved / Open / All) */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CheckCircle className="w-5 h-5 text-emerald-600" />
+                  {issueViewMode === "resolved"
+                    ? "Resolved Issues Details"
+                    : issueViewMode === "open"
+                    ? "Open Issues Details"
+                    : "All Issues Details"}
+                </CardTitle>
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setIssueViewMode("resolved")}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      issueViewMode === "resolved"
+                        ? "bg-white text-emerald-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Resolved ({analytics.issueSummary?.resolvedIssues ?? 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIssueViewMode("open")}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      issueViewMode === "open"
+                        ? "bg-white text-red-700 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Open ({analytics.issueSummary?.openIssues ?? 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIssueViewMode("all")}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      issueViewMode === "all"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    All ({analytics.issueSummary?.totalIssues ?? 0})
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const allIssues = analytics.enrichedIssues || [];
+                  const displayedIssues =
+                    issueViewMode === "resolved"
+                      ? allIssues.filter(i => i.isResolved)
+                      : issueViewMode === "open"
+                      ? allIssues.filter(i => !i.isResolved)
+                      : allIssues;
+
+                  if (displayedIssues.length === 0) {
+                    return (
+                      <p className="text-center text-slate-500 py-6 text-sm">
+                        No {issueViewMode !== "all" ? issueViewMode : ""} issues found.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50">
+                          <TableHead>Issue #</TableHead>
+                          <TableHead>PO Number</TableHead>
+                          <TableHead>Vendor</TableHead>
+                          <TableHead>Issue Type</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Description / Resolution</TableHead>
+                          <TableHead className="text-right">Date</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {displayedIssues.map((issue, idx) => (
+                          <TableRow key={issue.id || idx}>
+                            <TableCell className="font-mono font-medium text-slate-900">
+                              {issue.issue_number || "—"}
+                            </TableCell>
+                            <TableCell className="font-mono text-slate-700">
+                              {issue.po_number || "—"}
+                            </TableCell>
+                            <TableCell className="font-medium text-slate-800">
+                              {issue.vendor_name || "—"}
+                            </TableCell>
+                            <TableCell className="capitalize text-slate-600">
+                              {(issue.issue_type || "other").replace(/_/g, " ")}
+                            </TableCell>
+                            <TableCell>
+                              {issue.isResolved ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                                  Resolved
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                  Open
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="max-w-[300px]">
+                              <p className="text-xs text-slate-700 truncate" title={issue.description}>
+                                {issue.description || "—"}
+                              </p>
+                              {issue.resolution && (
+                                <p className="text-xs text-emerald-700 font-medium truncate mt-0.5" title={issue.resolution}>
+                                  Resolution: {issue.resolution}
+                                </p>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-slate-500">
+                              {issue.created_at ? new Date(issue.created_at).toLocaleDateString("en-IN") : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  );
+                })()}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Vendors Tab */}
@@ -1595,12 +1779,14 @@ const Analytics = () => {
                         <TableHead>#</TableHead>
                         <TableHead>Vendor</TableHead>
                         <TableHead className="text-right">Orders</TableHead>
-                        <TableHead className="text-right">Issues</TableHead>
+                        <TableHead className="text-right">Total Issues</TableHead>
+                        <TableHead className="text-right">Open Issues</TableHead>
+                        <TableHead className="text-right">Resolved Issues</TableHead>
                         <TableHead className="text-right">Spend (Without GST)</TableHead>
                         <TableHead className="text-right">GST Amount</TableHead>
                         <TableHead className="text-right">Total Spend (With GST)</TableHead>
                         <TableHead className="text-right">% of Total</TableHead>
-                        <TableHead className="w-[150px]">Share</TableHead>
+                        <TableHead className="w-[140px]">Share</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1611,13 +1797,31 @@ const Analytics = () => {
                         return (
                           <TableRow key={idx}>
                             <TableCell className="font-medium">{idx + 1}</TableCell>
-                            <TableCell>{vendor.name}</TableCell>
-                            <TableCell className="text-right">{vendor.orders}</TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="font-medium text-slate-900">{vendor.name}</TableCell>
+                            <TableCell className="text-right font-mono">{vendor.orders}</TableCell>
+                            <TableCell className="text-right font-mono">
                               {vendor.issues > 0 ? (
-                                <span className="text-red-600 font-medium">{vendor.issues}</span>
+                                <span className="font-semibold text-slate-800">{vendor.issues}</span>
                               ) : (
-                                <span className="text-emerald-600">0</span>
+                                <span className="text-slate-400">0</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {vendor.openIssues > 0 ? (
+                                <span className="px-2 py-0.5 rounded bg-red-50 text-red-600 font-medium text-xs">
+                                  {vendor.openIssues}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-600 text-xs">0</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {vendor.resolvedIssues > 0 ? (
+                                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold text-xs">
+                                  {vendor.resolvedIssues}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-xs">0</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right font-mono text-slate-700">{formatCurrency(vendor.baseAmount || 0)}</TableCell>
