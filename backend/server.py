@@ -6110,7 +6110,7 @@ async def get_delivery_timeline(current_user: dict = Depends(get_current_user)):
     for log in audit_logs:
         entity_id = log.get("entity_id")
         action = log.get("action")
-        ts = log.get("timestamp")
+        ts = log.get("timestamp") or log.get("created_at")
         if not entity_id or not action or not ts:
             continue
         if entity_id not in audit_map:

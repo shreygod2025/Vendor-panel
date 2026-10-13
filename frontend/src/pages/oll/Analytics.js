@@ -461,7 +461,7 @@ const Analytics = () => {
       totalProductSpend
     };
 
-    // Issue types
+    // Issue types & filtered summary
     const issueTypeCount = {};
     filteredIssues.forEach(issue => {
       const type = issue.issue_type || "other";
@@ -471,15 +471,32 @@ const Analytics = () => {
       .map(([type, count]) => ({ type, count }))
       .sort((a, b) => b.count - a.count);
 
-    // Vendor spend
+    const issueSummary = {
+      openIssues: filteredIssues.filter(i => i.status === "open" || i.status === "in_progress").length,
+      resolvedIssues: filteredIssues.filter(i => i.status === "resolved" || i.status === "closed").length,
+      totalIssues: filteredIssues.length
+    };
+
+    // Vendor spend (with & without GST)
     const vendorSpendMap = {};
+    const vendorBaseSpendMap = {};
+    const vendorTaxSpendMap = {};
     const vendorOrderCount = {};
     const vendorIssueCount = {};
     
     nonDraftPOs.forEach(po => {
       const vendorId = po.vendor_id;
       const vendorName = vendorMap[vendorId] || po.vendor_name || "Unknown";
-      vendorSpendMap[vendorName] = (vendorSpendMap[vendorName] || 0) + (Number(po.grand_total) || 0);
+      const grandTotal = Number(po.grand_total) || 0;
+      const taxTotal = Number(po.total_tax) || 0;
+      const subTotal =
+        po.subtotal != null
+          ? Math.max(0, (Number(po.subtotal) || 0) - (Number(po.total_discount) || 0))
+          : Math.max(0, grandTotal - taxTotal);
+
+      vendorSpendMap[vendorName] = (vendorSpendMap[vendorName] || 0) + grandTotal;
+      vendorBaseSpendMap[vendorName] = (vendorBaseSpendMap[vendorName] || 0) + subTotal;
+      vendorTaxSpendMap[vendorName] = (vendorTaxSpendMap[vendorName] || 0) + taxTotal;
       vendorOrderCount[vendorName] = (vendorOrderCount[vendorName] || 0) + 1;
     });
     
@@ -496,22 +513,36 @@ const Analytics = () => {
       .map(([name, amount]) => ({ 
         name, 
         amount,
+        baseAmount: vendorBaseSpendMap[name] || 0,
+        taxAmount: vendorTaxSpendMap[name] || 0,
         orders: vendorOrderCount[name] || 0,
         issues: vendorIssueCount[name] || 0
       }))
       .sort((a, b) => b.amount - a.amount);
 
-    // Monthly spend
+    // Monthly spend (with & without GST)
     const monthlySpendMap = {};
+    const monthlyBaseSpendMap = {};
     nonDraftPOs.forEach(po => {
       if (!po.created_at) return;
       const date = new Date(po.created_at);
       if (isNaN(date.getTime())) return;
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      monthlySpendMap[monthKey] = (monthlySpendMap[monthKey] || 0) + (Number(po.grand_total) || 0);
+      const grandTotal = Number(po.grand_total) || 0;
+      const taxTotal = Number(po.total_tax) || 0;
+      const subTotal =
+        po.subtotal != null
+          ? Math.max(0, (Number(po.subtotal) || 0) - (Number(po.total_discount) || 0))
+          : Math.max(0, grandTotal - taxTotal);
+      monthlySpendMap[monthKey] = (monthlySpendMap[monthKey] || 0) + grandTotal;
+      monthlyBaseSpendMap[monthKey] = (monthlyBaseSpendMap[monthKey] || 0) + subTotal;
     });
     const monthlySpend = Object.entries(monthlySpendMap)
-      .map(([month, amount]) => ({ month, amount }))
+      .map(([month, amount]) => ({
+        month,
+        amount,
+        baseAmount: monthlyBaseSpendMap[month] || 0
+      }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
     setAnalytics({
@@ -528,6 +559,7 @@ const Analytics = () => {
       allProductAnalytics,
       productSummary,
       issueTypes,
+      issueSummary,
       vendorSpend,
       monthlySpend
     });
@@ -712,9 +744,12 @@ const Analytics = () => {
                         const monthLabel = new Date(item.month + "-01").toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
                         return (
                           <div key={idx}>
-                            <div className="flex justify-between text-sm mb-1">
+                            <div className="flex justify-between items-baseline text-sm mb-1">
                               <span className="text-slate-600">{monthLabel}</span>
-                              <span className="font-mono font-medium">{formatCurrency(item.amount)}</span>
+                              <div className="text-right">
+                                <span className="font-mono font-medium text-slate-900">{formatCurrency(item.amount)}</span>
+                                <span className="text-xs text-slate-400 ml-2">(Excl. GST: {formatCurrency(item.baseAmount || 0)})</span>
+                              </div>
                             </div>
                             <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                               <div 
@@ -1519,11 +1554,11 @@ const Analytics = () => {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-4 bg-red-50 rounded-lg text-center">
-                        <p className="text-3xl font-bold text-red-700">{data.issues.filter(i => i.status === "open").length}</p>
+                        <p className="text-3xl font-bold text-red-700">{analytics.issueSummary?.openIssues ?? 0}</p>
                         <p className="text-sm text-red-600">Open Issues</p>
                       </div>
                       <div className="p-4 bg-emerald-50 rounded-lg text-center">
-                        <p className="text-3xl font-bold text-emerald-700">{data.issues.filter(i => i.status === "resolved").length}</p>
+                        <p className="text-3xl font-bold text-emerald-700">{analytics.issueSummary?.resolvedIssues ?? 0}</p>
                         <p className="text-sm text-emerald-600">Resolved</p>
                       </div>
                     </div>
@@ -1535,7 +1570,7 @@ const Analytics = () => {
                     </div>
                     <div className="p-4 bg-amber-50 rounded-lg">
                       <p className="text-sm text-amber-600 mb-2">Total Issues</p>
-                      <p className="text-lg font-medium">{data.issues.length} issues reported</p>
+                      <p className="text-lg font-medium">{analytics.issueSummary?.totalIssues ?? 0} issues reported</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1561,7 +1596,9 @@ const Analytics = () => {
                         <TableHead>Vendor</TableHead>
                         <TableHead className="text-right">Orders</TableHead>
                         <TableHead className="text-right">Issues</TableHead>
-                        <TableHead className="text-right">Total Spend</TableHead>
+                        <TableHead className="text-right">Spend (Without GST)</TableHead>
+                        <TableHead className="text-right">GST Amount</TableHead>
+                        <TableHead className="text-right">Total Spend (With GST)</TableHead>
                         <TableHead className="text-right">% of Total</TableHead>
                         <TableHead className="w-[150px]">Share</TableHead>
                       </TableRow>
@@ -1583,7 +1620,9 @@ const Analytics = () => {
                                 <span className="text-emerald-600">0</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-right font-mono">{formatCurrency(vendor.amount)}</TableCell>
+                            <TableCell className="text-right font-mono text-slate-700">{formatCurrency(vendor.baseAmount || 0)}</TableCell>
+                            <TableCell className="text-right font-mono text-amber-700">{formatCurrency(vendor.taxAmount || 0)}</TableCell>
+                            <TableCell className="text-right font-mono font-semibold text-emerald-700">{formatCurrency(vendor.amount)}</TableCell>
                             <TableCell className="text-right">{percentage}%</TableCell>
                             <TableCell>
                               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
