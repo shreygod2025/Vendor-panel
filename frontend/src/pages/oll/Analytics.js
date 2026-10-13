@@ -330,6 +330,7 @@ const Analytics = () => {
         is_active: p.is_active !== false,
         count: 0,
         ordersCount: 0,
+        baseSpend: 0,
         totalSpend: 0,
         poIds: new Set(),
         lastOrderedAt: null
@@ -358,16 +359,22 @@ const Analytics = () => {
             ? Number(item.unit_price) || 0
             : Number(matchedProduct?.unit_price) || 0;
 
+        const baseAmount = qty * unitPrice;
+        const discountAmt =
+          Number(item.discount_amount) ||
+          (baseAmount * (Number(item.discount_percent) || 0)) / 100;
+        const lineBaseSpend = Math.max(0, baseAmount - discountAmt);
+
         let lineSpend = 0;
         if (item.line_total != null && item.line_total !== "") {
           lineSpend = Number(item.line_total) || 0;
         } else {
-          const baseAmount = qty * unitPrice;
-          const discountAmt = Number(item.discount_amount) || (baseAmount * (Number(item.discount_percent) || 0)) / 100;
-          const taxable = Math.max(0, baseAmount - discountAmt);
-          const taxRate = item.tax_rate != null ? Number(item.tax_rate) : (Number(matchedProduct?.tax_rate) || 0);
-          const taxAmt = (taxable * taxRate) / 100;
-          lineSpend = taxable + taxAmt;
+          const taxRate =
+            item.tax_rate != null
+              ? Number(item.tax_rate)
+              : Number(matchedProduct?.tax_rate ?? 18);
+          const taxAmt = (lineBaseSpend * taxRate) / 100;
+          lineSpend = lineBaseSpend + taxAmt;
         }
 
         if (!productStatsMap[key]) {
@@ -387,6 +394,7 @@ const Analytics = () => {
             is_active: matchedProduct ? matchedProduct.is_active !== false : true,
             count: 0,
             ordersCount: 0,
+            baseSpend: 0,
             totalSpend: 0,
             poIds: new Set(),
             lastOrderedAt: null
@@ -395,6 +403,7 @@ const Analytics = () => {
 
         const entry = productStatsMap[key];
         entry.count += qty;
+        entry.baseSpend += lineBaseSpend;
         entry.totalSpend += lineSpend;
         if (po.id && !entry.poIds.has(po.id)) {
           entry.poIds.add(po.id);
@@ -1313,8 +1322,9 @@ const Analytics = () => {
                           <TableHead className="text-right">POs</TableHead>
                           <TableHead className="text-right">Units Ordered</TableHead>
                           <TableHead className="text-right">Unit Price</TableHead>
-                          <TableHead className="text-right">Total Spend</TableHead>
-                          <TableHead className="w-[180px]">Popularity</TableHead>
+                          <TableHead className="text-right">Base Amount</TableHead>
+                          <TableHead className="text-right">Total Spend (incl. GST)</TableHead>
+                          <TableHead className="w-[160px]">Popularity</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1377,6 +1387,9 @@ const Analytics = () => {
                               </TableCell>
                               <TableCell className="text-right font-mono text-slate-600">
                                 {formatCurrency(product.unit_price || 0)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-slate-700">
+                                {formatCurrency(product.baseSpend || 0)}
                               </TableCell>
                               <TableCell className="text-right font-mono font-semibold text-emerald-700">
                                 {formatCurrency(product.totalSpend || 0)}
