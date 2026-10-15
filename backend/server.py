@@ -5619,13 +5619,25 @@ class TrackingLinkResponse(BaseModel):
     dispatch_info: Optional[Dict] = None
 
 # API Key validation for integration endpoints
-INTEGRATION_API_KEY = os.environ.get('INTEGRATION_API_KEY', 'oll-integration-key-2024')
-
 async def verify_integration_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
-    """Verify API key for integration endpoints"""
-    if not x_api_key or x_api_key != INTEGRATION_API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-    return True
+    """Verify API key for integration endpoints (supports keys from db.api_keys or env vars)"""
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API key required. Use X-API-Key header.")
+    
+    # Check database for active keys generated via Admin Portal
+    db_key = await db.api_keys.find_one({"key": x_api_key, "is_active": True})
+    if db_key:
+        await db.api_keys.update_one(
+            {"id": db_key["id"]}, 
+            {"$set": {"last_used_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return True
+    
+    # Check environment variable keys
+    if (INTEGRATION_API_KEY and x_api_key == INTEGRATION_API_KEY) or (EXTERNAL_API_KEY and x_api_key == EXTERNAL_API_KEY):
+        return True
+        
+    raise HTTPException(status_code=401, detail="Invalid or inactive API key")
 
 @api_router.post("/integration/raise-po", response_model=IntegrationPOResponse)
 async def integration_raise_po(
