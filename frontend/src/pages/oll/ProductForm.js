@@ -17,6 +17,13 @@ import {
 import { ArrowLeft, Save, Loader2, Upload, X, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
+const PRODUCT_CATEGORIES = [
+  "Curriculum Books",
+  "Curriculum Robotic Kits",
+  "Competition Kits",
+  "Individual Components",
+];
+
 const ProductForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -31,6 +38,7 @@ const ProductForm = () => {
     name: "",
     sku: "",
     vendor_id: "",
+    category: "",
     unit_price: "",
     tax_rate: "18",
     description: "",
@@ -79,6 +87,7 @@ const ProductForm = () => {
         name: p.name || "",
         sku: p.sku || "",
         vendor_id: p.vendor_id || "",
+        category: p.category || "",
         unit_price: p.unit_price != null ? p.unit_price.toString() : "",
         tax_rate: p.tax_rate != null ? p.tax_rate.toString() : "18",
         description: p.description || "",
@@ -250,6 +259,7 @@ const ProductForm = () => {
       name: formData.name,
       sku: formData.sku,
       vendor_id: formData.vendor_id,
+      category: formData.category || null,
       unit_price: parseFloat(formData.unit_price),
       tax_rate: parseFloat(formData.tax_rate),
       description: formData.description || null,
@@ -343,21 +353,39 @@ const ProductForm = () => {
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="vendor_id" className="form-label">Vendor *</Label>
-                <Select 
-                  value={formData.vendor_id} 
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, vendor_id: value }))}
-                >
-                  <SelectTrigger data-testid="product-vendor-select">
-                    <SelectValue placeholder="Select a vendor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendors.map((vendor) => (
-                      <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="vendor_id" className="form-label">Vendor *</Label>
+                  <Select 
+                    value={formData.vendor_id} 
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, vendor_id: value }))}
+                  >
+                    <SelectTrigger data-testid="product-vendor-select">
+                      <SelectValue placeholder="Select a vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendors.map((vendor) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="category" className="form-label">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
+                  >
+                    <SelectTrigger data-testid="product-category-select">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRODUCT_CATEGORIES.map((category) => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -191,6 +191,7 @@ class ProductCreate(BaseModel):
     name: str
     sku: str
     vendor_id: str
+    category: Optional[str] = None
     unit_price: float
     tax_rate: float = 18.0
     description: Optional[str] = None
@@ -210,6 +211,7 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     sku: Optional[str] = None
     vendor_id: Optional[str] = None
+    category: Optional[str] = None
     unit_price: Optional[float] = None
     tax_rate: Optional[float] = None
     description: Optional[str] = None
@@ -231,6 +233,7 @@ class ProductResponse(BaseModel):
     sku: str
     vendor_id: str
     vendor_name: Optional[str] = None
+    category: Optional[str] = None
     unit_price: float
     tax_rate: float
     description: Optional[str] = None
@@ -1015,6 +1018,7 @@ class ProductImportItem(BaseModel):
     name: str
     sku: str
     vendor_name: str
+    category: Optional[str] = None
     unit_price: float = 0
     tax_rate: float = 18
     description: Optional[str] = ""
@@ -1061,6 +1065,7 @@ async def import_products(import_data: ProductImportRequest, current_user: dict 
                 "name": item.name,
                 "sku": item.sku,
                 "vendor_id": vendor_id,
+                "category": item.category or None,
                 "unit_price": float(item.unit_price),
                 "tax_rate": float(item.tax_rate),
                 "description": item.description or "",
@@ -1108,6 +1113,7 @@ def _normalize_product_doc(p: dict) -> dict:
 @api_router.get("/products", response_model=List[ProductResponse])
 async def get_products(
     vendor_id: Optional[str] = None,
+    category: Optional[str] = None,
     is_active: Optional[bool] = None,
     show_on_shop: Optional[bool] = None,
     current_user: dict = Depends(get_current_user)
@@ -1115,6 +1121,8 @@ async def get_products(
     query = {}
     if vendor_id:
         query["vendor_id"] = vendor_id
+    if category:
+        query["category"] = category
     if is_active is not None:
         query["is_active"] = is_active
     if show_on_shop is not None:
@@ -2705,11 +2713,13 @@ async def track_order(tracking_token: str):
 # ========================
 
 @api_router.get("/public/products")
-async def get_public_products(show_on_shop: Optional[bool] = None):
+async def get_public_products(show_on_shop: Optional[bool] = None, category: Optional[str] = None):
     """Get list of products for public PO request form or public shop (no authentication required)"""
     query: Dict[str, Any] = {"is_active": True}
     if show_on_shop is not None:
         query["show_on_shop"] = show_on_shop
+    if category:
+        query["category"] = category
     products = await db.products.find(query, {"_id": 0}).to_list(1000)
     
     # Get vendor names for display
@@ -2726,6 +2736,7 @@ async def get_public_products(show_on_shop: Optional[bool] = None):
             "sku": p.get("sku", ""),
             "vendor_id": p["vendor_id"],
             "vendor_name": vendor_map.get(p["vendor_id"], ""),
+            "category": p.get("category"),
             "unit": p.get("unit", "pcs"),
             "description": p.get("description", ""),
             "image_url": p.get("image_url"),
@@ -2742,9 +2753,9 @@ async def get_public_products(show_on_shop: Optional[bool] = None):
     return result
 
 @api_router.get("/public/shop/products")
-async def get_public_shop_products():
+async def get_public_shop_products(category: Optional[str] = None):
     """Get active products marked as show_on_shop=True for the public shop (no authentication required)"""
-    return await get_public_products(show_on_shop=True)
+    return await get_public_products(show_on_shop=True, category=category)
 
 @api_router.post("/public/po-request", response_model=PublicPORequestResponse)
 async def create_public_po_request(request: PublicPORequest):
@@ -5975,13 +5986,14 @@ async def integration_list_vendors(
 async def integration_list_products(
     vendor_id: Optional[str] = None,
     vendor_name: Optional[str] = None,
+    category: Optional[str] = None,
     show_on_shop: Optional[bool] = None,
     api_key_valid: bool = Depends(verify_integration_api_key)
 ):
     """
     External Integration Endpoint: List Available Products
     
-    Returns a list of active products, optionally filtered by vendor or show_on_shop.
+    Returns a list of active products, optionally filtered by vendor, category, or show_on_shop.
     Useful for external apps to get product SKUs, prices, and shop details.
     
     Authentication: Requires X-API-Key header
@@ -5989,6 +6001,8 @@ async def integration_list_products(
     query: Dict[str, Any] = {"is_active": True}
     if show_on_shop is not None:
         query["show_on_shop"] = show_on_shop
+    if category:
+        query["category"] = category
     
     if vendor_id:
         query["vendor_id"] = vendor_id
@@ -6016,6 +6030,7 @@ async def integration_list_products(
                 "sku": p["sku"],
                 "vendor_id": p["vendor_id"],
                 "vendor_name": vendor_map.get(p["vendor_id"]),
+                "category": p.get("category"),
                 "unit_price": p["unit_price"],
                 "tax_rate": p["tax_rate"],
                 "unit": p.get("unit", "pcs"),
@@ -6039,6 +6054,7 @@ async def integration_list_products(
 async def external_list_products(
     show_on_shop: Optional[bool] = None,
     vendor_id: Optional[str] = None,
+    category: Optional[str] = None,
     _: bool = Depends(verify_external_api_key)
 ):
     """
@@ -6050,6 +6066,8 @@ async def external_list_products(
         query["show_on_shop"] = show_on_shop
     if vendor_id:
         query["vendor_id"] = vendor_id
+    if category:
+        query["category"] = category
 
     products = await db.products.find(query, {"_id": 0}).to_list(1000)
     vendor_ids = list(set(p["vendor_id"] for p in products))
@@ -6064,6 +6082,7 @@ async def external_list_products(
                 "sku": p.get("sku"),
                 "vendor_id": p["vendor_id"],
                 "vendor_name": vendor_map.get(p["vendor_id"]),
+                "category": p.get("category"),
                 "unit_price": p.get("unit_price"),
                 "tax_rate": p.get("tax_rate"),
                 "unit": p.get("unit", "pcs"),

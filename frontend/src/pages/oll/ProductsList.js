@@ -30,12 +30,20 @@ import {
 import { Plus, Search, Edit, Trash2, Package, Upload, Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+const PRODUCT_CATEGORIES = [
+  "Curriculum Books",
+  "Curriculum Robotic Kits",
+  "Competition Kits",
+  "Individual Components",
+];
+
 const ProductsList = () => {
   const [products, setProducts] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   
   // Import dialog state
@@ -85,11 +93,11 @@ const ProductsList = () => {
 
   // Download sample CSV
   const downloadSampleFile = () => {
-    const sampleData = `name,sku,vendor_name,unit_price,tax_rate,description,is_active
-"Industrial Motor A1",SKU-MOTOR-001,"Tech Components Pvt Ltd",15000,18,"High performance industrial motor",true
-"Steel Bearings Set",SKU-BEAR-002,"Tech Components Pvt Ltd",3500,18,"Premium steel bearings pack of 10",true
-"Control Panel Unit",SKU-CTRL-003,"Supreme Electricals",25000,18,"Advanced control panel with LCD display",true
-"Copper Wire Bundle",SKU-WIRE-004,"Supreme Electricals",8000,18,"100m copper wire bundle",true`;
+    const sampleData = `name,sku,vendor_name,category,unit_price,tax_rate,description,is_active
+"Industrial Motor A1",SKU-MOTOR-001,"Tech Components Pvt Ltd","Individual Components",15000,18,"High performance industrial motor",true
+"Steel Bearings Set",SKU-BEAR-002,"Tech Components Pvt Ltd","Individual Components",3500,18,"Premium steel bearings pack of 10",true
+"Control Panel Unit",SKU-CTRL-003,"Supreme Electricals","Curriculum Robotic Kits",25000,18,"Advanced control panel with LCD display",true
+"Copper Wire Bundle",SKU-WIRE-004,"Supreme Electricals","Individual Components",8000,18,"100m copper wire bundle",true`;
 
     const blob = new Blob([sampleData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -178,6 +186,7 @@ const ProductsList = () => {
             name: row.name || '',
             sku: row.sku || '',
             vendor_name: row.vendor_name || '',
+            category: row.category || null,
             unit_price: parseFloat(row.unit_price) || 0,
             tax_rate: parseFloat(row.tax_rate) || 18,
             description: row.description || '',
@@ -229,11 +238,12 @@ const ProductsList = () => {
       product.name.toLowerCase().includes(search.toLowerCase()) ||
       product.sku.toLowerCase().includes(search.toLowerCase());
     const matchesVendor = vendorFilter === "all" || product.vendor_id === vendorFilter;
+    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
     const matchesStatus = 
       statusFilter === "all" || 
       (statusFilter === "active" && product.is_active) ||
       (statusFilter === "inactive" && !product.is_active);
-    return matchesSearch && matchesVendor && matchesStatus;
+    return matchesSearch && matchesVendor && matchesCategory && matchesStatus;
   });
 
   return (
@@ -287,6 +297,17 @@ const ProductsList = () => {
               ))}
             </SelectContent>
           </Select>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[220px]" data-testid="category-filter">
+              <SelectValue placeholder="Filter by category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {PRODUCT_CATEGORIES.map((category) => (
+                <SelectItem key={category} value={category}>{category}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[150px]" data-testid="status-filter">
               <SelectValue placeholder="Status" />
@@ -326,6 +347,7 @@ const ProductsList = () => {
                 <TableRow className="bg-slate-50">
                   <TableHead>Product</TableHead>
                   <TableHead>SKU</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Tax Rate</TableHead>
@@ -363,6 +385,15 @@ const ProductsList = () => {
                     </TableCell>
                     <TableCell>
                       <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{product.sku}</span>
+                    </TableCell>
+                    <TableCell>
+                      {product.category ? (
+                        <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">
+                          {product.category}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
                     </TableCell>
                     <TableCell>{product.vendor_name}</TableCell>
                     <TableCell className="font-mono">{formatCurrency(product.unit_price)}</TableCell>

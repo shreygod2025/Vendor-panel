@@ -22,7 +22,7 @@ import {
 import { Plus, Trash2, Loader2, Send, Package, User, MapPin, FileText, Search, Check, ChevronsUpDown } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
-const API = process.env.REACT_APP_BACKEND_URL;
+const API = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
 
 const PublicPORequest = () => {
   const navigate = useNavigate();

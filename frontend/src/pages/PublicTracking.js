@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 const OLL_LOGO = "https://customer-assets.emergentagent.com/job_1abb6756-ee51-414a-aff6-9c61f26a1a75/artifacts/23infxd1_Logo.png";
 

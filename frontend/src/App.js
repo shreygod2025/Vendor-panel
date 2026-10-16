@@ -47,7 +47,7 @@ import DistributorProducts from "./pages/distributor/Products";
 // Layout
 import Sidebar from "./components/Sidebar";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
 export const API = `${BACKEND_URL}/api`;
 
 // Auth Context
