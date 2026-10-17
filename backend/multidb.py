@@ -29,12 +29,21 @@ try:
 except Exception:
     pass
 
+try:
+    import certifi
+    CA_FILE = certifi.where()
+except Exception:
+    CA_FILE = None
+
 def _create_motor_client(uri: str) -> AsyncIOMotorClient:
-    """Create AsyncIOMotorClient with retry logic for SRV DNS resolution."""
+    """Create AsyncIOMotorClient with retry logic for SRV DNS resolution and SSL cert bundle."""
     last_err = None
+    kwargs = {}
+    if CA_FILE:
+        kwargs["tlsCAFile"] = CA_FILE
     for attempt in range(3):
         try:
-            return AsyncIOMotorClient(uri)
+            return AsyncIOMotorClient(uri, **kwargs)
         except Exception as e:
             last_err = e
             time.sleep(1.0)
