@@ -1108,6 +1108,15 @@ def _normalize_product_doc(p: dict) -> dict:
         p["shop_videos"] = []
     if not isinstance(p.get("kit_includes"), list):
         p["kit_includes"] = []
+    if p.get("image_url") and "emergent" in p["image_url"] and "/api/files/" in p["image_url"]:
+        fname = p["image_url"].split("/api/files/")[-1].split("?")[0]
+        p["image_url"] = f"https://vendor-panel-6kjc.onrender.com/api/files/{fname}"
+    if isinstance(p.get("shop_images"), list):
+        p["shop_images"] = [
+            f"https://vendor-panel-6kjc.onrender.com/api/files/{s.split('/api/files/')[-1].split('?')[0]}"
+            if (s and "emergent" in s and "/api/files/" in s) else s
+            for s in p["shop_images"]
+        ]
     return p
 
 @api_router.get("/products", response_model=List[ProductResponse])
