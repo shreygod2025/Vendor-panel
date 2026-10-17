@@ -66,10 +66,23 @@ UPLOADS_DIR = ROOT_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
+# Multi-Cluster MongoDB connection (Auto-switches to MONGO_URL_2 when storage > 490 MB)
+from multidb import MultiClusterManager, MultiClusterDatabase
+
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+mongo_url_2 = os.environ.get('MONGO_URL_2')
+db_name = os.environ.get('DB_NAME') or os.environ.get('DB_NAMe', 'oll_vendor_panel')
+storage_threshold = float(os.environ.get('MONGO_STORAGE_THRESHOLD_MB', 490.0))
+
+multidb_manager = MultiClusterManager(
+    primary_url=mongo_url,
+    secondary_url=mongo_url_2,
+    db_name=db_name,
+    threshold_mb=storage_threshold
+)
+db = MultiClusterDatabase(multidb_manager)
+client = multidb_manager.primary_client
+
 
 # JWT Configuration
 SECRET_KEY = os.environ['SECRET_KEY']
@@ -89,7 +102,23 @@ security = HTTPBearer()
 
 @api_router.get("/health")
 async def health():
-    return {"status": "healthy"}
+    try:
+        storage_info = await multidb_manager.check_primary_storage()
+        return {
+            "status": "healthy",
+            "multidb": {
+                "active_write_target": "secondary" if storage_info["is_full"] else "primary",
+                "primary_storage_mb": storage_info["storage_mb"],
+                "threshold_mb": storage_info["threshold_mb"],
+                "is_failover_active": storage_info["is_full"]
+            }
+        }
+    except Exception as e:
+        return {"status": "healthy", "multidb_error": str(e)}
+
+@api_router.get("/system/storage-status")
+async def get_storage_status():
+    return await multidb_manager.get_status()
 
 # Configure logging
 logging.basicConfig(
@@ -6386,5 +6415,5 @@ async def create_indexes():
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    multidb_manager.close()
 
