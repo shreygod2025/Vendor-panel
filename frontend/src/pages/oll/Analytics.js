@@ -46,7 +46,6 @@ const Analytics = () => {
   const [vendorFilter, setVendorFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
   const [productViewMode, setProductViewMode] = useState("ordered"); // "ordered" | "all"
-  const [issueViewMode, setIssueViewMode] = useState("resolved"); // "resolved" | "open" | "all"
   
   const [data, setData] = useState({
     vendors: [],
@@ -59,8 +58,6 @@ const Analytics = () => {
 
   const [analytics, setAnalytics] = useState({
     totalSpend: 0,
-    totalSubtotal: 0,
-    totalTax: 0,
     totalOrders: 0,
     deliveredOrders: 0,
     onTimeDeliveries: 0,
@@ -75,8 +72,6 @@ const Analytics = () => {
       shopListedProducts: 0,
       orderedProductsCount: 0,
       totalUnitsOrdered: 0,
-      totalBaseSpend: 0,
-      totalTaxSpend: 0,
       totalProductSpend: 0
     },
     issueTypes: [],
@@ -242,13 +237,6 @@ const Analytics = () => {
     const excludedStatuses = new Set(["draft", "request", "rejected", "cancelled"]);
     const nonDraftPOs = filteredPOs.filter(po => !excludedStatuses.has(po.status));
     const totalSpend = nonDraftPOs.reduce((sum, po) => sum + (Number(po.grand_total) || 0), 0);
-    const totalTax = nonDraftPOs.reduce((sum, po) => sum + (Number(po.total_tax) || 0), 0);
-    const totalSubtotal = nonDraftPOs.reduce((sum, po) => {
-      if (po.subtotal != null) {
-        return sum + Math.max(0, (Number(po.subtotal) || 0) - (Number(po.total_discount) || 0));
-      }
-      return sum + Math.max(0, (Number(po.grand_total) || 0) - (Number(po.total_tax) || 0));
-    }, 0);
     const totalOrders = nonDraftPOs.length;
 
     // Delivery metrics
@@ -336,15 +324,12 @@ const Analytics = () => {
         vendor_name: p.vendor_name || vendorMap[p.vendor_id] || "Unknown",
         unit: p.unit || "pcs",
         unit_price: Number(p.unit_price) || 0,
-        tax_rate: p.tax_rate != null ? Number(p.tax_rate) : null,
         mrp: p.mrp != null ? Number(p.mrp) : null,
         image_url: p.image_url || "",
         show_on_shop: Boolean(p.show_on_shop),
         is_active: p.is_active !== false,
         count: 0,
         ordersCount: 0,
-        baseSpend: 0,
-        taxSpend: 0,
         totalSpend: 0,
         poIds: new Set(),
         lastOrderedAt: null
@@ -373,24 +358,17 @@ const Analytics = () => {
             ? Number(item.unit_price) || 0
             : Number(matchedProduct?.unit_price) || 0;
 
-        // Tax rate fetched from MongoDB (Product record or PO line_item record)
-        const dbTaxRate =
-          matchedProduct?.tax_rate != null
-            ? Number(matchedProduct.tax_rate)
-            : item.tax_rate != null
-            ? Number(item.tax_rate)
-            : 0;
-
-        const baseAmount = qty * unitPrice;
-        const discountAmt =
-          Number(item.discount_amount) ||
-          (baseAmount * (Number(item.discount_percent) || 0)) / 100;
-        const lineBaseSpend = Math.max(0, baseAmount - discountAmt);
-        const lineTaxSpend = (lineBaseSpend * dbTaxRate) / 100;
-        const lineSpend =
-          item.line_total != null && item.line_total !== ""
-            ? Number(item.line_total) || 0
-            : lineBaseSpend + lineTaxSpend;
+        let lineSpend = 0;
+        if (item.line_total != null && item.line_total !== "") {
+          lineSpend = Number(item.line_total) || 0;
+        } else {
+          const baseAmount = qty * unitPrice;
+          const discountAmt = Number(item.discount_amount) || (baseAmount * (Number(item.discount_percent) || 0)) / 100;
+          const taxable = Math.max(0, baseAmount - discountAmt);
+          const taxRate = item.tax_rate != null ? Number(item.tax_rate) : (Number(matchedProduct?.tax_rate) || 0);
+          const taxAmt = (taxable * taxRate) / 100;
+          lineSpend = taxable + taxAmt;
+        }
 
         if (!productStatsMap[key]) {
           const vId = matchedProduct?.vendor_id || po.vendor_id || "";
@@ -403,15 +381,12 @@ const Analytics = () => {
             vendor_name: matchedProduct?.vendor_name || vendorMap[vId] || po.vendor_name || "Unknown",
             unit: matchedProduct?.unit || item.unit || "pcs",
             unit_price: unitPrice,
-            tax_rate: matchedProduct?.tax_rate != null ? Number(matchedProduct.tax_rate) : (item.tax_rate != null ? Number(item.tax_rate) : null),
             mrp: matchedProduct?.mrp != null ? Number(matchedProduct.mrp) : null,
             image_url: matchedProduct?.image_url || "",
             show_on_shop: Boolean(matchedProduct?.show_on_shop),
             is_active: matchedProduct ? matchedProduct.is_active !== false : true,
             count: 0,
             ordersCount: 0,
-            baseSpend: 0,
-            taxSpend: 0,
             totalSpend: 0,
             poIds: new Set(),
             lastOrderedAt: null
@@ -419,12 +394,7 @@ const Analytics = () => {
         }
 
         const entry = productStatsMap[key];
-        if (entry.tax_rate == null && item.tax_rate != null) {
-          entry.tax_rate = Number(item.tax_rate);
-        }
         entry.count += qty;
-        entry.baseSpend += lineBaseSpend;
-        entry.taxSpend += lineTaxSpend;
         entry.totalSpend += lineSpend;
         if (po.id && !entry.poIds.has(po.id)) {
           entry.poIds.add(po.id);
@@ -447,8 +417,6 @@ const Analytics = () => {
     const popularProducts = allProductAnalytics.filter(p => p.count > 0);
 
     const totalUnitsOrdered = popularProducts.reduce((sum, p) => sum + p.count, 0);
-    const totalBaseSpend = popularProducts.reduce((sum, p) => sum + p.baseSpend, 0);
-    const totalTaxSpend = popularProducts.reduce((sum, p) => sum + p.taxSpend, 0);
     const totalProductSpend = popularProducts.reduce((sum, p) => sum + p.totalSpend, 0);
 
     const productSummary = {
@@ -457,12 +425,10 @@ const Analytics = () => {
       shopListedProducts: filteredCatalogProducts.filter(p => Boolean(p.show_on_shop)).length,
       orderedProductsCount: popularProducts.length,
       totalUnitsOrdered,
-      totalBaseSpend,
-      totalTaxSpend,
       totalProductSpend
     };
 
-    // Issue types & filtered summary
+    // Issue types
     const issueTypeCount = {};
     filteredIssues.forEach(issue => {
       const type = issue.issue_type || "other";
@@ -472,67 +438,24 @@ const Analytics = () => {
       .map(([type, count]) => ({ type, count }))
       .sort((a, b) => b.count - a.count);
 
-    // Enrich issues with vendor_name and po_number for display
-    const poById = {};
-    (data.purchaseOrders || []).forEach(p => {
-      if (p && p.id) poById[p.id] = p;
-    });
-
-    const enrichedIssues = filteredIssues.map(issue => {
-      const po = poById[issue.po_id];
-      const vId = issue.vendor_id || po?.vendor_id;
-      const vendorName = vendorMap[vId] || issue.vendor_name || po?.vendor_name || "Unknown";
-      const poNumber = issue.po_number || po?.po_number || "—";
-      const isResolved = issue.status === "resolved" || issue.status === "closed";
-      return {
-        ...issue,
-        vendor_name: vendorName,
-        po_number: poNumber,
-        isResolved
-      };
-    });
-
-    const issueSummary = {
-      openIssues: enrichedIssues.filter(i => !i.isResolved).length,
-      resolvedIssues: enrichedIssues.filter(i => i.isResolved).length,
-      totalIssues: enrichedIssues.length
-    };
-
-    // Vendor spend (with & without GST) + Open vs Resolved issues per vendor
+    // Vendor spend
     const vendorSpendMap = {};
-    const vendorBaseSpendMap = {};
-    const vendorTaxSpendMap = {};
     const vendorOrderCount = {};
     const vendorIssueCount = {};
-    const vendorOpenIssueCount = {};
-    const vendorResolvedIssueCount = {};
     
     nonDraftPOs.forEach(po => {
       const vendorId = po.vendor_id;
       const vendorName = vendorMap[vendorId] || po.vendor_name || "Unknown";
-      const grandTotal = Number(po.grand_total) || 0;
-      const taxTotal = Number(po.total_tax) || 0;
-      const subTotal =
-        po.subtotal != null
-          ? Math.max(0, (Number(po.subtotal) || 0) - (Number(po.total_discount) || 0))
-          : Math.max(0, grandTotal - taxTotal);
-
-      vendorSpendMap[vendorName] = (vendorSpendMap[vendorName] || 0) + grandTotal;
-      vendorBaseSpendMap[vendorName] = (vendorBaseSpendMap[vendorName] || 0) + subTotal;
-      vendorTaxSpendMap[vendorName] = (vendorTaxSpendMap[vendorName] || 0) + taxTotal;
+      vendorSpendMap[vendorName] = (vendorSpendMap[vendorName] || 0) + (Number(po.grand_total) || 0);
       vendorOrderCount[vendorName] = (vendorOrderCount[vendorName] || 0) + 1;
     });
     
-    enrichedIssues.forEach(issue => {
-      const vendorName = issue.vendor_name || "Unknown";
-      vendorIssueCount[vendorName] = (vendorIssueCount[vendorName] || 0) + 1;
-      if (issue.isResolved) {
-        vendorResolvedIssueCount[vendorName] = (vendorResolvedIssueCount[vendorName] || 0) + 1;
-      } else {
-        vendorOpenIssueCount[vendorName] = (vendorOpenIssueCount[vendorName] || 0) + 1;
-      }
-      if (!(vendorName in vendorSpendMap)) {
-        vendorSpendMap[vendorName] = 0;
+    filteredIssues.forEach(issue => {
+      const po = data.purchaseOrders.find(p => p.id === issue.po_id);
+      const vendorId = issue.vendor_id || po?.vendor_id;
+      if (vendorId || po) {
+        const vendorName = vendorMap[vendorId] || issue.vendor_name || po?.vendor_name || "Unknown";
+        vendorIssueCount[vendorName] = (vendorIssueCount[vendorName] || 0) + 1;
       }
     });
     
@@ -540,44 +463,26 @@ const Analytics = () => {
       .map(([name, amount]) => ({ 
         name, 
         amount,
-        baseAmount: vendorBaseSpendMap[name] || 0,
-        taxAmount: vendorTaxSpendMap[name] || 0,
         orders: vendorOrderCount[name] || 0,
-        issues: vendorIssueCount[name] || 0,
-        openIssues: vendorOpenIssueCount[name] || 0,
-        resolvedIssues: vendorResolvedIssueCount[name] || 0
+        issues: vendorIssueCount[name] || 0
       }))
       .sort((a, b) => b.amount - a.amount);
 
-    // Monthly spend (with & without GST)
+    // Monthly spend
     const monthlySpendMap = {};
-    const monthlyBaseSpendMap = {};
     nonDraftPOs.forEach(po => {
       if (!po.created_at) return;
       const date = new Date(po.created_at);
       if (isNaN(date.getTime())) return;
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const grandTotal = Number(po.grand_total) || 0;
-      const taxTotal = Number(po.total_tax) || 0;
-      const subTotal =
-        po.subtotal != null
-          ? Math.max(0, (Number(po.subtotal) || 0) - (Number(po.total_discount) || 0))
-          : Math.max(0, grandTotal - taxTotal);
-      monthlySpendMap[monthKey] = (monthlySpendMap[monthKey] || 0) + grandTotal;
-      monthlyBaseSpendMap[monthKey] = (monthlyBaseSpendMap[monthKey] || 0) + subTotal;
+      monthlySpendMap[monthKey] = (monthlySpendMap[monthKey] || 0) + (Number(po.grand_total) || 0);
     });
     const monthlySpend = Object.entries(monthlySpendMap)
-      .map(([month, amount]) => ({
-        month,
-        amount,
-        baseAmount: monthlyBaseSpendMap[month] || 0
-      }))
+      .map(([month, amount]) => ({ month, amount }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
     setAnalytics({
       totalSpend,
-      totalSubtotal,
-      totalTax,
       totalOrders,
       deliveredOrders,
       onTimeDeliveries,
@@ -588,8 +493,6 @@ const Analytics = () => {
       allProductAnalytics,
       productSummary,
       issueTypes,
-      issueSummary,
-      enrichedIssues,
       vendorSpend,
       monthlySpend
     });
@@ -690,15 +593,12 @@ const Analytics = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
                   <DollarSign className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="min-w-0">
+                <div>
                   <p className="text-2xl font-bold text-slate-900">{formatCurrency(analytics.totalSpend)}</p>
-                  <p className="text-xs text-slate-500">Total Spend (With GST)</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                    Without GST: {formatCurrency(analytics.totalSubtotal || 0)} · GST: {formatCurrency(analytics.totalTax || 0)}
-                  </p>
+                  <p className="text-xs text-slate-500">Total Spend</p>
                 </div>
               </div>
             </CardContent>
@@ -774,12 +674,9 @@ const Analytics = () => {
                         const monthLabel = new Date(item.month + "-01").toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
                         return (
                           <div key={idx}>
-                            <div className="flex justify-between items-baseline text-sm mb-1">
+                            <div className="flex justify-between text-sm mb-1">
                               <span className="text-slate-600">{monthLabel}</span>
-                              <div className="text-right">
-                                <span className="font-mono font-medium text-slate-900">{formatCurrency(item.amount)}</span>
-                                <span className="text-xs text-slate-400 ml-2">(Excl. GST: {formatCurrency(item.baseAmount || 0)})</span>
-                              </div>
+                              <span className="font-mono font-medium">{formatCurrency(item.amount)}</span>
                             </div>
                             <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                               <div 
@@ -1279,10 +1176,10 @@ const Analytics = () => {
                                 {item.quantity?.toLocaleString()}
                               </TableCell>
                               <TableCell className="text-right font-mono text-slate-600">
-                                {formatCurrency(item.unit_price || 0)}
-                              </TableCell>
+                                  </TableCell>
                               <TableCell className="text-right font-mono font-semibold text-emerald-700">
-                                {formatCurrency(item.total_value || 0)}
+                                {formatCurrency(item.total_value || 0)} {formatCurrency(item.unit_price || 0)}
+                           
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1300,7 +1197,7 @@ const Analytics = () => {
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-6">
             {/* Product Summary KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="border-l-4 border-l-indigo-500">
                 <CardContent className="p-4">
                   <p className="text-2xl font-bold text-slate-900">
@@ -1313,42 +1210,31 @@ const Analytics = () => {
                   </p>
                 </CardContent>
               </Card>
+              <Card className="border-l-4 border-l-emerald-500">
+                <CardContent className="p-4">
+                  <p className="text-2xl font-bold text-slate-900">
+                    {analytics.productSummary?.orderedProductsCount || 0}
+                  </p>
+                  <p className="text-xs text-slate-500">Products Ordered</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Distinct products in POs</p>
+                </CardContent>
+              </Card>
               <Card className="border-l-4 border-l-blue-500">
                 <CardContent className="p-4">
                   <p className="text-2xl font-bold text-slate-900">
                     {(analytics.productSummary?.totalUnitsOrdered || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-slate-500">Total Units Ordered</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {analytics.productSummary?.orderedProductsCount || 0} products · {analytics.totalOrders} POs
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="border-l-4 border-l-slate-500">
-                <CardContent className="p-4">
-                  <p className="text-2xl font-bold text-slate-900">
-                    {formatCurrency(analytics.productSummary?.totalBaseSpend || 0)}
-                  </p>
-                  <p className="text-xs text-slate-500">Spend (Without GST)</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Units × Unit Price</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Across {analytics.totalOrders} orders</p>
                 </CardContent>
               </Card>
               <Card className="border-l-4 border-l-amber-500">
                 <CardContent className="p-4">
-                  <p className="text-2xl font-bold text-amber-700">
-                    {formatCurrency(analytics.productSummary?.totalTaxSpend || 0)}
-                  </p>
-                  <p className="text-xs text-slate-500">Total GST Amount</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Calculated from DB tax rate</p>
-                </CardContent>
-              </Card>
-              <Card className="border-l-4 border-l-emerald-500">
-                <CardContent className="p-4">
-                  <p className="text-2xl font-bold text-emerald-700">
+                  <p className="text-2xl font-bold text-slate-900">
                     {formatCurrency(analytics.productSummary?.totalProductSpend || 0)}
                   </p>
-                  <p className="text-xs text-slate-500">Total Spend (With GST)</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Without GST + GST</p>
+                  <p className="text-xs text-slate-500">Total Product Spend</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Line-item value incl. tax</p>
                 </CardContent>
               </Card>
             </div>
@@ -1427,11 +1313,8 @@ const Analytics = () => {
                           <TableHead className="text-right">POs</TableHead>
                           <TableHead className="text-right">Units Ordered</TableHead>
                           <TableHead className="text-right">Unit Price</TableHead>
-                          <TableHead className="text-right">Tax Rate</TableHead>
-                          <TableHead className="text-right">Spend (Without GST)</TableHead>
-                          <TableHead className="text-right">GST Amount</TableHead>
-                          <TableHead className="text-right">Total Spend (With GST)</TableHead>
-                          <TableHead className="w-[150px]">Popularity</TableHead>
+                          <TableHead className="text-right">Total Spend</TableHead>
+                          <TableHead className="w-[180px]">Popularity</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1495,21 +1378,6 @@ const Analytics = () => {
                               <TableCell className="text-right font-mono text-slate-600">
                                 {formatCurrency(product.unit_price || 0)}
                               </TableCell>
-                              <TableCell className="text-right">
-                                {product.tax_rate != null ? (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200">
-                                    {product.tax_rate}%
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-slate-400">—</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-medium text-slate-800">
-                                {formatCurrency(product.baseSpend || 0)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-amber-700">
-                                {formatCurrency(product.taxSpend || 0)}
-                              </TableCell>
                               <TableCell className="text-right font-mono font-semibold text-emerald-700">
                                 {formatCurrency(product.totalSpend || 0)}
                               </TableCell>
@@ -1538,7 +1406,7 @@ const Analytics = () => {
           </TabsContent>
 
           {/* Issues Tab */}
-          <TabsContent value="issues" className="space-y-6">
+          <TabsContent value="issues">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -1577,189 +1445,35 @@ const Analytics = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5" />
-                    Issue Summary & Vendor Breakdown
+                    Issue Summary
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="p-3 bg-amber-50 rounded-lg text-center">
-                        <p className="text-2xl font-bold text-amber-700">{analytics.issueSummary?.totalIssues ?? 0}</p>
-                        <p className="text-xs text-amber-600">Total Issues</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-red-50 rounded-lg text-center">
+                        <p className="text-3xl font-bold text-red-700">{data.issues.filter(i => i.status === "open").length}</p>
+                        <p className="text-sm text-red-600">Open Issues</p>
                       </div>
-                      <div className="p-3 bg-red-50 rounded-lg text-center">
-                        <p className="text-2xl font-bold text-red-700">{analytics.issueSummary?.openIssues ?? 0}</p>
-                        <p className="text-xs text-red-600">Open Issues</p>
-                      </div>
-                      <div className="p-3 bg-emerald-50 rounded-lg text-center">
-                        <p className="text-2xl font-bold text-emerald-700">{analytics.issueSummary?.resolvedIssues ?? 0}</p>
-                        <p className="text-xs text-emerald-600">Resolved</p>
+                      <div className="p-4 bg-emerald-50 rounded-lg text-center">
+                        <p className="text-3xl font-bold text-emerald-700">{data.issues.filter(i => i.status === "resolved").length}</p>
+                        <p className="text-sm text-emerald-600">Resolved</p>
                       </div>
                     </div>
-
-                    {/* Vendor-wise Issue Breakdown */}
-                    {analytics.vendorSpend.filter(v => v.issues > 0).length > 0 && (
-                      <div className="p-3 bg-slate-50 rounded-lg space-y-2">
-                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                          Issues by Vendor (Open vs Resolved)
-                        </p>
-                        {analytics.vendorSpend
-                          .filter(v => v.issues > 0)
-                          .map((v, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-sm py-1 border-b border-slate-200/60 last:border-0">
-                              <span className="font-medium text-slate-800">{v.name}</span>
-                              <div className="flex items-center gap-2 font-mono text-xs">
-                                <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700">
-                                  Total: {v.issues}
-                                </span>
-                                <span className="px-2 py-0.5 rounded bg-red-100 text-red-700">
-                                  Open: {v.openIssues}
-                                </span>
-                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold">
-                                  Resolved: {v.resolvedIssues}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-
-                    <div className="p-3 bg-slate-50 rounded-lg flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Most Common Issue</span>
-                      <span className="text-sm font-semibold capitalize text-slate-900">
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <p className="text-sm text-slate-600 mb-2">Most Common Issue</p>
+                      <p className="text-lg font-medium capitalize">
                         {analytics.issueTypes[0]?.type.replace(/_/g, ' ') || "None"}
-                      </span>
+                      </p>
+                    </div>
+                    <div className="p-4 bg-amber-50 rounded-lg">
+                      <p className="text-sm text-amber-600 mb-2">Total Issues</p>
+                      <p className="text-lg font-medium">{data.issues.length} issues reported</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
-
-            {/* Detailed Issues Table (Resolved / Open / All) */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
-                  {issueViewMode === "resolved"
-                    ? "Resolved Issues Details"
-                    : issueViewMode === "open"
-                    ? "Open Issues Details"
-                    : "All Issues Details"}
-                </CardTitle>
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-                  <button
-                    type="button"
-                    onClick={() => setIssueViewMode("resolved")}
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                      issueViewMode === "resolved"
-                        ? "bg-white text-emerald-700 shadow-sm"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Resolved ({analytics.issueSummary?.resolvedIssues ?? 0})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIssueViewMode("open")}
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                      issueViewMode === "open"
-                        ? "bg-white text-red-700 shadow-sm"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Open ({analytics.issueSummary?.openIssues ?? 0})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIssueViewMode("all")}
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                      issueViewMode === "all"
-                        ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    All ({analytics.issueSummary?.totalIssues ?? 0})
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {(() => {
-                  const allIssues = analytics.enrichedIssues || [];
-                  const displayedIssues =
-                    issueViewMode === "resolved"
-                      ? allIssues.filter(i => i.isResolved)
-                      : issueViewMode === "open"
-                      ? allIssues.filter(i => !i.isResolved)
-                      : allIssues;
-
-                  if (displayedIssues.length === 0) {
-                    return (
-                      <p className="text-center text-slate-500 py-6 text-sm">
-                        No {issueViewMode !== "all" ? issueViewMode : ""} issues found.
-                      </p>
-                    );
-                  }
-
-                  return (
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-slate-50">
-                          <TableHead>Issue #</TableHead>
-                          <TableHead>PO Number</TableHead>
-                          <TableHead>Vendor</TableHead>
-                          <TableHead>Issue Type</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Description / Resolution</TableHead>
-                          <TableHead className="text-right">Date</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {displayedIssues.map((issue, idx) => (
-                          <TableRow key={issue.id || idx}>
-                            <TableCell className="font-mono font-medium text-slate-900">
-                              {issue.issue_number || "—"}
-                            </TableCell>
-                            <TableCell className="font-mono text-slate-700">
-                              {issue.po_number || "—"}
-                            </TableCell>
-                            <TableCell className="font-medium text-slate-800">
-                              {issue.vendor_name || "—"}
-                            </TableCell>
-                            <TableCell className="capitalize text-slate-600">
-                              {(issue.issue_type || "other").replace(/_/g, " ")}
-                            </TableCell>
-                            <TableCell>
-                              {issue.isResolved ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                                  Resolved
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                                  Open
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="max-w-[300px]">
-                              <p className="text-xs text-slate-700 truncate" title={issue.description}>
-                                {issue.description || "—"}
-                              </p>
-                              {issue.resolution && (
-                                <p className="text-xs text-emerald-700 font-medium truncate mt-0.5" title={issue.resolution}>
-                                  Resolution: {issue.resolution}
-                                </p>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right text-xs text-slate-500">
-                              {issue.created_at ? new Date(issue.created_at).toLocaleDateString("en-IN") : "—"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  );
-                })()}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Vendors Tab */}
@@ -1779,14 +1493,10 @@ const Analytics = () => {
                         <TableHead>#</TableHead>
                         <TableHead>Vendor</TableHead>
                         <TableHead className="text-right">Orders</TableHead>
-                        <TableHead className="text-right">Total Issues</TableHead>
-                        <TableHead className="text-right">Open Issues</TableHead>
-                        <TableHead className="text-right">Resolved Issues</TableHead>
-                        <TableHead className="text-right">Spend (Without GST)</TableHead>
-                        <TableHead className="text-right">GST Amount</TableHead>
-                        <TableHead className="text-right">Total Spend (With GST)</TableHead>
+                        <TableHead className="text-right">Issues</TableHead>
+                        <TableHead className="text-right">Total Spend</TableHead>
                         <TableHead className="text-right">% of Total</TableHead>
-                        <TableHead className="w-[140px]">Share</TableHead>
+                        <TableHead className="w-[150px]">Share</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1797,36 +1507,16 @@ const Analytics = () => {
                         return (
                           <TableRow key={idx}>
                             <TableCell className="font-medium">{idx + 1}</TableCell>
-                            <TableCell className="font-medium text-slate-900">{vendor.name}</TableCell>
-                            <TableCell className="text-right font-mono">{vendor.orders}</TableCell>
-                            <TableCell className="text-right font-mono">
+                            <TableCell>{vendor.name}</TableCell>
+                            <TableCell className="text-right">{vendor.orders}</TableCell>
+                            <TableCell className="text-right">
                               {vendor.issues > 0 ? (
-                                <span className="font-semibold text-slate-800">{vendor.issues}</span>
+                                <span className="text-red-600 font-medium">{vendor.issues}</span>
                               ) : (
-                                <span className="text-slate-400">0</span>
+                                <span className="text-emerald-600">0</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {vendor.openIssues > 0 ? (
-                                <span className="px-2 py-0.5 rounded bg-red-50 text-red-600 font-medium text-xs">
-                                  {vendor.openIssues}
-                                </span>
-                              ) : (
-                                <span className="text-emerald-600 text-xs">0</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {vendor.resolvedIssues > 0 ? (
-                                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold text-xs">
-                                  {vendor.resolvedIssues}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 text-xs">0</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-slate-700">{formatCurrency(vendor.baseAmount || 0)}</TableCell>
-                            <TableCell className="text-right font-mono text-amber-700">{formatCurrency(vendor.taxAmount || 0)}</TableCell>
-                            <TableCell className="text-right font-mono font-semibold text-emerald-700">{formatCurrency(vendor.amount)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatCurrency(vendor.amount)}</TableCell>
                             <TableCell className="text-right">{percentage}%</TableCell>
                             <TableCell>
                               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
