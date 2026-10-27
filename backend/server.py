@@ -88,9 +88,11 @@ client = multidb_manager.primary_client
 SECRET_KEY = os.environ['SECRET_KEY']
 ALGORITHM = "HS256"
 
-# PO Sync Webhook Configuration
+# PO & Product Sync Webhook Configuration
 PO_SYNC_WEBHOOK_URL = os.environ.get('PO_SYNC_WEBHOOK_URL', '')
 PO_SYNC_WEBHOOK_SECRET = os.environ.get('PO_SYNC_WEBHOOK_SECRET', '')
+PRODUCT_SYNC_WEBHOOK_URL = os.environ.get('PRODUCT_SYNC_WEBHOOK_URL', '')
+PRODUCT_SYNC_WEBHOOK_SECRET = os.environ.get('PRODUCT_SYNC_WEBHOOK_SECRET', '')
 
 # Create the main app
 app = FastAPI(title="OLL Vendor Management System")
@@ -227,6 +229,7 @@ class ProductCreate(BaseModel):
     unit: str = "pcs"
     is_active: bool = True
     in_stock: bool = True
+    stock_status: str = "in_stock"
     image_url: Optional[str] = None
     show_on_shop: bool = False
     mrp: Optional[float] = None
@@ -800,6 +803,40 @@ async def trigger_po_sync_webhook():
         logger.error(f"PO sync webhook error: {e}")
         return False
 
+async def trigger_product_sync_webhook(product: dict):
+    """Notify external storefronts/apps whenever a product's stock or details change in real time"""
+    url = PRODUCT_SYNC_WEBHOOK_URL or PO_SYNC_WEBHOOK_URL
+    secret = PRODUCT_SYNC_WEBHOOK_SECRET or PO_SYNC_WEBHOOK_SECRET
+    if not url:
+        return False
+    
+    try:
+        in_stock_val = bool(product.get("in_stock", True))
+        payload = {
+            "event": "product.stock_updated",
+            "product_id": product.get("id"),
+            "sku": product.get("sku"),
+            "name": product.get("name"),
+            "in_stock": in_stock_val,
+            "is_in_stock": in_stock_val,
+            "stock_status": "in_stock" if in_stock_val else "out_of_stock",
+            "show_on_shop": bool(product.get("show_on_shop", False)),
+            "mrp": product.get("mrp"),
+            "updated_at": product.get("updated_at") or datetime.now(timezone.utc).isoformat()
+        }
+        target_url = f"{url}?secret={secret}" if secret else url
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(target_url, json=payload)
+            if response.status_code in (200, 201, 204):
+                logger.info(f"Product stock sync webhook sent for SKU: {product.get('sku')} (in_stock: {in_stock_val})")
+                return True
+            else:
+                logger.warning(f"Product sync webhook returned status {response.status_code}")
+                return False
+    except Exception as e:
+        logger.warning(f"Product sync webhook error: {e}")
+        return False
+
 # ========================
 # AUTH ENDPOINTS
 # ========================
@@ -1137,6 +1174,7 @@ def _normalize_product_doc(p: dict) -> dict:
         p["unit"] = "pcs"
     p["show_on_shop"] = bool(p.get("show_on_shop", False))
     p["in_stock"] = bool(p.get("in_stock", True))
+    p["stock_status"] = "in_stock" if p["in_stock"] else "out_of_stock" 
     if not isinstance(p.get("shop_images"), list):
         p["shop_images"] = []
     if not isinstance(p.get("shop_videos"), list):
@@ -1233,6 +1271,9 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
     vendor = await db.vendors.find_one({"id": updated["vendor_id"]}, {"_id": 0})
     updated["vendor_name"] = vendor.get("name") if vendor else None
     _normalize_product_doc(updated)
+    
+    # Broadcast stock/product changes to any connected external applications
+    asyncio.create_task(trigger_product_sync_webhook(updated))
     
     return ProductResponse(**updated)
 
@@ -2759,51 +2800,72 @@ async def track_order(tracking_token: str):
 # PUBLIC PO REQUEST ENDPOINT (No Auth)
 # ========================
 
+def _format_public_product_doc(p: dict, vendor_name: str = "") -> dict:
+    in_stock_val = bool(p.get("in_stock", True))
+    return {
+        "id": p["id"],
+        "name": p["name"],
+        "sku": p.get("sku", ""),
+        "vendor_id": p.get("vendor_id"),
+        "vendor_name": vendor_name,
+        "category": p.get("category"),
+        "unit": p.get("unit", "pcs"),
+        "description": p.get("description", ""),
+        "image_url": p.get("image_url"),
+        "show_on_shop": bool(p.get("show_on_shop", False)),
+        "in_stock": in_stock_val,
+        "is_in_stock": in_stock_val,
+        "stock_status": "in_stock" if in_stock_val else "out_of_stock",
+        "mrp": p.get("mrp"),
+        "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
+        "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
+        "youtube_url": p.get("youtube_url"),
+        "kit_includes": p.get("kit_includes") if isinstance(p.get("kit_includes"), list) else [],
+        "dimensions": p.get("dimensions"),
+        "additional_info": p.get("additional_info"),
+    }
+
 @api_router.get("/public/products")
-async def get_public_products(show_on_shop: Optional[bool] = None, category: Optional[str] = None):
+async def get_public_products(
+    show_on_shop: Optional[bool] = None, 
+    in_stock: Optional[bool] = None, 
+    category: Optional[str] = None
+):
     """Get list of products for public PO request form or public shop (no authentication required)"""
     query: Dict[str, Any] = {"is_active": True}
     if show_on_shop is not None:
         query["show_on_shop"] = show_on_shop
+    if in_stock is not None:
+        query["in_stock"] = in_stock
     if category:
         query["category"] = category
     products = await db.products.find(query, {"_id": 0}).to_list(1000)
     
-    # Get vendor names for display
-    vendor_ids = list(set(p["vendor_id"] for p in products))
+    vendor_ids = list(set(p["vendor_id"] for p in products if p.get("vendor_id")))
     vendors = await db.vendors.find({"id": {"$in": vendor_ids}}, {"_id": 0}).to_list(1000)
     vendor_map = {v["id"]: v["name"] for v in vendors}
     
-    # Return products with vendor names and shop details but without sensitive vendor unit_price
-    result = []
-    for p in products:
-        result.append({
-            "id": p["id"],
-            "name": p["name"],
-            "sku": p.get("sku", ""),
-            "vendor_id": p["vendor_id"],
-            "vendor_name": vendor_map.get(p["vendor_id"], ""),
-            "category": p.get("category"),
-            "unit": p.get("unit", "pcs"),
-            "description": p.get("description", ""),
-            "image_url": p.get("image_url"),
-            "show_on_shop": bool(p.get("show_on_shop", False)),
-            "in_stock": bool(p.get("in_stock", True)),
-            "mrp": p.get("mrp"),
-            "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
-            "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
-            "youtube_url": p.get("youtube_url"),
-            "kit_includes": p.get("kit_includes") if isinstance(p.get("kit_includes"), list) else [],
-            "dimensions": p.get("dimensions"),
-            "additional_info": p.get("additional_info"),
-        })
-    
-    return result
+    return [_format_public_product_doc(p, vendor_map.get(p.get("vendor_id"), "")) for p in products]
 
 @api_router.get("/public/shop/products")
-async def get_public_shop_products(category: Optional[str] = None):
+async def get_public_shop_products(category: Optional[str] = None, in_stock: Optional[bool] = None):
     """Get active products marked as show_on_shop=True for the public shop (no authentication required)"""
-    return await get_public_products(show_on_shop=True, category=category)
+    return await get_public_products(show_on_shop=True, in_stock=in_stock, category=category)
+
+@api_router.get("/public/shop/products/{product_id}")
+@api_router.get("/public/products/{product_id}")
+async def get_public_product(product_id: str):
+    """Get single product by ID or SKU with public shop details and live stock availability (no auth required)"""
+    product = await db.products.find_one(
+        {"$or": [{"id": product_id}, {"sku": product_id}], "is_active": True},
+        {"_id": 0}
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    vendor = None
+    if product.get("vendor_id"):
+        vendor = await db.vendors.find_one({"id": product["vendor_id"]}, {"_id": 0, "name": 1})
+    return _format_public_product_doc(product, vendor.get("name") if vendor else "")
 
 @api_router.post("/public/po-request", response_model=PublicPORequestResponse)
 async def create_public_po_request(request: PublicPORequest):
@@ -4555,6 +4617,7 @@ async def delete_api_key(key_id: str, current_user: dict = Depends(get_current_u
 
 # External API Key for third-party access (fallback to env var)
 EXTERNAL_API_KEY = os.environ.get('EXTERNAL_API_KEY', '')
+INTEGRATION_API_KEY = os.environ.get('INTEGRATION_API_KEY', '')
 
 async def verify_external_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
     """Verify external API key for third-party applications"""
@@ -6036,6 +6099,7 @@ async def integration_list_products(
     vendor_name: Optional[str] = None,
     category: Optional[str] = None,
     show_on_shop: Optional[bool] = None,
+    in_stock: Optional[bool] = None,
     api_key_valid: bool = Depends(verify_integration_api_key)
 ):
     """
@@ -6049,6 +6113,8 @@ async def integration_list_products(
     query: Dict[str, Any] = {"is_active": True}
     if show_on_shop is not None:
         query["show_on_shop"] = show_on_shop
+    if in_stock is not None:
+        query["in_stock"] = in_stock
     if category:
         query["category"] = category
     
@@ -6086,6 +6152,8 @@ async def integration_list_products(
                 "image_url": p.get("image_url"),
                 "show_on_shop": bool(p.get("show_on_shop", False)),
                 "in_stock": bool(p.get("in_stock", True)),
+                "is_in_stock": bool(p.get("in_stock", True)),
+                "stock_status": "in_stock" if bool(p.get("in_stock", True)) else "out_of_stock",
                 "mrp": p.get("mrp"),
                 "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
                 "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
@@ -6102,6 +6170,7 @@ async def integration_list_products(
 @api_router.get("/external/products")
 async def external_list_products(
     show_on_shop: Optional[bool] = None,
+    in_stock: Optional[bool] = None,
     vendor_id: Optional[str] = None,
     category: Optional[str] = None,
     _: bool = Depends(verify_external_api_key)
@@ -6113,6 +6182,8 @@ async def external_list_products(
     query: Dict[str, Any] = {"is_active": True}
     if show_on_shop is not None:
         query["show_on_shop"] = show_on_shop
+    if in_stock is not None:
+        query["in_stock"] = in_stock
     if vendor_id:
         query["vendor_id"] = vendor_id
     if category:
@@ -6139,6 +6210,8 @@ async def external_list_products(
                 "image_url": p.get("image_url"),
                 "show_on_shop": bool(p.get("show_on_shop", False)),
                 "in_stock": bool(p.get("in_stock", True)),
+                "is_in_stock": bool(p.get("in_stock", True)),
+                "stock_status": "in_stock" if bool(p.get("in_stock", True)) else "out_of_stock",
                 "mrp": p.get("mrp"),
                 "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
                 "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
