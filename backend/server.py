@@ -226,6 +226,7 @@ class ProductCreate(BaseModel):
     description: Optional[str] = None
     unit: str = "pcs"
     is_active: bool = True
+    in_stock: bool = True
     image_url: Optional[str] = None
     show_on_shop: bool = False
     mrp: Optional[float] = None
@@ -246,6 +247,7 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     unit: Optional[str] = None
     is_active: Optional[bool] = None
+    in_stock: Optional[bool] = None
     image_url: Optional[str] = None
     show_on_shop: Optional[bool] = None
     mrp: Optional[float] = None
@@ -268,6 +270,7 @@ class ProductResponse(BaseModel):
     description: Optional[str] = None
     unit: str = "pcs"
     is_active: bool = True
+    in_stock: bool = True
     image_url: Optional[str] = None
     show_on_shop: bool = False
     mrp: Optional[float] = None
@@ -1053,6 +1056,7 @@ class ProductImportItem(BaseModel):
     description: Optional[str] = ""
     unit: str = "pcs"
     is_active: bool = True
+    in_stock: bool = True
 
 class ProductImportRequest(BaseModel):
     products: List[ProductImportItem]
@@ -1100,6 +1104,7 @@ async def import_products(import_data: ProductImportRequest, current_user: dict 
                 "description": item.description or "",
                 "unit": item.unit or "pcs",
                 "is_active": item.is_active,
+                "in_stock": item.in_stock,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
@@ -1131,6 +1136,7 @@ def _normalize_product_doc(p: dict) -> dict:
     if not p.get("unit"):
         p["unit"] = "pcs"
     p["show_on_shop"] = bool(p.get("show_on_shop", False))
+    p["in_stock"] = bool(p.get("in_stock", True))
     if not isinstance(p.get("shop_images"), list):
         p["shop_images"] = []
     if not isinstance(p.get("shop_videos"), list):
@@ -1153,6 +1159,7 @@ async def get_products(
     vendor_id: Optional[str] = None,
     category: Optional[str] = None,
     is_active: Optional[bool] = None,
+    in_stock: Optional[bool] = None,
     show_on_shop: Optional[bool] = None,
     current_user: dict = Depends(get_current_user)
 ):
@@ -1163,6 +1170,8 @@ async def get_products(
         query["category"] = category
     if is_active is not None:
         query["is_active"] = is_active
+    if in_stock is not None:
+        query["in_stock"] = in_stock
     if show_on_shop is not None:
         query["show_on_shop"] = show_on_shop
     
@@ -2779,6 +2788,7 @@ async def get_public_products(show_on_shop: Optional[bool] = None, category: Opt
             "description": p.get("description", ""),
             "image_url": p.get("image_url"),
             "show_on_shop": bool(p.get("show_on_shop", False)),
+            "in_stock": bool(p.get("in_stock", True)),
             "mrp": p.get("mrp"),
             "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
             "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
@@ -6075,6 +6085,7 @@ async def integration_list_products(
                 "description": p.get("description"),
                 "image_url": p.get("image_url"),
                 "show_on_shop": bool(p.get("show_on_shop", False)),
+                "in_stock": bool(p.get("in_stock", True)),
                 "mrp": p.get("mrp"),
                 "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
                 "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
@@ -6127,6 +6138,7 @@ async def external_list_products(
                 "description": p.get("description"),
                 "image_url": p.get("image_url"),
                 "show_on_shop": bool(p.get("show_on_shop", False)),
+                "in_stock": bool(p.get("in_stock", True)),
                 "mrp": p.get("mrp"),
                 "shop_images": p.get("shop_images") if isinstance(p.get("shop_images"), list) else [],
                 "shop_videos": p.get("shop_videos") if isinstance(p.get("shop_videos"), list) else [],
@@ -6401,6 +6413,7 @@ async def create_indexes():
         # Product indexes
         await db.products.create_index([("vendor_id", 1)])
         await db.products.create_index([("is_active", 1)])
+        await db.products.create_index([("in_stock", 1)])
         await db.products.create_index([("show_on_shop", 1)])
         
         # Uploaded files index

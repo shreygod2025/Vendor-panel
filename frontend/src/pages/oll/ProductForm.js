@@ -44,6 +44,7 @@ const ProductForm = () => {
     description: "",
     unit: "pcs",
     is_active: true,
+    in_stock: true,
     image_url: "",
     show_on_shop: false,
     mrp: "",
@@ -93,6 +94,7 @@ const ProductForm = () => {
         description: p.description || "",
         unit: p.unit || "pcs",
         is_active: p.is_active !== false,
+        in_stock: p.in_stock !== false,
         image_url: p.image_url || "",
         show_on_shop: Boolean(p.show_on_shop),
         mrp: p.mrp != null ? p.mrp.toString() : "",
@@ -265,6 +267,7 @@ const ProductForm = () => {
       description: formData.description || null,
       unit: formData.unit,
       is_active: formData.is_active,
+      in_stock: formData.in_stock,
       image_url: formData.image_url || null,
       show_on_shop: formData.show_on_shop,
       mrp: formData.show_on_shop && formData.mrp ? parseFloat(formData.mrp) : null,
@@ -713,16 +716,42 @@ const ProductForm = () => {
                 </div>
               )}
 
-              <div className="flex items-center justify-between py-3 px-4 bg-slate-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-slate-900">Active Status</p>
-                  <p className="text-sm text-slate-500">Enable or disable this product</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between py-3 px-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div>
+                    <p className="font-medium text-slate-900">Active Status</p>
+                    <p className="text-sm text-slate-500">Enable or disable this product</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${formData.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
+                      {formData.is_active ? "Active" : "Inactive"}
+                    </span>
+                    <Switch
+                      checked={formData.is_active}
+                      onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
+                      data-testid="product-active-switch"
+                    />
+                  </div>
                 </div>
-                <Switch
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
-                  data-testid="product-active-switch"
-                />
+
+                <div className="flex items-center justify-between py-3 px-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div>
+                    <p className="font-medium text-slate-900">Stock Availability</p>
+                    <p className="text-sm text-slate-500">
+                      {formData.in_stock ? "Currently In Stock" : "Currently Out of Stock"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${formData.in_stock ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                      {formData.in_stock ? "In Stock" : "Out of Stock"}
+                    </span>
+                    <Switch
+                      checked={formData.in_stock}
+                      onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, in_stock: checked }))}
+                      data-testid="product-stock-switch"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t">

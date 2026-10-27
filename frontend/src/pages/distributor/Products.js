@@ -25,6 +25,7 @@ const DistributorProducts = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("all");
+  const [stockFilter, setStockFilter] = useState("all");
 
   useEffect(() => {
     fetchData();
@@ -50,7 +51,11 @@ const DistributorProducts = () => {
       product.name.toLowerCase().includes(search.toLowerCase()) ||
       product.sku.toLowerCase().includes(search.toLowerCase());
     const matchesVendor = vendorFilter === "all" || product.vendor_id === vendorFilter;
-    return matchesSearch && matchesVendor;
+    const matchesStock =
+      stockFilter === "all" ||
+      (stockFilter === "in_stock" && product.in_stock !== false) ||
+      (stockFilter === "out_of_stock" && product.in_stock === false);
+    return matchesSearch && matchesVendor && matchesStock;
   });
 
   return (
@@ -83,6 +88,16 @@ const DistributorProducts = () => {
               ))}
             </SelectContent>
           </Select>
+          <Select value={stockFilter} onValueChange={setStockFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Filter by stock" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Stock</SelectItem>
+              <SelectItem value="in_stock">In Stock</SelectItem>
+              <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Table */}
@@ -105,6 +120,7 @@ const DistributorProducts = () => {
                   <TableHead>SKU</TableHead>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Unit</TableHead>
+                  <TableHead>Stock</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -124,6 +140,15 @@ const DistributorProducts = () => {
                     </TableCell>
                     <TableCell>{product.vendor_name}</TableCell>
                     <TableCell>{product.unit || 'pcs'}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
+                        product.in_stock !== false
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : 'bg-rose-100 text-rose-800 border border-rose-200'
+                      }`}>
+                        {product.in_stock !== false ? "In Stock" : "Out of Stock"}
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <span className={`badge ${product.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                         {product.is_active ? "Available" : "Unavailable"}

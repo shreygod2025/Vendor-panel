@@ -295,7 +295,14 @@ const DistributorPurchaseOrderForm = () => {
                                             className={`mr-2 h-4 w-4 ${item.product_id === product.id ? "opacity-100" : "opacity-0"}`}
                                           />
                                           <div className="flex flex-col">
-                                            <span className="font-medium">{product.name}</span>
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-medium">{product.name}</span>
+                                              {product.in_stock === false && (
+                                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">
+                                                  Out of stock
+                                                </span>
+                                              )}
+                                            </div>
                                             <span className="text-xs text-slate-500">{product.sku}</span>
                                           </div>
                                         </CommandItem>

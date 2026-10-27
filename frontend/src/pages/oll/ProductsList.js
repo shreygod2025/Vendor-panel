@@ -45,6 +45,7 @@ const ProductsList = () => {
   const [vendorFilter, setVendorFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [stockFilter, setStockFilter] = useState("all");
   
   // Import dialog state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -93,11 +94,11 @@ const ProductsList = () => {
 
   // Download sample CSV
   const downloadSampleFile = () => {
-    const sampleData = `name,sku,vendor_name,category,unit_price,tax_rate,description,is_active
-"Industrial Motor A1",SKU-MOTOR-001,"Tech Components Pvt Ltd","Individual Components",15000,18,"High performance industrial motor",true
-"Steel Bearings Set",SKU-BEAR-002,"Tech Components Pvt Ltd","Individual Components",3500,18,"Premium steel bearings pack of 10",true
-"Control Panel Unit",SKU-CTRL-003,"Supreme Electricals","Curriculum Robotic Kits",25000,18,"Advanced control panel with LCD display",true
-"Copper Wire Bundle",SKU-WIRE-004,"Supreme Electricals","Individual Components",8000,18,"100m copper wire bundle",true`;
+    const sampleData = `name,sku,vendor_name,category,unit_price,tax_rate,description,is_active,in_stock
+"Industrial Motor A1",SKU-MOTOR-001,"Tech Components Pvt Ltd","Individual Components",15000,18,"High performance industrial motor",true,true
+"Steel Bearings Set",SKU-BEAR-002,"Tech Components Pvt Ltd","Individual Components",3500,18,"Premium steel bearings pack of 10",true,true
+"Control Panel Unit",SKU-CTRL-003,"Supreme Electricals","Curriculum Robotic Kits",25000,18,"Advanced control panel with LCD display",true,true
+"Copper Wire Bundle",SKU-WIRE-004,"Supreme Electricals","Individual Components",8000,18,"100m copper wire bundle",true,false`;
 
     const blob = new Blob([sampleData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -190,7 +191,8 @@ const ProductsList = () => {
             unit_price: parseFloat(row.unit_price) || 0,
             tax_rate: parseFloat(row.tax_rate) || 18,
             description: row.description || '',
-            is_active: row.is_active !== 'false' && row.is_active !== false
+            is_active: row.is_active !== 'false' && row.is_active !== false,
+            in_stock: row.in_stock !== 'false' && row.in_stock !== false
           })).filter(p => p.name && p.sku && p.vendor_name);
 
           if (productsToImport.length === 0) {
@@ -243,7 +245,11 @@ const ProductsList = () => {
       statusFilter === "all" || 
       (statusFilter === "active" && product.is_active) ||
       (statusFilter === "inactive" && !product.is_active);
-    return matchesSearch && matchesVendor && matchesCategory && matchesStatus;
+    const matchesStock =
+      stockFilter === "all" ||
+      (stockFilter === "in_stock" && product.in_stock !== false) ||
+      (stockFilter === "out_of_stock" && product.in_stock === false);
+    return matchesSearch && matchesVendor && matchesCategory && matchesStatus && matchesStock;
   });
 
   return (
@@ -308,6 +314,16 @@ const ProductsList = () => {
               ))}
             </SelectContent>
           </Select>
+          <Select value={stockFilter} onValueChange={setStockFilter}>
+            <SelectTrigger className="w-[150px]" data-testid="stock-filter">
+              <SelectValue placeholder="Stock" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Stock</SelectItem>
+              <SelectItem value="in_stock">In Stock</SelectItem>
+              <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[150px]" data-testid="status-filter">
               <SelectValue placeholder="Status" />
@@ -351,6 +367,7 @@ const ProductsList = () => {
                   <TableHead>Vendor</TableHead>
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Tax Rate</TableHead>
+                  <TableHead>Stock</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -398,6 +415,15 @@ const ProductsList = () => {
                     <TableCell>{product.vendor_name}</TableCell>
                     <TableCell className="font-mono">{formatCurrency(product.unit_price)}</TableCell>
                     <TableCell>{product.tax_rate}%</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
+                        product.in_stock !== false
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : 'bg-rose-100 text-rose-800 border border-rose-200'
+                      }`}>
+                        {product.in_stock !== false ? "In Stock" : "Out of Stock"}
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <span className={`badge ${product.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                         {product.is_active ? "Active" : "Inactive"}
