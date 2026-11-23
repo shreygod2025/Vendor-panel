@@ -428,7 +428,7 @@ const InventoryPage = () => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingItem ? "Edit Inventory Item" : "Add Inventory Item"}
@@ -444,13 +444,15 @@ const InventoryPage = () => {
                 onValueChange={handleProductSelect}
                 disabled={editingItem !== null}
               >
-                <SelectTrigger data-testid="product-select">
+                <SelectTrigger data-testid="product-select" className="w-full">
                   <SelectValue placeholder="Choose a product from the list" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-60 overflow-y-auto">
                   {products.map((product) => (
                     <SelectItem key={product.id} value={product.id}>
-                      {product.name} {product.sku ? `(${product.sku})` : ''}
+                      <span className="truncate block max-w-[320px] sm:max-w-[420px]">
+                        {product.name} {product.sku ? `(${product.sku})` : ''}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -463,35 +465,35 @@ const InventoryPage = () => {
             {/* Show selected product info */}
             {formData.product_name && (
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-blue-600">Product:</span>
-                    <span className="ml-2 font-medium">{formData.product_name}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="text-blue-600 font-medium">Product:</span>
+                    <span className="ml-2 font-medium text-slate-900 break-words">{formData.product_name}</span>
                   </div>
                   {formData.sku && (
-                    <div>
-                      <span className="text-blue-600">SKU:</span>
-                      <span className="ml-2 font-mono">{formData.sku}</span>
+                    <div className="min-w-0">
+                      <span className="text-blue-600 font-medium">SKU:</span>
+                      <span className="ml-2 font-mono text-slate-800 break-all">{formData.sku}</span>
                     </div>
                   )}
                   {formData.category && (
-                    <div>
-                      <span className="text-blue-600">Category:</span>
-                      <span className="ml-2">{formData.category}</span>
+                    <div className="min-w-0">
+                      <span className="text-blue-600 font-medium">Category:</span>
+                      <span className="ml-2 text-slate-800 break-words">{formData.category}</span>
                     </div>
                   )}
                   {formData.unit_price && (
-                    <div>
-                      <span className="text-blue-600">Unit Price:</span>
-                      <span className="ml-2 font-mono">{formatCurrency(parseFloat(formData.unit_price))}</span>
+                    <div className="min-w-0">
+                      <span className="text-blue-600 font-medium">Unit Price:</span>
+                      <span className="ml-2 font-mono text-slate-800">{formatCurrency(parseFloat(formData.unit_price))}</span>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="min-w-0">
                 <Label htmlFor="quantity">Quantity *</Label>
                 <Input
                   id="quantity"
@@ -500,10 +502,11 @@ const InventoryPage = () => {
                   value={formData.quantity}
                   onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
                   placeholder="0"
+                  className="w-full"
                   data-testid="quantity-input"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="unit_price">Unit Price (₹) *</Label>
                 <Input
                   id="unit_price"
@@ -513,16 +516,17 @@ const InventoryPage = () => {
                   value={formData.unit_price}
                   onChange={(e) => setFormData(prev => ({ ...prev, unit_price: e.target.value }))}
                   placeholder="0.00"
+                  className="w-full"
                   data-testid="unit-price-input"
                 />
               </div>
             </div>
 
             {formData.quantity && formData.unit_price && (
-              <div className="p-3 bg-emerald-50 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <span className="text-emerald-700 font-medium">Total Value:</span>
-                  <span className="text-xl font-bold text-emerald-600 font-mono">
+              <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-emerald-700 font-medium text-sm sm:text-base">Total Value:</span>
+                  <span className="text-lg sm:text-xl font-bold text-emerald-600 font-mono truncate">
                     {formatCurrency(parseInt(formData.quantity) * parseFloat(formData.unit_price))}
                   </span>
                 </div>
@@ -536,6 +540,7 @@ const InventoryPage = () => {
                 value={formData.location}
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="e.g., Office Shelf A, Warehouse Rack 3"
+                className="w-full"
               />
             </div>
 
@@ -547,10 +552,11 @@ const InventoryPage = () => {
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Additional details about this item..."
                 rows={3}
+                className="w-full resize-none"
               />
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="pt-2 sm:pt-4 border-t mt-4">
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
                 Cancel
               </Button>
