@@ -18,6 +18,7 @@ from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
 import asyncio
+import re
 from io import BytesIO
 import httpx
 
@@ -344,6 +345,9 @@ class POImport(BaseModel):
     status: str = "delivered"
     notes: Optional[str] = None
 
+class POCancelRequest(BaseModel):
+    reason: Optional[str] = None
+
 class POResponse(BaseModel):
     id: str
     po_number: str
@@ -377,8 +381,13 @@ class POResponse(BaseModel):
     created_by_role: Optional[str] = None
     created_by_name: Optional[str] = None
     distributor_id: Optional[str] = None
-    # Rejection reason
+    # Rejection & Cancellation fields
     rejection_reason: Optional[str] = None
+    cancellation_reason: Optional[str] = None
+    cancelled_at: Optional[str] = None
+    cancelled_by: Optional[str] = None
+    inventory_deducted: Optional[bool] = False
+    inventory_adjustments: Optional[List[Dict]] = []
     # External request fields
     requester_name: Optional[str] = None
     is_external_request: Optional[bool] = False
@@ -781,6 +790,182 @@ def calculate_po_totals(line_items: List[POLineItem], order_discount_amount: flo
         "total_tax": round(total_tax, 2),
         "grand_total": round(grand_total, 2)
     }
+
+async def find_inventory_item_for_line_item(item: dict, db):
+    """Find matching inventory item by product_id, sku, or product_name."""
+    inv_item = None
+    product_id = item.get("product_id")
+    sku = item.get("sku")
+    name = item.get("product_name")
+
+    if product_id:
+        inv_item = await db.inventory.find_one({"product_id": str(product_id)}, {"_id": 0})
+        if not inv_item:
+            inv_item = await db.inventory.find_one({"id": str(product_id)}, {"_id": 0})
+
+    if not inv_item and sku and str(sku).strip():
+        clean_sku = str(sku).strip()
+        inv_item = await db.inventory.find_one(
+            {"sku": {"$regex": f"^{re.escape(clean_sku)}$", "$options": "i"}},
+            {"_id": 0}
+        )
+
+    if not inv_item and name and str(name).strip():
+        clean_name = str(name).strip()
+        inv_item = await db.inventory.find_one(
+            {"product_name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}},
+            {"_id": 0}
+        )
+
+    return inv_item
+
+async def deduct_inventory_for_po(po_doc: dict, db, current_user: Optional[dict] = None) -> List[dict]:
+    """
+    Deducts line item quantities from the inventory collection when a PO is raised.
+    Returns list of adjustment records.
+    """
+    line_items = po_doc.get("line_items", [])
+    adjustments = []
+
+    for item in line_items:
+        try:
+            qty = int(item.get("quantity") or 0)
+        except (ValueError, TypeError):
+            qty = 0
+
+        if qty <= 0:
+            continue
+
+        inv_item = await find_inventory_item_for_line_item(item, db)
+        if inv_item:
+            current_qty = int(inv_item.get("quantity") or 0)
+            unit_price = float(inv_item.get("unit_price") or 0.0)
+            new_qty = max(0, current_qty - qty)
+            new_total_val = round(new_qty * unit_price, 2)
+
+            await db.inventory.update_one(
+                {"id": inv_item["id"]},
+                {
+                    "$set": {
+                        "quantity": new_qty,
+                        "total_value": new_total_val,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }
+                }
+            )
+
+            adjustments.append({
+                "inventory_id": inv_item["id"],
+                "product_id": inv_item.get("product_id") or item.get("product_id"),
+                "product_name": inv_item.get("product_name") or item.get("product_name"),
+                "sku": inv_item.get("sku") or item.get("sku"),
+                "quantity_deducted": qty,
+                "previous_quantity": current_qty,
+                "new_quantity": new_qty
+            })
+
+            logger.info(
+                f"[INVENTORY DEDUCT] PO {po_doc.get('po_number')}: Subtracted {qty} of "
+                f"'{inv_item.get('product_name')}' (SKU: {inv_item.get('sku')}). "
+                f"Qty: {current_qty} -> {new_qty}"
+            )
+
+    return adjustments
+
+async def restore_inventory_for_po(po_doc: dict, db, current_user: Optional[dict] = None) -> List[dict]:
+    """
+    Restores line item quantities back to the inventory collection when a PO is cancelled or deleted.
+    Returns list of restoration records.
+    """
+    adjustments = po_doc.get("inventory_adjustments", [])
+    restorations = []
+
+    if adjustments:
+        for adj in adjustments:
+            inv_id = adj.get("inventory_id")
+            try:
+                qty = int(adj.get("quantity_deducted") or 0)
+            except (ValueError, TypeError):
+                qty = 0
+
+            if not inv_id or qty <= 0:
+                continue
+
+            inv_item = await db.inventory.find_one({"id": inv_id}, {"_id": 0})
+            if inv_item:
+                current_qty = int(inv_item.get("quantity") or 0)
+                unit_price = float(inv_item.get("unit_price") or 0.0)
+                new_qty = current_qty + qty
+                new_total_val = round(new_qty * unit_price, 2)
+
+                await db.inventory.update_one(
+                    {"id": inv_id},
+                    {
+                        "$set": {
+                            "quantity": new_qty,
+                            "total_value": new_total_val,
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        }
+                    }
+                )
+
+                restorations.append({
+                    "inventory_id": inv_id,
+                    "product_name": inv_item.get("product_name"),
+                    "sku": inv_item.get("sku"),
+                    "quantity_restored": qty,
+                    "previous_quantity": current_qty,
+                    "new_quantity": new_qty
+                })
+
+                logger.info(
+                    f"[INVENTORY RESTORE] PO {po_doc.get('po_number')}: Restored {qty} of "
+                    f"'{inv_item.get('product_name')}'. Qty: {current_qty} -> {new_qty}"
+                )
+    else:
+        # Fallback to line_items if inventory_adjustments wasn't recorded
+        for item in po_doc.get("line_items", []):
+            try:
+                qty = int(item.get("quantity") or 0)
+            except (ValueError, TypeError):
+                qty = 0
+
+            if qty <= 0:
+                continue
+
+            inv_item = await find_inventory_item_for_line_item(item, db)
+            if inv_item:
+                current_qty = int(inv_item.get("quantity") or 0)
+                unit_price = float(inv_item.get("unit_price") or 0.0)
+                new_qty = current_qty + qty
+                new_total_val = round(new_qty * unit_price, 2)
+
+                await db.inventory.update_one(
+                    {"id": inv_item["id"]},
+                    {
+                        "$set": {
+                            "quantity": new_qty,
+                            "total_value": new_total_val,
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        }
+                    }
+                )
+
+                restorations.append({
+                    "inventory_id": inv_item["id"],
+                    "product_name": inv_item.get("product_name"),
+                    "sku": inv_item.get("sku"),
+                    "quantity_restored": qty,
+                    "previous_quantity": current_qty,
+                    "new_quantity": new_qty
+                })
+
+                logger.info(
+                    f"[INVENTORY RESTORE] PO {po_doc.get('po_number')}: Restored {qty} of "
+                    f"'{inv_item.get('product_name')}'. Qty: {current_qty} -> {new_qty}"
+                )
+
+    return restorations
 
 async def trigger_po_sync_webhook():
     """Trigger the PO sync webhook to update external panel"""
@@ -1356,8 +1541,17 @@ async def create_purchase_order(po: POCreate, current_user: dict = Depends(get_c
         **totals
     }
     
+    # Automatically subtract from inventory for products in this PO
+    adjustments = await deduct_inventory_for_po(po_doc, db, current_user)
+    po_doc["inventory_deducted"] = True
+    po_doc["inventory_adjustments"] = adjustments
+
     await db.purchase_orders.insert_one(po_doc)
-    await create_audit_log("CREATE_PO", "purchase_order", po_doc["id"], current_user, {"po_number": po_doc["po_number"], "status": initial_status})
+    await create_audit_log("CREATE_PO", "purchase_order", po_doc["id"], current_user, {
+        "po_number": po_doc["po_number"], 
+        "status": initial_status,
+        "inventory_subtracted": len(adjustments) > 0
+    })
     
     # Trigger webhook to sync PO data to external panel
     asyncio.create_task(trigger_po_sync_webhook())
@@ -1905,6 +2099,26 @@ async def update_purchase_order(po_id: str, po_update: POUpdate, current_user: d
         elif "[Edited by OLL" not in existing_notes:
             update_data["notes"] = existing_notes + " [Edited by OLL - Requires reconfirmation]"
     
+    # Handle inventory adjustments upon status cancellation, re-raise, or line item edit
+    if update_data.get("status") == "cancelled" and existing.get("status") != "cancelled":
+        if existing.get("inventory_deducted", False):
+            await restore_inventory_for_po(existing, db, current_user)
+            update_data["inventory_deducted"] = False
+            update_data["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+            update_data["cancelled_by"] = current_user["user_id"]
+    elif existing.get("status") == "cancelled" and update_data.get("status") in ["sent", "draft", "confirmed"]:
+        if not existing.get("inventory_deducted", False):
+            po_for_deduct = {**existing, **update_data}
+            new_adjustments = await deduct_inventory_for_po(po_for_deduct, db, current_user)
+            update_data["inventory_deducted"] = True
+            update_data["inventory_adjustments"] = new_adjustments
+    elif "line_items" in update_data and existing.get("inventory_deducted", False) and update_data.get("status", existing.get("status")) != "cancelled":
+        await restore_inventory_for_po(existing, db, current_user)
+        po_with_new_items = {**existing, "line_items": [item.model_dump() if hasattr(item, "model_dump") else item for item in line_items]}
+        new_adjustments = await deduct_inventory_for_po(po_with_new_items, db, current_user)
+        update_data["inventory_adjustments"] = new_adjustments
+        update_data["inventory_deducted"] = True
+
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     await db.purchase_orders.update_one({"id": po_id}, {"$set": update_data})
@@ -1936,6 +2150,10 @@ async def delete_purchase_order(po_id: str, force: bool = False, current_user: d
     po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Restore inventory if deducted
+    if po.get("inventory_deducted", False):
+        await restore_inventory_for_po(po, db, current_user)
     
     # TEMPORARY: Allow force delete for any status (for cleaning test data)
     if force:
@@ -2047,6 +2265,66 @@ async def reject_po(po_id: str, reason: Optional[str] = None, current_user: dict
     asyncio.create_task(trigger_po_sync_webhook())
     
     return {"message": "PO rejected"}
+
+@api_router.post("/purchase-orders/{po_id}/cancel")
+async def cancel_purchase_order(
+    po_id: str,
+    body: Optional[POCancelRequest] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Cancel a purchase order and automatically return any deducted products back to inventory.
+    """
+    po = await db.purchase_orders.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Role permissions: OLL can cancel any PO, distributor can cancel their own, vendor can cancel their own sent PO
+    if current_user.get("role") == "distributor" and po.get("distributor_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.get("role") == "vendor" and current_user.get("vendor_id") != po.get("vendor_id"):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if po.get("status") == "cancelled":
+        raise HTTPException(status_code=400, detail="Purchase order is already cancelled")
+    
+    if po.get("status") in ["delivered", "closed"]:
+        raise HTTPException(status_code=400, detail="Cannot cancel a delivered or closed purchase order")
+    
+    # Restore inventory if deducted
+    restored = []
+    if po.get("inventory_deducted", False):
+        restored = await restore_inventory_for_po(po, db, current_user)
+    
+    reason = body.reason if body else None
+    await db.purchase_orders.update_one(
+        {"id": po_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancellation_reason": reason,
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+            "cancelled_by": current_user["user_id"],
+            "inventory_deducted": False,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await create_audit_log(
+        "CANCEL_PO",
+        "purchase_order",
+        po_id,
+        current_user,
+        {"reason": reason, "items_restored": len(restored)}
+    )
+    
+    # Trigger webhook to sync PO data
+    asyncio.create_task(trigger_po_sync_webhook())
+    
+    return {
+        "message": f"Purchase order {po.get('po_number')} cancelled successfully",
+        "inventory_restored": len(restored) > 0,
+        "items_restored": restored
+    }
 
 @api_router.post("/purchase-orders/{po_id}/deliver")
 async def confirm_delivery(po_id: str, confirmation: DeliveryConfirmation, current_user: dict = Depends(get_current_user)):
@@ -3068,16 +3346,27 @@ async def approve_po_request(po_id: str, current_user: dict = Depends(get_curren
     if not po.get("vendor_id"):
         raise HTTPException(status_code=400, detail="Please assign a vendor before approving")
     
+    # Deduct inventory for products if not already deducted
+    adjustments = []
+    if not po.get("inventory_deducted", False):
+        adjustments = await deduct_inventory_for_po(po, db, current_user)
+
     # Update status to sent
     await db.purchase_orders.update_one(
         {"id": po_id},
         {"$set": {
             "status": "sent",
+            "inventory_deducted": True,
+            "inventory_adjustments": adjustments if adjustments else po.get("inventory_adjustments", []),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
     
-    await create_audit_log("APPROVE_PO_REQUEST", "purchase_order", po_id, current_user, {"from": "request", "to": "sent"})
+    await create_audit_log("APPROVE_PO_REQUEST", "purchase_order", po_id, current_user, {
+        "from": "request", 
+        "to": "sent",
+        "inventory_subtracted": len(adjustments) > 0
+    })
     
     # Notify vendor that the PO has been approved and sent
     vendor = await db.vendors.find_one({"id": po["vendor_id"]}, {"_id": 0})
@@ -5881,6 +6170,11 @@ async def integration_raise_po(
         }
     }
     
+    # Automatically subtract from inventory for products in this PO
+    adjustments = await deduct_inventory_for_po(po_doc, db, None)
+    po_doc["inventory_deducted"] = True
+    po_doc["inventory_adjustments"] = adjustments
+
     await db.purchase_orders.insert_one(po_doc)
     
     # Create audit log

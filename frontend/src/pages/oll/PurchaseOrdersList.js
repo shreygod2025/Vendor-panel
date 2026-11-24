@@ -57,18 +57,22 @@ const PurchaseOrdersList = () => {
     raised: true,
     confirmed: true,
     changes: true,
+    cancelled: true,
     pending_approval: true,
     dispatched: true
   });
   
-  // Approval dialog state
+  // Approval and cancel dialog state
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
   const [approving, setApproving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [approvalConfirmed, setApprovalConfirmed] = useState(false);
   const [selectedPOInvoice, setSelectedPOInvoice] = useState(null);
 
@@ -311,7 +315,8 @@ const PurchaseOrdersList = () => {
       pending_approval: "bg-purple-100 text-purple-700",
       delivered: "status-delivered",
       closed: "status-closed",
-      rejected: "status-rejected"
+      rejected: "status-rejected",
+      cancelled: "bg-red-100 text-red-700"
     };
     return colors[status] || "status-draft";
   };
@@ -367,6 +372,7 @@ const PurchaseOrdersList = () => {
     raised: filteredOrders.filter(o => o.status === "draft" || o.status === "sent"),
     confirmed: filteredOrders.filter(o => o.status === "confirmed"),
     changes: filteredOrders.filter(o => o.status === "rejected"),
+    cancelled: filteredOrders.filter(o => o.status === "cancelled"),
     // Dispatched section (includes pending_approval)
     dispatched: filteredOrders.filter(o => o.status === "dispatched"),
     pending_approval: filteredOrders.filter(o => o.status === "pending_approval"),
@@ -434,6 +440,27 @@ const PurchaseOrdersList = () => {
       toast.error(error.response?.data?.detail || "Failed to delete PO");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleCancelPO = async () => {
+    if (!selectedPO) return;
+    setCancelling(true);
+    try {
+      const response = await apiClient.post(`/purchase-orders/${selectedPO.id}/cancel`, {
+        reason: cancelReason || undefined
+      });
+      toast.success(response.data.inventory_restored 
+        ? "PO cancelled and products returned to inventory successfully" 
+        : "PO cancelled successfully");
+      setCancelDialogOpen(false);
+      setSelectedPO(null);
+      setCancelReason("");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to cancel PO");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -560,8 +587,9 @@ const PurchaseOrdersList = () => {
 
   const renderOrderRow = (order, showActions = false, showApprovalActions = false) => {
     const canEdit = order.status === "request" || order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
-    const canDelete = order.status === "request" || order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected";
-    const canReRaise = order.status === "rejected";
+    const canDelete = order.status === "request" || order.status === "draft" || order.status === "sent" || order.status === "confirmed" || order.status === "rejected" || order.status === "cancelled";
+    const canReRaise = order.status === "rejected" || order.status === "cancelled";
+    const canCancel = order.status !== "cancelled" && order.status !== "delivered" && order.status !== "closed";
     
     return (
       <TableRow key={order.id} data-testid={`po-row-${order.id}`}>
@@ -576,6 +604,11 @@ const PurchaseOrdersList = () => {
             {order.status === "rejected" && order.rejection_reason && (
               <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded mt-1 max-w-[250px] truncate" title={order.rejection_reason}>
                 Rejected: {order.rejection_reason}
+              </span>
+            )}
+            {order.status === "cancelled" && (
+              <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded mt-1 max-w-[250px] truncate" title={order.cancellation_reason || "Cancelled"}>
+                Cancelled{order.cancellation_reason ? `: ${order.cancellation_reason}` : ""}
               </span>
             )}
           </div>
@@ -613,6 +646,21 @@ const PurchaseOrdersList = () => {
                   <Edit className="w-4 h-4" />
                 </Button>
               </Link>
+            )}
+            {canCancel && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedPO(order);
+                  setCancelDialogOpen(true);
+                }}
+                className="text-red-500 hover:bg-red-50"
+                title="Cancel PO"
+                data-testid={`cancel-po-${order.id}`}
+              >
+                <XCircle className="w-4 h-4" />
+              </Button>
             )}
             {canDelete && (
               <Button
@@ -1015,7 +1063,7 @@ const PurchaseOrdersList = () => {
                 <div className="flex flex-col items-center gap-1">
                   <Clock className="w-4 h-4" />
                   <span>PO Confirmation</span>
-                  <span className="text-xs opacity-70">({categorizedOrders.raised.length + categorizedOrders.confirmed.length + categorizedOrders.changes.length})</span>
+                  <span className="text-xs opacity-70">({categorizedOrders.raised.length + categorizedOrders.confirmed.length + categorizedOrders.changes.length + categorizedOrders.cancelled.length})</span>
                 </div>
               </TabsTrigger>
               <TabsTrigger value="dispatched" className="py-3 data-[state=active]:bg-amber-600 data-[state=active]:text-white">
@@ -1159,6 +1207,13 @@ const PurchaseOrdersList = () => {
                 "changes",
                 <Circle className="w-4 h-4 text-red-600" />,
                 "bg-red-100"
+              )}
+              {renderSubSection(
+                "Cancelled",
+                categorizedOrders.cancelled,
+                "cancelled",
+                <XCircle className="w-4 h-4 text-slate-600" />,
+                "bg-slate-100"
               )}
             </TabsContent>
 
@@ -1562,6 +1617,45 @@ const PurchaseOrdersList = () => {
             >
               {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel PO Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="w-5 h-5" />
+              Cancel Purchase Order
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel PO {selectedPO?.po_number}? Any products deducted from inventory will automatically be restored back to inventory.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3 space-y-3">
+            <Label htmlFor="cancel-reason">Cancellation Reason (Optional)</Label>
+            <Input
+              id="cancel-reason"
+              placeholder="e.g., Client requested cancellation, duplicate order..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <strong>Inventory Note:</strong> Quantities of all inventory products in this purchase order will be automatically added back to inventory.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>Back</Button>
+            <Button 
+              onClick={handleCancelPO} 
+              disabled={cancelling}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="confirm-cancel-po-btn"
+            >
+              {cancelling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
+              Confirm Cancel PO
             </Button>
           </DialogFooter>
         </DialogContent>

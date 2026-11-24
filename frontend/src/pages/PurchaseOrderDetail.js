@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "../components/ui/dialog";
 import { Checkbox } from "../components/ui/checkbox";
@@ -44,7 +45,8 @@ import {
   AlertTriangle,
   FileText,
   Download,
-  Image
+  Image,
+  XCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -71,6 +73,10 @@ const PurchaseOrderDetail = () => {
     priority: "medium",
     description: ""
   });
+
+  // Cancel PO Dialog State
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   useEffect(() => {
     fetchOrder();
@@ -261,6 +267,25 @@ const PurchaseOrderDetail = () => {
     }
   };
 
+  const handleCancelPO = async () => {
+    setActionLoading(true);
+    try {
+      const response = await apiClient.post(`/purchase-orders/${id}/cancel`, {
+        reason: cancelReason || undefined
+      });
+      toast.success(response.data.inventory_restored 
+        ? "PO cancelled and products returned to inventory successfully" 
+        : "PO cancelled successfully");
+      setCancelDialogOpen(false);
+      setCancelReason("");
+      fetchOrder();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to cancel PO");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -286,7 +311,8 @@ const PurchaseOrderDetail = () => {
       dispatched: "bg-amber-100 text-amber-700 border-amber-200",
       delivered: "bg-emerald-100 text-emerald-700 border-emerald-200",
       closed: "bg-slate-100 text-slate-500 border-slate-200",
-      rejected: "bg-red-100 text-red-700 border-red-200"
+      rejected: "bg-red-100 text-red-700 border-red-200",
+      cancelled: "bg-red-100 text-red-700 border-red-200"
     };
     return colors[status] || "bg-slate-100 text-slate-600";
   };
@@ -390,6 +416,20 @@ const PurchaseOrderDetail = () => {
                   Edit PO
                 </Button>
               </Link>
+            )}
+
+            {/* Cancel PO button */}
+            {(isOLL || isDistributor) && order.status !== "cancelled" && order.status !== "delivered" && order.status !== "closed" && (
+              <Button
+                variant="outline"
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => setCancelDialogOpen(true)}
+                disabled={actionLoading}
+                data-testid="cancel-po-btn"
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                Cancel PO
+              </Button>
             )}
 
             {/* Approve & Send for request status */}
@@ -1019,6 +1059,45 @@ const PurchaseOrderDetail = () => {
             >
               {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Raise Issue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel PO Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="w-5 h-5" />
+              Cancel Purchase Order
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel PO {order?.po_number}? Any products deducted from inventory will automatically be restored back to inventory.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3 space-y-3">
+            <Label htmlFor="detail-cancel-reason">Cancellation Reason (Optional)</Label>
+            <Input
+              id="detail-cancel-reason"
+              placeholder="e.g., Client requested cancellation, duplicate order..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <strong>Inventory Note:</strong> Quantities of all inventory products in this purchase order will be automatically added back to inventory.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>Back</Button>
+            <Button 
+              onClick={handleCancelPO} 
+              disabled={actionLoading}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="confirm-cancel-po-btn"
+            >
+              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
+              Confirm Cancel PO
             </Button>
           </DialogFooter>
         </DialogContent>

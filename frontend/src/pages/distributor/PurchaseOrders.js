@@ -24,7 +24,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "../../components/ui/accordion";
-import { Plus, Search, Eye, Package, Truck, CheckCircle, Clock } from "lucide-react";
+import { Plus, Search, Eye, Package, Truck, CheckCircle, Clock, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const DistributorPurchaseOrders = () => {
@@ -62,6 +62,7 @@ const DistributorPurchaseOrders = () => {
   const confirmedPOs = filteredPOs.filter(po => ["confirmed"].includes(po.status));
   const dispatchedPOs = filteredPOs.filter(po => ["dispatched", "pending_approval"].includes(po.status));
   const deliveredPOs = filteredPOs.filter(po => ["delivered", "closed"].includes(po.status));
+  const cancelledPOs = filteredPOs.filter(po => ["cancelled"].includes(po.status));
 
   const getStatusBadge = (status) => {
     const styles = {
@@ -71,6 +72,7 @@ const DistributorPurchaseOrders = () => {
       pending_approval: "bg-orange-100 text-orange-700",
       delivered: "bg-green-100 text-green-700",
       closed: "bg-slate-100 text-slate-700",
+      cancelled: "bg-red-100 text-red-700",
     };
     return styles[status] || "bg-slate-100 text-slate-600";
   };
@@ -180,6 +182,7 @@ const DistributorPurchaseOrders = () => {
               <SelectItem value="confirmed">Confirmed</SelectItem>
               <SelectItem value="dispatched">Dispatched</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -245,6 +248,22 @@ const DistributorPurchaseOrders = () => {
                 <POTable data={deliveredPOs} showTracking />
               </AccordionContent>
             </AccordionItem>
+
+            {/* Cancelled */}
+            {cancelledPOs.length > 0 && (
+              <AccordionItem value="cancelled" className="border rounded-lg bg-white">
+                <AccordionTrigger className="px-4 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <XCircle className="w-5 h-5 text-red-600" />
+                    <span className="font-semibold">Cancelled</span>
+                    <span className="badge bg-red-100 text-red-700">{cancelledPOs.length}</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <POTable data={cancelledPOs} />
+                </AccordionContent>
+              </AccordionItem>
+            )}
           </Accordion>
         )}
       </div>
